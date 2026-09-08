@@ -30,7 +30,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
 - Primary / all-monitors rendering, kiosk mode, configurable FPS (1–240)
-- Settings window (`--settings`), preview mode (`--preview --shader <id>`), headless thumbnail capture (`--thumbnail`)
+- Settings window by default (argless or `--settings`); screensaver via `--open` (fullscreen) or `--preview --shader <id>` (windowed); headless thumbnail capture (`--thumbnail`)
 - Config at `~/.config/scrnsvr/config.json` (or `$XDG_CONFIG_HOME/scrnsvr/config.json`), Zod-validated with atomic writes
 - Linux packaging: AppImage + deb via electron-builder, ships a systemd user unit (`scrnsvr.service`)
 
@@ -46,11 +46,13 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 npm install
 npm run build
 
+# Open settings (default, no flags needed)
+npm run settings
+
+# Run the screensaver fullscreen
+npx electron dist/main/index.js --open
 # Preview a shader in a window
 npm start -- --preview --shader gradient-blobs
-
-# Open settings
-npm run settings
 
 # Run the idle daemon in the foreground
 npm run daemon
@@ -60,7 +62,7 @@ npm run typecheck
 npm test
 ```
 
-CLI flags (`src/main/cli.ts`): `--settings|-s`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
 
 ## Config
 

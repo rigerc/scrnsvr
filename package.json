@@ -10,7 +10,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "start": "npm run build && electron dist/main/index.js --preview",
+    "start": "npm run build && electron dist/main/index.js",
+    "open": "npm run build && electron dist/main/index.js --open",
     "settings": "npm run build && electron dist/main/index.js --settings",
     "daemon": "npm run build && electron dist/main/index.js --daemon",
     "typecheck": "node scripts/generate-shader-registry.mjs && tsc -p tsconfig.json --noEmit",

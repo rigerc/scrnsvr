@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
-import { parseArgs } from './cli';
+import { parseArgs, resolveMode } from './cli';
 import { attachPowerResume, IdleDaemon, type RendererChild } from './daemon';
 import { ConfigSchema, loadConfig, saveConfig, type Config } from '../shared/config';
 import { IPC } from '../shared/ipc';
@@ -96,13 +96,13 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   registerIpc();
-  if (options.thumbnail) {
+  const mode = resolveMode(options);
+  if (mode === 'thumbnail') {
     await captureThumbnails(path.resolve(options.output ?? 'assets/thumbnails'), options.frames);
     app.quit();
     return;
   }
-  if (options.settings) { await createSettingsWindow(); return; }
-  if (options.daemon) {
+  if (mode === 'daemon') {
     const config = await loadConfig();
     const daemon = new IdleDaemon({ thresholdSeconds: config.global.idleThresholdSeconds, launchRenderer: launchWindowGroup });
     attachPowerResume(daemon);
@@ -110,7 +110,11 @@ app.whenReady().then(async () => {
     app.once('before-quit', () => daemon.stop());
     return;
   }
-  await createRendererWindows(options.shader, options.preview);
+  if (mode === 'screensaver') {
+    await createRendererWindows(options.shader, options.preview);
+    return;
+  }
+  await createSettingsWindow();
 }).catch((error) => {
   console.error('scrnsvr failed to start', error);
   app.exit(1);
