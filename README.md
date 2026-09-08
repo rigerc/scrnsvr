@@ -2,6 +2,26 @@
 
 A shader-based idle screensaver for Linux desktops. Electron + WebGL (OGL) renderers launch fullscreen after a configurable idle timeout, with a settings UI, clock overlay, and systemd user service.
 
+## Gallery
+
+Click a screenshot to watch the 5-second animated preview (H.264 MP4, ~640px).
+
+| | | |
+|---|---|---|
+| [![Aurora Veil](assets/screenshots/aurora-veil.png)](assets/videos/aurora-veil.mp4) | [![Flow Field](assets/screenshots/flow-field.png)](assets/videos/flow-field.mp4) | [![Gradient Blobs](assets/screenshots/gradient-blobs.png)](assets/videos/gradient-blobs.mp4) |
+| **Aurora Veil** · [video](assets/videos/aurora-veil.mp4) | **Flow Field** · [video](assets/videos/flow-field.mp4) | **Gradient Blobs** · [video](assets/videos/gradient-blobs.mp4) |
+| [![Gradient Drift](assets/screenshots/gradient-drift.png)](assets/videos/gradient-drift.mp4) | [![Orbital Interference](assets/screenshots/interference.png)](assets/videos/interference.mp4) | [![Mesh Gradient](assets/screenshots/mesh-gradient.png)](assets/videos/mesh-gradient.mp4) |
+| **Gradient Drift** · [video](assets/videos/gradient-drift.mp4) | **Orbital Interference** · [video](assets/videos/interference.mp4) | **Mesh Gradient** · [video](assets/videos/mesh-gradient.mp4) |
+| [![Chromatic Plasma](assets/screenshots/plasma.png)](assets/videos/plasma.mp4) | | |
+| **Chromatic Plasma** · [video](assets/videos/plasma.mp4) | | |
+
+Media is captured headlessly at 1280×720 (stills) / 640px 12 fps (video) via `scripts/capture-frames.cjs` + ffmpeg:
+
+```sh
+npx electron scripts/capture-frames.cjs --shader plasma --out /tmp/frames-plasma --frames 61 --fps 12 --width 1280 --height 720
+ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:v libx264 -pix_fmt yuv420p -crf 23 -movflags +faststart assets/videos/plasma.mp4
+```
+
 ## Features
 
 - 7 GLSL shaders: `aurora-veil`, `flow-field`, `gradient-blobs`, `gradient-drift`, `interference`, `mesh-gradient`, `plasma`
