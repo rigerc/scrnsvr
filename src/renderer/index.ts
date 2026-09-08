@@ -2,6 +2,7 @@ import { shaderRegistry } from './shaders';
 import { mountShader } from './core/runtime';
 import type { Config } from '../shared/config';
 import { defaultClockConfig } from '../shared/clock';
+import { resolveRotationValues } from '../shared/rotation';
 import { mountClock } from './core/clock';
 import { mountFadeOverlay } from './core/fade';
 
@@ -12,7 +13,10 @@ void (async () => {
   const chosen = shaderRegistry[requested] ?? shaderRegistry['flow-field'] ?? Object.values(shaderRegistry)[0];
   if (!chosen) throw new Error('No shaders are registered');
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-  mountShader(canvas, chosen, config.shaders[chosen.manifest.id] ?? {}, config.global.fps);
+  const values = params.get('preset')
+    ? resolveRotationValues(config.shaders, config.presets, chosen.manifest.id, params.get('preset') ?? undefined)
+    : config.shaders[chosen.manifest.id] ?? {};
+  mountShader(canvas, chosen, values, config.global.fps);
   const clock = mountClock(document.body, config.clock ?? defaultClockConfig);
   const fade = params.has('nofade') ? undefined : mountFadeOverlay(document.body, config.global.fadeSeconds ?? 1);
   const teardown = () => { fade?.destroy(); clock.destroy(); };

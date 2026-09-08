@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import { clockFonts, clockPositions, defaultClockConfig } from './clock';
+import { RotationSchema } from './rotation';
 
 const ClockSchema = z.object({
   enabled: z.boolean().default(defaultClockConfig.enabled),
@@ -33,6 +34,7 @@ const ConfigObjectSchema = z.object({
   settings: z.boolean().default(false),
   global: GlobalSchema,
   clock: ClockSchema,
+  rotation: RotationSchema,
   shaders: z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()]))).default({}),
   presets: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()])))).default({})
 });

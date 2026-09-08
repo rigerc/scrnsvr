@@ -46,7 +46,19 @@ html,body{margin:0;min-height:100%;background:#080c14}
 .live-badge{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;color:#8ee7c4}
 .live-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#66dbac}
 .preview-description{margin:0;padding:14px 18px;color:#aabbd3;font-size:13px}
-.scrnsvr-settings .gallery-heading{font-size:15px;margin:24px 0 12px}
+.scrnsvr-settings .gallery-heading{font-size:15px;margin:24px 0 8px}
+.rotation-hint{margin:0 0 12px;color:#8ea6cc;font-size:13px}
+.rotation-hint strong{color:#eef4ff}
+.shader-card .rotate-toggle{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12px;color:#8ea6cc;cursor:pointer}
+.shader-card .rotate-toggle input{margin:0;accent-color:#5ac8fa}
+.rotation{border:1px solid #243954;border-radius:14px;padding:18px;background:#0d1726cc}
+.rotation .clock-toggle{margin:0 0 12px}
+.rotation-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rotation-list li{display:flex;align-items:center;gap:10px}
+.rotation-list span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rotation-list select{min-width:0;flex:1;padding:7px;border:1px solid #38557c;border-radius:6px;background:#0a1220;color:#eef4ff}
+.rotation-list button{padding:7px 10px;font-size:12px}
+.rotation-empty{margin:12px 0 0;color:#8ea6cc;font-size:12px}
 .controls,aside{border:1px solid #243954;border-radius:14px;padding:22px;background:#0d1726cc}
 .control{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:center;gap:16px;margin:18px 0;color:#aabbd3;text-transform:capitalize}
 .control input,.control select{width:100%;accent-color:#5ac8fa}

@@ -17,6 +17,12 @@ describe('config', () => {
     expect(parsed.global).toMatchObject({ fps: 24, monitors: 'all' });
   });
 
+  it('defaults rotation to disabled with no entries', () => {
+    expect(ConfigSchema.parse({}).rotation).toEqual({ enabled: false, entries: [] });
+    expect(ConfigSchema.parse({ rotation: { enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }] } }).rotation)
+      .toEqual({ enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }] });
+  });
+
   it('defaults fade duration and accepts updates', () => {
     expect(ConfigSchema.parse({}).global.fadeSeconds).toBe(1);
     expect(ConfigSchema.parse({ global: { fadeSeconds: 2.5 } }).global.fadeSeconds).toBe(2.5);

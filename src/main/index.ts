@@ -5,6 +5,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import { parseArgs, resolveMode } from './cli';
 import { attachPowerResume, IdleDaemon, type RendererChild } from './daemon';
 import { ConfigSchema, loadConfig, saveConfig, type Config } from '../shared/config';
+import { pickRotationEntry } from '../shared/rotation';
 import { IPC } from '../shared/ipc';
 import { loadNoctaliaColors } from './noctalia';
 import { shaderIds, shaderRegistry } from '../renderer/shaders';
@@ -25,7 +26,7 @@ function webPreferences(): Electron.WebPreferences {
   return { preload, contextIsolation: true, nodeIntegration: false, sandbox: true };
 }
 
-async function createRendererWindow(config: Config, bounds: Electron.Rectangle, shaderId: string, preview: boolean): Promise<BrowserWindow> {
+async function createRendererWindow(config: Config, bounds: Electron.Rectangle, shaderId: string, preview: boolean, preset?: string): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     x: bounds.x, y: bounds.y,
     width: preview ? 960 : bounds.width,
@@ -39,15 +40,23 @@ async function createRendererWindow(config: Config, bounds: Electron.Rectangle, 
     webPreferences: webPreferences(),
   });
   window.once('ready-to-show', () => { if (!window.isDestroyed()) window.show(); });
-  await window.loadFile(rendererHtml, { query: { shader: shaderId } });
+  const query: Record<string, string> = { shader: shaderId };
+  if (preset) query.preset = preset;
+  await window.loadFile(rendererHtml, { query });
   return window;
 }
 
 async function createRendererWindows(shaderOverride?: string, preview = false): Promise<BrowserWindow[]> {
   const config = await loadConfig();
-  const shaderId = shaderOverride && shaderRegistry[shaderOverride] ? shaderOverride : config.shader;
+  // `--shader` wins; otherwise a random enabled rotation entry wins; else the saved shader.
+  let shaderId = shaderOverride && shaderRegistry[shaderOverride] ? shaderOverride : config.shader;
+  let preset: string | undefined;
+  if (!shaderOverride && !preview) {
+    const pick = pickRotationEntry(config.rotation, config.shaders, config.presets, shaderIds);
+    if (pick) { shaderId = pick.shaderId; preset = pick.preset; }
+  }
   const displays = preview || config.global.monitors === 'primary' ? [screen.getPrimaryDisplay()] : screen.getAllDisplays();
-  return Promise.all(displays.map((display) => createRendererWindow(config, display.bounds, shaderId, preview)));
+  return Promise.all(displays.map((display) => createRendererWindow(config, display.bounds, shaderId, preview, preset)));
 }
 
 async function createSettingsWindow(): Promise<BrowserWindow> {
