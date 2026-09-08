@@ -1,6 +1,6 @@
 {
   "name": "scrnsvr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A shader-based idle screensaver for Linux desktops.",
   "homepage": "https://github.com/rigerc/scrnsvr",
   "author": { "name": "rigerc", "email": "bond@bsgb.nl" },
