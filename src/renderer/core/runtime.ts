@@ -24,7 +24,9 @@ export function mountShader(
   const initial = canvas.getBoundingClientRect();
   const initialWidth = Math.max(1, Math.round(initial.width) || canvas.width);
   const initialHeight = Math.max(1, Math.round(initial.height) || canvas.height);
+  const inlineSize = { width: canvas.style.width, height: canvas.style.height };
   const renderer = new Renderer({ canvas, width: initialWidth, height: initialHeight, dpr: Math.min(devicePixelRatio, 2), alpha: false });
+  Object.assign(canvas.style, inlineSize);
   const gl = renderer.gl;
   const resolved = bindUniforms(shader.manifest.uniforms, values);
   const uniforms: Record<string, { value: unknown }> = {
@@ -39,12 +41,16 @@ export function mountShader(
     fragment: shader.source,
     uniforms,
   });
-  const mesh = new Mesh(gl, { geometry: new Triangle(gl), program });
+  const geometry = new Triangle(gl);
+  const mesh = new Mesh(gl, { geometry, program });
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
     renderer.setSize(width, height);
-    uniforms.uResolution.value = [width, height];
+    // OGL sets inline CSS dimensions; let the host layout keep sizing the canvas.
+    Object.assign(canvas.style, inlineSize);
+    uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+    renderer.render({ scene: mesh });
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -57,5 +63,10 @@ export function mountShader(
     }
     renderer.render({ scene: mesh });
   }, fps);
-  return () => { stopLoop(); observer.disconnect(); };
+  return () => {
+    stopLoop();
+    observer.disconnect();
+    geometry.remove();
+    program.remove();
+  };
 }

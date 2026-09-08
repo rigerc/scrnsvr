@@ -2,6 +2,23 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { clockFonts, clockPositions, defaultClockConfig } from './clock';
+
+const ClockSchema = z.object({
+  enabled: z.boolean().default(defaultClockConfig.enabled),
+  position: z.enum(clockPositions).default(defaultClockConfig.position),
+  font: z.enum(clockFonts).default(defaultClockConfig.font),
+  customFont: z.string().max(100).default(defaultClockConfig.customFont),
+  size: z.number().min(2).max(30).default(defaultClockConfig.size),
+  weight: z.number().int().min(100).max(900).default(defaultClockConfig.weight),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i).default(defaultClockConfig.color),
+  opacity: z.number().min(0.1).max(1).default(defaultClockConfig.opacity),
+  margin: z.number().min(0).max(20).default(defaultClockConfig.margin),
+  format: z.enum(['24h', '12h']).default(defaultClockConfig.format),
+  showSeconds: z.boolean().default(defaultClockConfig.showSeconds),
+  showDate: z.boolean().default(defaultClockConfig.showDate),
+  shadow: z.boolean().default(defaultClockConfig.shadow),
+}).default({});
 
 const GlobalSchema = z.object({
   idleThresholdSeconds: z.number().min(0).default(300),
@@ -14,6 +31,7 @@ const ConfigObjectSchema = z.object({
   monitor: z.enum(['all','primary']).default('primary'), kiosk: z.boolean().default(true),
   settings: z.boolean().default(false),
   global: GlobalSchema,
+  clock: ClockSchema,
   shaders: z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()]))).default({}),
   presets: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()])))).default({})
 });

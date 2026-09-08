@@ -1,6 +1,8 @@
 import { shaderRegistry } from './shaders';
 import { mountShader } from './core/runtime';
 import type { Config } from '../shared/config';
+import { defaultClockConfig } from '../shared/clock';
+import { mountClock } from './core/clock';
 
 void (async () => {
   const config = await window.scrnsvr.getConfig() as Config;
@@ -9,6 +11,8 @@ void (async () => {
   if (!chosen) throw new Error('No shaders are registered');
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
   mountShader(canvas, chosen, config.shaders[chosen.manifest.id] ?? {}, config.global.fps);
+  const clock = mountClock(document.body, config.clock ?? defaultClockConfig);
+  addEventListener('pagehide', () => clock.destroy(), { once: true });
 
   let origin: { x: number; y: number } | undefined;
   const dismiss = () => window.scrnsvr.close();

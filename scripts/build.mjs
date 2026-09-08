@@ -7,5 +7,6 @@ await mkdir('dist', { recursive:true });
 await build({entryPoints:['src/main/index.ts','src/preload/index.ts'],outdir:'dist',bundle:true,platform:'node',format:'cjs',sourcemap:true,external:['electron'],loader:{'.glsl':'text'},logLevel:'info'});
 await build({entryPoints:['src/renderer/index.ts','src/settings/bootstrap.ts'],outdir:'dist',bundle:true,platform:'browser',format:'iife',sourcemap:true,loader:{'.glsl':'text'},logLevel:'info'});
 await cp('src/renderer/index.html','dist/renderer/index.html');
+await cp('src/renderer/clock.css','dist/renderer/clock.css');
 await cp('src/settings/index.html','dist/settings/index.html');
 await cp('src/settings/settings.css','dist/settings/settings.css');

@@ -6,6 +6,7 @@ import { parseArgs } from './cli';
 import { attachPowerResume, IdleDaemon, type RendererChild } from './daemon';
 import { ConfigSchema, loadConfig, saveConfig, type Config } from '../shared/config';
 import { IPC } from '../shared/ipc';
+import { loadNoctaliaColors } from './noctalia';
 import { shaderIds, shaderRegistry } from '../renderer/shaders';
 
 const options = parseArgs(process.argv.slice(1));
@@ -88,6 +89,7 @@ async function launchWindowGroup(): Promise<RendererChild> {
 
 function registerIpc(): void {
   ipcMain.handle(IPC.getConfig, () => loadConfig());
+  ipcMain.handle(IPC.importNoctaliaColors, () => loadNoctaliaColors());
   ipcMain.handle(IPC.setConfig, (_event, candidate: unknown) => saveConfig(ConfigSchema.parse(candidate)));
   ipcMain.on(IPC.close, (event) => BrowserWindow.fromWebContents(event.sender)?.close());
 }

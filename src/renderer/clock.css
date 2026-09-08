@@ -1,0 +1,7 @@
+.clock-stage{position:relative;overflow:hidden}
+.clock-overlay{position:absolute;inset:0;display:grid;pointer-events:none;user-select:none;overflow:hidden;box-sizing:border-box}
+.clock-overlay[hidden],.clock-overlay [hidden]{display:none}
+.clock-content{width:max-content;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.clock-time{display:block;font:inherit;letter-spacing:-.035em}
+.clock-period{font-size:.25em;letter-spacing:.04em;margin-inline-start:.5em}
+.clock-date{font-size:.22em;line-height:1.4;letter-spacing:.06em;margin-top:.65em}
