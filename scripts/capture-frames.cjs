@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
   // Renderer expects window.scrnsvr IPC; supply a minimal stub.
   ipcMain.handle('config:get', async () => ({
     shader, fps: 60, monitor: 'primary', kiosk: false, settings: false,
-    global: { idleThresholdSeconds: 300, fps: 60, monitors: 'primary' },
+    global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 0, monitors: 'primary' },
     clock: { enabled: false },
     shaders: {}, presets: {},
   }));
@@ -43,7 +43,7 @@ app.whenReady().then(async () => {
     show: false, width, height,
     webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  await win.loadFile(rendererHtml, { query: { shader } });
+  await win.loadFile(rendererHtml, { query: { shader, nofade: '1' } });
   await sleep(800); // let first frames settle
   const interval = Math.round(1000 / fps);
   for (let i = 0; i < frames; i += 1) {

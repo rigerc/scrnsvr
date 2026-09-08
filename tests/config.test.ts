@@ -17,6 +17,11 @@ describe('config', () => {
     expect(parsed.global).toMatchObject({ fps: 24, monitors: 'all' });
   });
 
+  it('defaults fade duration and accepts updates', () => {
+    expect(ConfigSchema.parse({}).global.fadeSeconds).toBe(1);
+    expect(ConfigSchema.parse({ global: { fadeSeconds: 2.5 } }).global.fadeSeconds).toBe(2.5);
+  });
+
   it('falls back safely and atomically coalesces writes', async () => {
     temporary = await mkdtemp(path.join(tmpdir(), 'scrnsvr-test-'));
     process.env.XDG_CONFIG_HOME = temporary;

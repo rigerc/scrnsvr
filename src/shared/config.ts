@@ -23,6 +23,7 @@ const ClockSchema = z.object({
 const GlobalSchema = z.object({
   idleThresholdSeconds: z.number().min(0).default(300),
   fps: z.number().int().min(1).max(240).default(60),
+  fadeSeconds: z.number().min(0).max(5).default(1),
   monitors: z.enum(['all', 'primary']).default('primary')
 }).default({});
 const ConfigObjectSchema = z.object({

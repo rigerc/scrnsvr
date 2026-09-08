@@ -34,9 +34,11 @@ async function createRendererWindow(config: Config, bounds: Electron.Rectangle, 
     kiosk: !preview && config.kiosk,
     frame: preview,
     autoHideMenuBar: true,
+    show: false,
     backgroundColor: '#000000',
     webPreferences: webPreferences(),
   });
+  window.once('ready-to-show', () => { if (!window.isDestroyed()) window.show(); });
   await window.loadFile(rendererHtml, { query: { shader: shaderId } });
   return window;
 }
@@ -63,7 +65,7 @@ async function captureThumbnails(output: string, frames: number): Promise<void> 
   await mkdir(output, { recursive: true });
   for (const shaderId of shaderIds) {
     const window = new BrowserWindow({ show: false, width: 640, height: 360, webPreferences: webPreferences() });
-    await window.loadFile(rendererHtml, { query: { shader: shaderId } });
+    await window.loadFile(rendererHtml, { query: { shader: shaderId, nofade: '1' } });
     await new Promise((resolve) => setTimeout(resolve, Math.max(250, frames * 34)));
     let png = (await window.webContents.capturePage()).toPNG();
     if (png.byteLength < 2_048) {
