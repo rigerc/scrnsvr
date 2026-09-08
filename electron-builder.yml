@@ -1,0 +1,28 @@
+appId: com.scrnsvr.desktop
+productName: Scrnsvr
+directories:
+  output: release
+  buildResources: assets
+files:
+  - dist/**
+  - packaging/**
+  - assets/**
+  - package.json
+linux:
+  target: [AppImage, deb]
+  syncDesktopName: true
+  category: Utility
+  maintainer: rigerc <bond@bsgb.nl>
+  icon: assets/icon.svg
+  synopsis: Ambient shader screensaver
+  description: A low-power, shader-based screensaver for Linux desktops.
+  desktop:
+    entry:
+      Name: Scrnsvr
+      Comment: Ambient shader screensaver
+      StartupWMClass: scrnsvr
+extraResources:
+  - from: packaging/systemd/scrnsvr.service
+    to: systemd/scrnsvr.service
+deb:
+  afterInstall: packaging/post-install.sh

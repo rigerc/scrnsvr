@@ -1,0 +1,14 @@
+[Unit]
+Description=Scrnsvr idle screensaver daemon
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/scrnsvr --daemon
+Restart=on-failure
+RestartSec=5
+Environment=ELECTRON_OZONE_PLATFORM_HINT=auto
+
+[Install]
+WantedBy=graphical-session.target

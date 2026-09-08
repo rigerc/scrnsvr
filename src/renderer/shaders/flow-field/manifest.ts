@@ -1,0 +1,2 @@
+import { manifest } from '../../../shared/manifest';
+export const flowFieldManifest=manifest({id:'flow-field',title:'Flow Field',description:'Slow currents of luminous color.',fragment:'shader.glsl',uniforms:[{name:'speed',type:'float',default:0.4,min:0,max:3},{name:'scale',type:'float',default:1,min:.1,max:10},{name:'brightness',type:'float',default:1,min:0,max:2},{name:'trail',type:'bool',default:true},{name:'palette',type:'select',default:'aurora',options:['aurora','mono']},{name:'color',type:'color',default:'#44ccff'}]});

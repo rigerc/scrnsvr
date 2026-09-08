@@ -1,0 +1,5 @@
+# leitfaden:core:start
+[mcp_servers.leitfaden]
+command = "leitfaden-mcp"
+args = ["--endpoint","http://127.0.0.1:4782/mcp"]
+# leitfaden:core:end

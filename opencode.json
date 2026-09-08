@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "leitfaden": {
+      "type": "local",
+      "command": [
+        "leitfaden-mcp",
+        "--endpoint",
+        "http://127.0.0.1:4782/mcp"
+      ],
+      "enabled": true
+    }
+  }
+}

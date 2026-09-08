@@ -1,0 +1,1 @@
+export function startLoop(render:(dt:number)=>void,fps=60){let last=performance.now(), id=0; const interval=1000/Math.max(1,fps); const tick=(now:number)=>{if(now-last>=interval){render(now-last);last=now;} id=requestAnimationFrame(tick)}; id=requestAnimationFrame(tick); return()=>cancelAnimationFrame(id);}

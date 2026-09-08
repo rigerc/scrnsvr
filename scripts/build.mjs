@@ -1,0 +1,11 @@
+import { build } from 'esbuild';
+import { cp, mkdir } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+const generated = spawnSync(process.execPath, ['scripts/generate-shader-registry.mjs'], { stdio: 'inherit' });
+if (generated.status !== 0) process.exit(generated.status ?? 1);
+await mkdir('dist', { recursive:true });
+await build({entryPoints:['src/main/index.ts','src/preload/index.ts'],outdir:'dist',bundle:true,platform:'node',format:'cjs',sourcemap:true,external:['electron'],loader:{'.glsl':'text'},logLevel:'info'});
+await build({entryPoints:['src/renderer/index.ts','src/settings/bootstrap.ts'],outdir:'dist',bundle:true,platform:'browser',format:'iife',sourcemap:true,loader:{'.glsl':'text'},logLevel:'info'});
+await cp('src/renderer/index.html','dist/renderer/index.html');
+await cp('src/settings/index.html','dist/settings/index.html');
+await cp('src/settings/settings.css','dist/settings/settings.css');
