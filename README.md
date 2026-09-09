@@ -12,8 +12,10 @@ Click a screenshot to watch the 5-second animated preview (H.264 MP4, ~640px).
 | **Aurora Veil** · [video](assets/videos/aurora-veil.mp4) | **Flow Field** · [video](assets/videos/flow-field.mp4) | **Gradient Blobs** · [video](assets/videos/gradient-blobs.mp4) |
 | [![Gradient Drift](assets/screenshots/gradient-drift.png)](assets/videos/gradient-drift.mp4) | [![Orbital Interference](assets/screenshots/interference.png)](assets/videos/interference.mp4) | [![Mesh Gradient](assets/screenshots/mesh-gradient.png)](assets/videos/mesh-gradient.mp4) |
 | **Gradient Drift** · [video](assets/videos/gradient-drift.mp4) | **Orbital Interference** · [video](assets/videos/interference.mp4) | **Mesh Gradient** · [video](assets/videos/mesh-gradient.mp4) |
-| [![Chromatic Plasma](assets/screenshots/plasma.png)](assets/videos/plasma.mp4) | | |
-| **Chromatic Plasma** · [video](assets/videos/plasma.mp4) | | |
+| [![Chromatic Plasma](assets/screenshots/plasma.png)](assets/videos/plasma.mp4) | [![Contour Dunes](assets/screenshots/contour-dunes.png)](assets/videos/contour-dunes.mp4) | [![Ember Drift](assets/screenshots/ember-drift.png)](assets/videos/ember-drift.mp4) |
+| **Chromatic Plasma** · [video](assets/videos/plasma.mp4) | **Contour Dunes** · [video](assets/videos/contour-dunes.mp4) | **Ember Drift** · [video](assets/videos/ember-drift.mp4) |
+| [![Silk Ribbons](assets/screenshots/silk-ribbons.png)](assets/videos/silk-ribbons.mp4) | [![Star Drift](assets/screenshots/star-drift.png)](assets/videos/star-drift.mp4) | [![Tidal Caustics](assets/screenshots/tidal-caustics.png)](assets/videos/tidal-caustics.mp4) |
+| **Silk Ribbons** · [video](assets/videos/silk-ribbons.mp4) | **Star Drift** · [video](assets/videos/star-drift.mp4) | **Tidal Caustics** · [video](assets/videos/tidal-caustics.mp4) |
 
 Media is captured headlessly at 1280×720 (stills) / 640px 12 fps (video) via `scripts/capture-frames.cjs` + ffmpeg:
 
@@ -24,7 +26,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 7 GLSL shaders: `aurora-veil`, `flow-field`, `gradient-blobs`, `gradient-drift`, `interference`, `mesh-gradient`, `plasma`
+- 12 GLSL shaders: `aurora-veil`, `contour-dunes`, `ember-drift`, `flow-field`, `gradient-blobs`, `gradient-drift`, `interference`, `mesh-gradient`, `plasma`, `silk-ribbons`, `star-drift`, `tidal-caustics`
 - Per-shader uniforms (speed, palette, colors, etc.) with per-shader saved values and presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms

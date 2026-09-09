@@ -18,9 +18,13 @@ describe('config', () => {
   });
 
   it('defaults rotation to disabled with no entries', () => {
-    expect(ConfigSchema.parse({}).rotation).toEqual({ enabled: false, entries: [] });
-    expect(ConfigSchema.parse({ rotation: { enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }] } }).rotation)
-      .toEqual({ enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }] });
+    expect(ConfigSchema.parse({}).rotation).toEqual({ enabled: false, entries: [], intervalMinutes: 0 });
+    expect(ConfigSchema.parse({ rotation: { enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }], intervalMinutes: 10 } }).rotation)
+      .toEqual({ enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }], intervalMinutes: 10 });
+  });
+
+  it('defaults inhibit flags', () => {
+    expect(ConfigSchema.parse({}).global).toMatchObject({ inhibitOnAudio: false, inhibitOnFullscreen: true });
   });
 
   it('defaults fade duration and accepts updates', () => {

@@ -2,7 +2,7 @@ import { shaderRegistry } from './shaders';
 import { mountShader } from './core/runtime';
 import type { Config } from '../shared/config';
 import { defaultClockConfig } from '../shared/clock';
-import { resolveRotationValues } from '../shared/rotation';
+import { resolveRotationValues, rotationEntryKey } from '../shared/rotation';
 import { mountClock } from './core/clock';
 import { mountFadeOverlay } from './core/fade';
 
@@ -13,13 +13,31 @@ void (async () => {
   const chosen = shaderRegistry[requested] ?? shaderRegistry['flow-field'] ?? Object.values(shaderRegistry)[0];
   if (!chosen) throw new Error('No shaders are registered');
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-  const values = params.get('preset')
-    ? resolveRotationValues(config.shaders, config.presets, chosen.manifest.id, params.get('preset') ?? undefined)
-    : config.shaders[chosen.manifest.id] ?? {};
-  mountShader(canvas, chosen, values, config.global.fps);
+  const initialPreset = params.get('preset') ?? undefined;
+  const valuesFor = (shaderId: string, preset?: string) => preset
+    ? resolveRotationValues(config.shaders, config.presets, shaderId, preset)
+    : config.shaders[shaderId] ?? {};
+  let currentKey = rotationEntryKey(chosen.manifest.id, initialPreset);
+  let stopScene = mountShader(canvas, chosen, valuesFor(chosen.manifest.id, initialPreset), config.global.fps);
   const clock = mountClock(document.body, config.clock ?? defaultClockConfig);
   const fade = params.has('nofade') ? undefined : mountFadeOverlay(document.body, config.global.fadeSeconds ?? 1);
-  const teardown = () => { fade?.destroy(); clock.destroy(); };
+
+  // Cycling is coordinated by the main process so every monitor swaps together.
+  const unsubscribeCycle = window.scrnsvr.onCycle?.((pick) => {
+    const next = shaderRegistry[pick.shader];
+    if (!next) return;
+    const key = rotationEntryKey(pick.shader, pick.preset);
+    if (key === currentKey) return;
+    currentKey = key;
+    const swap = () => {
+      stopScene();
+      stopScene = mountShader(canvas, next, valuesFor(pick.shader, pick.preset), config.global.fps);
+    };
+    if (fade) fade.transition(swap);
+    else swap();
+  });
+
+  const teardown = () => { unsubscribeCycle?.(); fade?.destroy(); clock.destroy(); };
   addEventListener('pagehide', teardown, { once: true });
 
   let dismissed = false;

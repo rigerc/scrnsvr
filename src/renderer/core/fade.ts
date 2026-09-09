@@ -14,7 +14,13 @@ export function fadeOutOpacity(elapsedMs: number, fadeMs: number): number {
   return clamp01(elapsedMs / fadeMs);
 }
 
-export interface FadeOverlay { fadeOut(close: () => void): void; destroy(): void; }
+export interface FadeOverlay {
+  fadeOut(close: () => void): void;
+  /** Fade overlay to opaque, run swap, then fade back to transparent. */
+  transition(swap: () => void): void;
+  setOpacity(value: number): void;
+  destroy(): void;
+}
 
 /** Fullscreen black overlay that fades in on mount and fades out on dismiss. */
 export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOverlay {
@@ -46,6 +52,29 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
         else close();
       };
       raf = requestAnimationFrame(stepOut);
+    },
+    transition(swap) {
+      cancelAnimationFrame(raf);
+      if (fadeMs <= 0) { swap(); return; }
+      // Fade out (half time), swap the scene, then fade back in (half time).
+      const half = Math.max(fadeMs / 2, 1000 / 60);
+      const outStart = performance.now();
+      const stepOut = (now: number) => {
+        overlay.style.opacity = String(fadeOutOpacity(now - outStart, half));
+        if (Number(overlay.style.opacity) < 1) { raf = requestAnimationFrame(stepOut); return; }
+        swap();
+        const inStart = performance.now();
+        const stepIn = (then: number) => {
+          overlay.style.opacity = String(fadeInOpacity(then - inStart, half));
+          if (Number(overlay.style.opacity) > 0) raf = requestAnimationFrame(stepIn);
+        };
+        raf = requestAnimationFrame(stepIn);
+      };
+      raf = requestAnimationFrame(stepOut);
+    },
+    setOpacity(value) {
+      cancelAnimationFrame(raf);
+      overlay.style.opacity = String(value);
     },
     destroy() {
       cancelAnimationFrame(raf);

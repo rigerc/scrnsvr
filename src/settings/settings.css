@@ -53,6 +53,9 @@ html,body{margin:0;min-height:100%;background:#080c14}
 .shader-card .rotate-toggle input{margin:0;accent-color:#5ac8fa}
 .rotation{border:1px solid #243954;border-radius:14px;padding:18px;background:#0d1726cc}
 .rotation .clock-toggle{margin:0 0 12px}
+.rotation-interval{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:#aabbd3;font-size:13px}
+.rotation-interval input{width:64px;padding:7px;border:1px solid #38557c;border-radius:6px;background:#0a1220;color:#eef4ff}
+.rotation-interval span{color:#8ea6cc;font-size:12px}
 .rotation-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .rotation-list li{display:flex;align-items:center;gap:10px}
 .rotation-list span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -26,9 +26,9 @@ export class SettingsPanel {
   constructor(options: SettingsOptions) {
     this.manifests = options.manifests;
     this.preview = options.preview;
-    this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [] }, shaders: {}, presets: {} } as Config);
+    this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, shaders: {}, presets: {} } as Config);
     this.config.clock = { ...defaultClockConfig, ...this.config.clock };
-    this.config.rotation ??= { enabled: false, entries: [] };
+    this.config.rotation ??= { enabled: false, entries: [], intervalMinutes: 0 };
     this.element = options.root;
     this.element.className = 'scrnsvr-settings';
     this.render();
@@ -48,6 +48,7 @@ export class SettingsPanel {
           <section class="gallery" aria-label="Shaders"></section>
           <section class="rotation" aria-label="Random rotation">
             <label class="clock-toggle"><input type="checkbox" data-rotation="enabled">Shuffle on open</label>
+            <label class="rotation-interval">Change shader every <input type="number" data-rotation="intervalMinutes" min="0" max="180" step="1"> min <span data-rotation-interval-hint>(0 = only on open)</span></label>
             <ul class="rotation-list" data-rotation-list></ul>
             <p class="rotation-empty" data-rotation-empty hidden>No shaders selected — the saved shader plays instead.</p>
           </section>
@@ -68,7 +69,7 @@ export class SettingsPanel {
           <section id="clock-settings" class="clock-settings" role="tabpanel" aria-labelledby="clock-tab" hidden></section>
         </div>
       </section>
-      <section class="global" aria-label="Global settings"><label>Idle threshold (seconds)<input data-global="idleThresholdSeconds" type="number" min="0" step="1"></label><label>Frame rate <output data-output="fps"></output><input data-global="fps" type="range" min="1" max="240" step="1"></label><label>Fade in/out <output data-output="fadeSeconds"></output><input data-global="fadeSeconds" type="range" min="0" max="5" step="0.1"></label><label>Monitors<select data-global="monitors"><option value="primary">Primary monitor</option><option value="all">All monitors</option></select></label></section>
+      <section class="global" aria-label="Global settings"><label>Idle threshold (seconds)<input data-global="idleThresholdSeconds" type="number" min="0" step="1"></label><label>Frame rate <output data-output="fps"></output><input data-global="fps" type="range" min="1" max="240" step="1"></label><label>Fade in/out <output data-output="fadeSeconds"></output><input data-global="fadeSeconds" type="range" min="0" max="5" step="0.1"></label><label>Monitors<select data-global="monitors"><option value="primary">Primary monitor</option><option value="all">All monitors</option></select></label><label class="clock-toggle"><input data-global-check="inhibitOnAudio" type="checkbox">Don't start while audio is playing</label><label class="clock-toggle"><input data-global-check="inhibitOnFullscreen" type="checkbox">Don't start over fullscreen apps</label></section>
       <footer><span data-status role="status">All changes saved locally</span><button data-action="reset">Reset shader</button></footer>`;
     this.controls = this.element.querySelector('.controls')!; this.status = this.element.querySelector('[data-status]')!;
     const clock = mountClock(this.element.querySelector('.clock-stage') as HTMLElement, this.config.clock);
@@ -194,11 +195,17 @@ export class SettingsPanel {
     }
     return () => {};
   }
-  private bindGlobals(){const g=this.config.global; (this.element.querySelector('[data-global="idleThresholdSeconds"]') as HTMLInputElement).value=String(g.idleThresholdSeconds); const fps=this.element.querySelector('[data-global="fps"]') as HTMLInputElement;fps.value=String(g.fps);this.element.querySelector('[data-output="fps"]')!.textContent=`${g.fps} FPS`; const fade=this.element.querySelector('[data-global="fadeSeconds"]') as HTMLInputElement;fade.value=String(g.fadeSeconds);this.element.querySelector('[data-output="fadeSeconds"]')!.textContent=`${g.fadeSeconds}s`; (this.element.querySelector('[data-global="monitors"]') as HTMLSelectElement).value=g.monitors; this.element.querySelectorAll('[data-global]').forEach(x=>x.addEventListener('input',()=>{const key=(x as HTMLElement).dataset.global as keyof typeof g; const v=key==='monitors'?(x as HTMLSelectElement).value:Number((x as HTMLInputElement).value);(this.config.global as any)[key]=v;if(key==='fps')this.element.querySelector('[data-output="fps"]')!.textContent=`${v} FPS`;if(key==='fadeSeconds')this.element.querySelector('[data-output="fadeSeconds"]')!.textContent=`${v}s`;this.queueSave();}));}
+  private bindGlobals(){const g=this.config.global; (this.element.querySelector('[data-global="idleThresholdSeconds"]') as HTMLInputElement).value=String(g.idleThresholdSeconds); const fps=this.element.querySelector('[data-global="fps"]') as HTMLInputElement;fps.value=String(g.fps);this.element.querySelector('[data-output="fps"]')!.textContent=`${g.fps} FPS`; const fade=this.element.querySelector('[data-global="fadeSeconds"]') as HTMLInputElement;fade.value=String(g.fadeSeconds);this.element.querySelector('[data-output="fadeSeconds"]')!.textContent=`${g.fadeSeconds}s`; (this.element.querySelector('[data-global="monitors"]') as HTMLSelectElement).value=g.monitors; this.element.querySelectorAll('[data-global]').forEach(x=>x.addEventListener('input',()=>{const key=(x as HTMLElement).dataset.global as keyof typeof g; const v=key==='monitors'?(x as HTMLSelectElement).value:Number((x as HTMLInputElement).value);(this.config.global as any)[key]=v;if(key==='fps')this.element.querySelector('[data-output="fps"]')!.textContent=`${v} FPS`;if(key==='fadeSeconds')this.element.querySelector('[data-output="fadeSeconds"]')!.textContent=`${v}s`;this.queueSave();})); this.element.querySelectorAll<HTMLInputElement>('[data-global-check]').forEach(x=>{const key=x.dataset.globalCheck as 'inhibitOnAudio'|'inhibitOnFullscreen';x.checked=Boolean(g[key]);x.addEventListener('change',()=>{g[key]=x.checked;this.queueSave();});});}
   private bindRotation() {
     const toggle = this.element.querySelector('[data-rotation="enabled"]') as HTMLInputElement;
     toggle.checked = this.config.rotation.enabled;
     toggle.addEventListener('change', () => { this.config.rotation.enabled = toggle.checked; this.renderRotationList(); this.queueSave(); });
+    const interval = this.element.querySelector('[data-rotation="intervalMinutes"]') as HTMLInputElement;
+    interval.value = String(this.config.rotation.intervalMinutes);
+    interval.addEventListener('input', () => {
+      this.config.rotation.intervalMinutes = Math.max(0, Math.min(180, Math.round(Number(interval.value) || 0)));
+      this.queueSave();
+    });
     this.renderRotationList();
   }
   private setRotation(shaderId: string, include: boolean, preset?: string) {

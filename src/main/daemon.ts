@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { powerMonitor } from 'electron';
+import { shouldInhibitScreensaver } from './inhibit';
 
 const execFileAsync = promisify(execFile);
 
@@ -10,6 +11,7 @@ export interface IdleDaemonOptions {
   pollIntervalMs?: number;
   idleSeconds?: () => number;
   launchRenderer: () => RendererChild | Promise<RendererChild>;
+  inhibited?: () => boolean | Promise<boolean>;
   log?: (message: string, ...args: unknown[]) => void;
 }
 
@@ -41,6 +43,13 @@ export class IdleDaemon {
     try { idle = await readIdleSeconds(this.options.idleSeconds, this.options.log); }
     catch (error) { this.options.log?.('idle read failed', error); this.polling = false; return; }
     if (idle < this.options.thresholdSeconds) { this.polling = false; return; }
+    try {
+      if (await this.options.inhibited?.()) {
+        this.options.log?.('screensaver inhibited (audio/fullscreen); skipping launch');
+        this.polling = false;
+        return;
+      }
+    } catch (error) { this.options.log?.('inhibit check failed', error); }
     this.options.log?.('idle threshold reached (%ss), launching renderer', idle);
     try {
       const child = await this.options.launchRenderer();
