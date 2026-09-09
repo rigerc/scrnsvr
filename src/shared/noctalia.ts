@@ -31,6 +31,7 @@ export function noctaliaShaderValues(shader: ShaderManifest, palette: NoctaliaPa
     color3: palette.mTertiary,
     color4: palette.mOnSurface,
     background: palette.mSurface,
+    backgroundTop: palette.mSurface,
     shadow: palette.mSurface,
     midtone: palette.mPrimary,
     highlight: palette.mOnSurface,
@@ -40,5 +41,6 @@ export function noctaliaShaderValues(shader: ShaderManifest, palette: NoctaliaPa
     .map((u, index) => [u.name, named[u.name] ?? accents[index % accents.length]]));
   // Flow Field's monochrome mode ignores its color control.
   if (shader.id === 'flow-field' && values.color) values.palette = 'aurora';
+  if (shader.id === 'plasma' && values.color1) values.palette = 'custom';
   return values;
 }

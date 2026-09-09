@@ -1,5 +1,14 @@
 precision highp float;
 
+uniform float movementRange;
+uniform float stretchX;
+uniform float stretchY;
+uniform float sizeVariation;
+uniform float breathing;
+uniform float haloStrength;
+uniform float brightness;
+uniform float saturation;
+
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -23,12 +32,13 @@ void main() {
     if (i < count) {
       float index = float(i);
       float phase = index * 2.399963;
-      vec2 center = aspect * vec2(
+      vec2 center = movementRange * aspect * vec2(
         0.34 * sin(t * (0.23 + index * 0.017) + phase),
         0.32 * cos(t * (0.29 + index * 0.013) + phase * 1.3)
       );
-      float radius = size * (0.85 + 0.15 * sin(t * 0.3 + phase));
-      vec2 delta = p - center;
+      float radius = size * mix(1.0, 0.85 + 0.15 * sin(t * 0.3 + phase), breathing)
+        * (1.0 + sizeVariation * sin(phase * 2.1));
+      vec2 delta = (p - center) / vec2(stretchX, stretchY);
       float influence = radius * radius / max(dot(delta, delta), 0.0001);
       float tint = mod(index, 3.0);
       vec3 blobColor = tint < 0.5 ? color1 : (tint < 1.5 ? color2 : color3);
@@ -39,8 +49,11 @@ void main() {
   vec3 color = pigment / max(field, 0.0001);
   float edge = mix(0.04, 0.7, softness);
   float body = smoothstep(1.0 - edge, 1.0 + edge, field);
-  float halo = 0.16 * smoothstep(0.05, 1.0, field);
+  float halo = haloStrength * smoothstep(0.05, 1.0, field);
   color = mix(background, color, clamp(body + halo * (1.0 - body), 0.0, 1.0));
   float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
   gl_FragColor = vec4(clamp(color + (dither - 0.5) / 255.0, 0.0, 1.0), 1.0);
+  gl_FragColor.rgb *= brightness;
+  float luminance = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  gl_FragColor.rgb = mix(vec3(luminance), gl_FragColor.rgb, saturation);
 }

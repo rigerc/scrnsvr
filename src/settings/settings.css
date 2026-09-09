@@ -77,4 +77,22 @@ html,body{margin:0;min-height:100%;background:#080c14}
 .preview{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#05080e}
 .preset-list span{display:inline-flex}
 .preset-list span button+button{padding-inline:8px;border-left:0;border-radius:0 8px 8px 0}
+.shader-control-group{border:0;padding:0;margin:20px 0;min-width:0}
+.shader-control-group legend{padding:0;color:#eef4ff;font-size:13px;font-weight:650}
+.shader-control{margin:16px 0}
+.shader-control-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;color:#c7d6ec}
+.shader-control-heading label{font-size:13px}
+.scrnsvr-settings .uniform-reset{padding:3px 7px;font-size:11px;background:transparent;border-color:#38557c}
+.shader-control-inputs{display:flex;align-items:center;gap:12px;min-width:0}
+.shader-control-inputs input[type=range]{flex:1;min-width:0;width:100%;accent-color:#5ac8fa}
+.shader-control-inputs input[type=number]{width:82px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.shader-control-inputs input[type=number],.shader-control-inputs select{padding:6px;border:1px solid #38557c;border-radius:6px;background:#0a1220;color:#eef4ff}
+.shader-control-inputs select{width:100%;min-width:0}
+.shader-control-inputs input[type=color]{width:100%;height:32px;padding:0;border:0;background:transparent}
+.shader-control-inputs input[type=checkbox]{margin:0;accent-color:#5ac8fa}
+.shader-control p{margin:6px 0 0;color:#8ea6cc;font-size:12px}
+.shader-advanced{border-top:1px solid #243954;padding-top:16px}
+.shader-advanced summary{cursor:pointer;color:#c7d6ec}
+.shader-settings :focus-visible{outline:2px solid #62c9ff;outline-offset:3px}
+@media(min-width:781px){.shader-settings .controls{max-height:70vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}}
 @media(max-width:780px){.global,.editor{grid-template-columns:1fr}.scrnsvr-settings{padding:28px 18px}.scrnsvr-settings header{align-items:flex-start}.control{grid-template-columns:100px 1fr}}

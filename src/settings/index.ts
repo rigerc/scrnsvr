@@ -1,9 +1,11 @@
 import type { Config } from '../shared/config';
-import type { ShaderManifest, UniformManifest } from '../shared/manifest';
+import type { ShaderManifest } from '../shared/manifest';
 import { noctaliaShaderValues } from '../shared/noctalia';
 import { defaultClockConfig } from '../shared/clock';
 import { mountClock } from '../renderer/core/clock';
 import { mountClockControls } from './clock';
+import { mountShaderControls } from './shader-controls';
+import { randomizeUniforms } from '../renderer/core/uniforms';
 
 type Value = number | boolean | string;
 export interface PreviewRuntime { mount(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void; }
@@ -252,9 +254,14 @@ export class SettingsPanel {
       list.append(item);
     });
   }
-  private value(u: UniformManifest): Value { return this.config.shaders[this.shader.id]?.[u.name] ?? u.default; }
-  private renderControls() { this.controls.innerHTML = '<h2>Adjust shader</h2>'; this.shader.uniforms.forEach(u => { const row=document.createElement('label'); row.className='control'; row.innerHTML=`<span>${u.name}</span>`; let input: HTMLInputElement|HTMLSelectElement; if(u.type==='select'){ input=document.createElement('select'); (u.options??[]).forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;input.append(o);}); } else { input=document.createElement('input'); input.type=u.type==='bool'?'checkbox':u.type==='color'?'color': 'range'; if(u.type==='int'||u.type==='float'){input.min=String(u.min??0);input.max=String(u.max??1);input.step=u.type==='int'?'1':'0.01';} } input.dataset.name=u.name; input.value=String(this.value(u)); if(input instanceof HTMLInputElement && u.type==='bool') input.checked=Boolean(this.value(u)); input.oninput=()=>{let v:Value=input instanceof HTMLInputElement&&u.type==='bool'?input.checked:(u.type==='int'||u.type==='float'?Number(input.value):input.value);(this.config.shaders[this.shader.id]??={})[u.name]=v;this.queueSave();}; row.append(input); this.controls.append(row); }); }
-  private randomize() { const values: Record<string,Value> = {}; this.shader.uniforms.forEach(u => values[u.name]=u.type==='bool'?Math.random()>.5:u.type==='select'?(u.options??[])[Math.floor(Math.random()*(u.options?.length??1))]??u.default:u.type==='color'?`#${Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0')}`:Math.round(((u.min??0)+Math.random()*((u.max??1)-(u.min??0)))*(u.type==='int'?1:100))/ (u.type==='int'?1:100)); this.replaceValues(values); this.renderControls(); this.queueSave(); }
+  private renderControls() {
+    mountShaderControls(this.controls, this.shader.uniforms, this.config.shaders[this.shader.id] ??= {}, () => this.queueSave());
+  }
+  private randomize() {
+    this.replaceValues(randomizeUniforms(this.shader.uniforms, this.config.shaders[this.shader.id] ?? {}));
+    this.renderControls();
+    this.queueSave();
+  }
   private savePreset() { const input=this.element.querySelector('[data-preset]') as HTMLInputElement; const name=input.value.trim(); if(!name)return; (this.config.presets[this.shader.id]??={})[name]={...(this.config.shaders[this.shader.id]??{})}; input.value=''; this.renderPresets(); this.renderRotationList(); this.queueSave(); }
   private renderPresets() { const list=this.element.querySelector('.preset-list')!; list.innerHTML=''; Object.keys(this.config.presets[this.shader.id]??{}).forEach(name=>{const wrap=document.createElement('span');const b=document.createElement('button');b.textContent=name;b.onclick=()=>{this.replaceValues({...this.config.presets[this.shader.id][name]});this.renderControls();this.queueSave();};const add=document.createElement('button');add.textContent='+ shuffle';add.setAttribute('aria-label',`Add ${name} to rotation`);add.onclick=()=>{this.setRotation(this.shader.id,true,name);this.queueSave();};const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label',`Delete ${name}`);del.onclick=()=>{delete this.config.presets[this.shader.id][name];for(const entry of this.config.rotation.entries)if(entry.shader===this.shader.id&&entry.preset===name)delete entry.preset;this.renderPresets();this.renderRotationList();this.queueSave();};wrap.append(b,add,del);list.append(wrap);}); }
   private queueSave() { this.status.textContent='Saving…'; if(this.timer)clearTimeout(this.timer); this.timer=setTimeout(async()=>{try{await window.scrnsvr.setConfig(this.config);this.status.textContent='All changes saved locally';}catch{this.status.textContent='Could not save changes';}},300); }

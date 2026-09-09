@@ -27,7 +27,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 ## Features
 
 - 12 GLSL shaders: `aurora-veil`, `contour-dunes`, `ember-drift`, `flow-field`, `gradient-blobs`, `gradient-drift`, `interference`, `mesh-gradient`, `plasma`, `silk-ribbons`, `star-drift`, `tidal-caustics`
-- Per-shader uniforms (speed, palette, colors, etc.) with per-shader saved values and presets
+- 12–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -62,9 +62,19 @@ npm run daemon
 # Typecheck / tests
 npm run typecheck
 npm test
+# Chromium/WebGL rendering and settings integration checks (desktop or Xvfb)
+npm run check-shaders
 ```
 
 CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+
+## Shader controls
+
+Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
+
+Every shader supports speed, brightness, and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color. Existing settings and presets retain their values, with newly added parameters taking their defaults.
+
+See the [shader parameter guide](docs/shader-parameters.md) for the available adjustments.
 
 ## Config
 

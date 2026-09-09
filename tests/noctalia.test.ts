@@ -76,8 +76,12 @@ describe('Noctalia color import', () => {
     });
   });
 
-  it('enables color rendering for Flow Field and leaves fixed palettes alone', () => {
-    expect(noctaliaShaderValues(flowFieldManifest, palette)).toEqual({ color: palette.mPrimary, palette: 'aurora' });
-    expect(noctaliaShaderValues(plasmaManifest, palette)).toEqual({});
+  it('selects a color-aware palette for Flow Field and Plasma', () => {
+    expect(noctaliaShaderValues(flowFieldManifest, palette)).toEqual({
+      color: palette.mPrimary, color2: palette.mSecondary, background: palette.mSurface, palette: 'aurora',
+    });
+    expect(noctaliaShaderValues(plasmaManifest, palette)).toEqual({
+      color1: palette.mPrimary, color2: palette.mSecondary, color3: palette.mTertiary, palette: 'custom',
+    });
   });
 });
