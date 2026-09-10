@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const gradientBlobsManifest = manifest({
   id: "gradient-blobs",
   title: "Gradient Blobs",
+  category: 'Ambient',
   description: "Glowing gradient blobs float, merge, and gently pull apart.",
   fragment: "shader.glsl",
   uniforms: [

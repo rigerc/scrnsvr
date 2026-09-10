@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const contourDunesManifest = manifest({
   id: "contour-dunes",
   title: "Contour Dunes",
+  category: 'Landscapes',
   description: "Copper and indigo contour lines flow like wind-shaped dunes.",
   fragment: "shader.glsl",
   uniforms: [

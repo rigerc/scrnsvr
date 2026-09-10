@@ -1,3 +1,5 @@
+export const shaderCategories = ['Abstract', 'Ambient', 'Clocks', 'Digital', 'Landscapes', 'Space', 'Water'] as const;
+export type ShaderCategory = typeof shaderCategories[number];
 export type UniformType = 'float'|'int'|'bool'|'color'|'select';
 export type UniformValue = number | boolean | string;
 export type UniformGroup = 'Motion' | 'Shape' | 'Color';
@@ -17,5 +19,5 @@ export interface UniformManifest {
   visibleWhen?: { name: string; value: UniformValue };
   random?: { min: number; max: number } | false;
 }
-export interface ShaderManifest { id:string; title:string; description?:string; uniforms:UniformManifest[]; fragment:string; }
+export interface ShaderManifest { id:string; title:string; category?:ShaderCategory; description?:string; uniforms:UniformManifest[]; fragment:string; }
 export const manifest = (value: ShaderManifest): ShaderManifest => value;

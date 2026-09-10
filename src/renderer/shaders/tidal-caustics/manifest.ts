@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const tidalCausticsManifest = manifest({
   id: "tidal-caustics",
   title: "Tidal Caustics",
+  category: 'Water',
   description: "Soft pools of refracted light wander across a tranquil seabed.",
   fragment: "shader.glsl",
   uniforms: [

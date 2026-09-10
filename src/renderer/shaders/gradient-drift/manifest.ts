@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const gradientDriftManifest = manifest({
   id: "gradient-drift",
   title: "Gradient Drift",
+  category: 'Ambient',
   description: "Wide, silky bands of color that slowly turn and drift.",
   fragment: "shader.glsl",
   uniforms: [

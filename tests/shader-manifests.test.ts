@@ -13,8 +13,20 @@ import { plasmaManifest } from '../src/renderer/shaders/plasma/manifest';
 import { silkRibbonsManifest } from '../src/renderer/shaders/silk-ribbons/manifest';
 import { starDriftManifest } from '../src/renderer/shaders/star-drift/manifest';
 import { tidalCausticsManifest } from '../src/renderer/shaders/tidal-caustics/manifest';
+import { opalFilmManifest } from '../src/renderer/shaders/opal-film/manifest';
+import { kineticTilesManifest } from '../src/renderer/shaders/kinetic-tiles/manifest';
+import { inkBloomManifest } from '../src/renderer/shaders/ink-bloom/manifest';
+import { phosphorGardenManifest } from '../src/renderer/shaders/phosphor-garden/manifest';
+import { rainGlassManifest } from '../src/renderer/shaders/rain-glass/manifest';
+import { guillocheManifest } from '../src/renderer/shaders/guilloche/manifest';
+import { liquidChromeManifest } from '../src/renderer/shaders/liquid-chrome/manifest';
+import { prismMosaicManifest } from '../src/renderer/shaders/prism-mosaic/manifest';
+import { paperLanternsManifest } from '../src/renderer/shaders/paper-lanterns/manifest';
+import { magneticFilamentsManifest } from '../src/renderer/shaders/magnetic-filaments/manifest';
 
-const manifests = [auroraVeilManifest, contourDunesManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest];
+const manifests = [auroraVeilManifest, contourDunesManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest,
+  opalFilmManifest, kineticTilesManifest, inkBloomManifest, phosphorGardenManifest, rainGlassManifest,
+  guillocheManifest, liquidChromeManifest, prismMosaicManifest, paperLanternsManifest, magneticFilamentsManifest];
 
 describe('shader parameter contracts', () => {
   for (const manifest of manifests) {

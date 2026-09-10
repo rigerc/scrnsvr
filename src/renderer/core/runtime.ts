@@ -15,23 +15,25 @@ function oglValue(definition: UniformManifest, value: unknown): unknown {
   return value;
 }
 
-export function mountShader(
-  canvas: HTMLCanvasElement,
-  shader: ShaderDefinition,
-  values: Record<string, unknown>,
-  fps = 60,
-): () => void {
-  const initial = canvas.getBoundingClientRect();
-  const initialWidth = Math.max(1, Math.round(initial.width) || canvas.width);
-  const initialHeight = Math.max(1, Math.round(initial.height) || canvas.height);
-  const inlineSize = { width: canvas.style.width, height: canvas.style.height };
-  const renderer = new Renderer({ canvas, width: initialWidth, height: initialHeight, dpr: Math.min(devicePixelRatio, 2), alpha: false });
-  Object.assign(canvas.style, inlineSize);
+// A canvas owns one WebGL context. Keep OGL's state cache with that context
+// across shader switches instead of resetting the cache over existing GL state.
+const renderers = new WeakMap<HTMLCanvasElement, Renderer>();
+
+function createScene(renderer: Renderer, shader: ShaderDefinition, values: Record<string, unknown>) {
   const gl = renderer.gl;
   const resolved = bindUniforms(shader.manifest.uniforms, values);
+  const mountedAt = new Date();
   const uniforms: Record<string, { value: unknown }> = {
     uTime: { value: 0 },
-    uResolution: { value: [initialWidth, initialHeight] },
+    uResolution: { value: [1, 1] },
+    // Imported clock shaders use Shadertoy's year/month/day/seconds format.
+    // The shader adds scaled uTime so the Speed control can also freeze clocks.
+    uDate: { value: [
+      mountedAt.getFullYear(),
+      mountedAt.getMonth() + 1,
+      mountedAt.getDate(),
+      mountedAt.getHours() * 3600 + mountedAt.getMinutes() * 60 + mountedAt.getSeconds(),
+    ] },
   };
   for (const definition of shader.manifest.uniforms) {
     uniforms[definition.name] = { value: oglValue(definition, resolved[definition.name]) };
@@ -40,33 +42,97 @@ export function mountShader(
     vertex: 'attribute vec2 uv; attribute vec2 position; varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,0.,1.);}',
     fragment: shader.source,
     uniforms,
+    depthTest: false,
+    depthWrite: false,
+    cullFace: false,
   });
   const geometry = new Triangle(gl);
   const mesh = new Mesh(gl, { geometry, program });
+  return {
+    draw(time: number) {
+      uniforms.uTime.value = time;
+      uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+      const latest = bindUniforms(shader.manifest.uniforms, values);
+      for (const definition of shader.manifest.uniforms) {
+        uniforms[definition.name].value = oglValue(definition, latest[definition.name]);
+      }
+      renderer.render({ scene: mesh });
+    },
+    dispose() {
+      geometry.remove();
+      // OGL retains uploaded uniform values in its renderer cache.
+      for (const location of program.uniformLocations.values()) renderer.state.uniformLocations.delete(location);
+      gl.deleteShader(program.vertexShader);
+      gl.deleteShader(program.fragmentShader);
+      program.remove();
+    },
+  };
+}
+
+export function mountShader(
+  canvas: HTMLCanvasElement,
+  shader: ShaderDefinition,
+  values: Record<string, unknown>,
+  fps = 60,
+): () => void {
+  const inlineSize = { width: canvas.style.width, height: canvas.style.height };
+  let renderer = renderers.get(canvas);
+  if (!renderer) {
+    const initial = canvas.getBoundingClientRect();
+    renderer = new Renderer({
+      canvas,
+      width: Math.max(1, Math.round(initial.width) || canvas.width),
+      height: Math.max(1, Math.round(initial.height) || canvas.height),
+      dpr: Math.min(devicePixelRatio, 2),
+      alpha: false,
+    });
+    renderers.set(canvas, renderer);
+    Object.assign(canvas.style, inlineSize);
+  }
+  const scene = createScene(renderer, shader, values);
+  let time = 0;
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
     renderer.setSize(width, height);
-    // OGL sets inline CSS dimensions; let the host layout keep sizing the canvas.
     Object.assign(canvas.style, inlineSize);
-    uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-    renderer.render({ scene: mesh });
+    scene.draw(time);
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
-  const stopLoop = startLoop((delta) => {
-    uniforms.uTime.value = Number(uniforms.uTime.value) + delta / 1000;
-    const latest = bindUniforms(shader.manifest.uniforms, values);
-    for (const definition of shader.manifest.uniforms) {
-      uniforms[definition.name].value = oglValue(definition, latest[definition.name]);
-    }
-    renderer.render({ scene: mesh });
+  const stopLoop = startLoop(delta => {
+    time += delta / 1000;
+    scene.draw(time);
   }, fps);
   return () => {
     stopLoop();
     observer.disconnect();
-    geometry.remove();
-    program.remove();
+    scene.dispose();
   };
+}
+
+// Copy each visible thumbnail synchronously into a 2D canvas. The whole gallery
+// uses just one GPU context, regardless of window size or shader count.
+let thumbnailRenderer: Renderer | undefined;
+export function mountShaderThumbnail(
+  canvas: HTMLCanvasElement,
+  shader: ShaderDefinition,
+  values: Record<string, unknown>,
+): () => void {
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to create thumbnail canvas');
+  const renderer = thumbnailRenderer ??= new Renderer({ width: 180, height: 90, dpr: 1, alpha: false });
+  const scene = createScene(renderer, shader, values);
+  let time = 0;
+  const draw = () => {
+    if (renderer.width !== canvas.width || renderer.height !== canvas.height) {
+      renderer.setSize(canvas.width, canvas.height);
+    }
+    scene.draw(time);
+    context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
+  };
+  draw();
+  const stop = startLoop(delta => { time += delta / 1000; draw(); }, 15);
+  return () => { stop(); scene.dispose(); };
 }

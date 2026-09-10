@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const meshGradientManifest = manifest({
   id: "mesh-gradient",
   title: "Mesh Gradient",
+  category: 'Ambient',
   description: "Four floating pools of color blend into a soft, shifting mesh.",
   fragment: "shader.glsl",
   uniforms: [

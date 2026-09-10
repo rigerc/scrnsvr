@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const plasmaManifest = manifest({
   id: "plasma",
   title: "Chromatic Plasma",
+  category: 'Abstract',
   fragment: "shader.glsl",
   uniforms: [
     { name: "speed", type: "float", default: 0.65, min: 0, max: 3, step: 0.01,

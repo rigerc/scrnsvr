@@ -7,7 +7,10 @@ html,body{margin:0;min-height:100%;background:#080c14}
 .scrnsvr-settings small{color:#8ea6cc;letter-spacing:.16em}
 .scrnsvr-settings button{border:1px solid #38557c;border-radius:9px;padding:10px 15px;color:inherit;background:#17263d;cursor:pointer}
 .scrnsvr-settings button:hover,.scrnsvr-settings .active{background:#2b78b9;border-color:#62c9ff}
-.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:28px}
+.shader-categories{display:grid;gap:24px;margin-bottom:28px}
+.shader-category h3{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:14px;color:#c7d6ec}
+.shader-category-count{padding:2px 7px;border-radius:999px;background:#17263d;color:#8ea6cc;font-size:11px;font-weight:400;font-variant-numeric:tabular-nums}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
 .shader-card{display:grid!important;gap:8px;text-align:left;padding:0 0 12px!important;overflow:hidden}
 .shader-card canvas{display:block;width:100%;height:auto;aspect-ratio:2/1;background:#09111e}
 .shader-card strong{padding:0 12px;font-size:13px}

@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const starDriftManifest = manifest({
   id: "star-drift",
   title: "Star Drift",
+  category: 'Space',
   description: "Layers of softly glowing stars glide through a deep night sky.",
   fragment: "shader.glsl",
   uniforms: [

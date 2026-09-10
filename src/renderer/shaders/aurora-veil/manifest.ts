@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const auroraVeilManifest = manifest({
   id: "aurora-veil",
   title: "Aurora Veil",
+  category: 'Ambient',
   description: "Translucent ribbons of light ripple across a midnight gradient.",
   fragment: "shader.glsl",
   uniforms: [

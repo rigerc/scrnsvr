@@ -1,5 +1,5 @@
 import type { Config } from '../shared/config';
-import type { ShaderManifest } from '../shared/manifest';
+import { shaderCategories, type ShaderManifest } from '../shared/manifest';
 import { noctaliaShaderValues } from '../shared/noctalia';
 import { defaultClockConfig } from '../shared/clock';
 import { mountClock } from '../renderer/core/clock';
@@ -8,7 +8,10 @@ import { mountShaderControls } from './shader-controls';
 import { randomizeUniforms } from '../renderer/core/uniforms';
 
 type Value = number | boolean | string;
-export interface PreviewRuntime { mount(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void; }
+export interface PreviewRuntime {
+  mount(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void;
+  mountThumbnail?(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void;
+}
 export interface SettingsOptions { root: HTMLElement; manifests: ShaderManifest[]; initial?: Config; preview?: PreviewRuntime; }
 
 /** Vanilla settings UI. The host supplies manifests so this stays independent of the renderer registry. */
@@ -22,7 +25,6 @@ export class SettingsPanel {
   private status!: HTMLElement;
   private preview?: PreviewRuntime;
   private stopPreview?: () => void;
-  private readonly stopThumbnails: Array<() => void> = [];
   private importingColors = false;
 
   constructor(options: SettingsOptions) {
@@ -47,7 +49,7 @@ export class SettingsPanel {
           </section>
           <h2 class="gallery-heading">Choose a shader</h2>
           <p class="rotation-hint">Click a shader to edit it. Tick <strong>Rotate</strong> to include it in the random shuffle when the screensaver opens.</p>
-          <section class="gallery" aria-label="Shaders"></section>
+          <section class="shader-categories" aria-label="Shaders"></section>
           <section class="rotation" aria-label="Random rotation">
             <label class="clock-toggle"><input type="checkbox" data-rotation="enabled">Shuffle on open</label>
             <label class="rotation-interval">Change shader every <input type="number" data-rotation="intervalMinutes" min="0" max="180" step="1"> min <span data-rotation-interval-hint>(0 = only on open)</span></label>
@@ -79,7 +81,7 @@ export class SettingsPanel {
       clock.update(this.config.clock);
       this.queueSave();
     });
-    window.addEventListener('pagehide', () => clock.destroy(), { once: true });
+    window.addEventListener('pagehide', () => { clock.destroy(); this.stopPreview?.(); }, { once: true });
     const tabs = Array.from(this.element.querySelectorAll<HTMLButtonElement>('[data-tab]'));
     const activateTab = (tab: HTMLButtonElement) => {
       tabs.forEach(button => {
@@ -99,25 +101,69 @@ export class SettingsPanel {
         next.focus();
       });
     });
-    const gallery = this.element.querySelector('.gallery')!;
-    this.manifests.forEach(m => {
-      const b = document.createElement('button'); b.className = 'shader-card'; b.dataset.id = m.id;
-      const c = document.createElement('canvas'); c.width = 180; c.height = 90; c.setAttribute('aria-label', `${m.title} live thumbnail`); b.append(c);
-      const title = document.createElement('strong'); title.textContent = m.title; b.append(title);
-      const rotate = document.createElement('label'); rotate.className = 'rotate-toggle';
-      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.rotate = m.id;
-      checkbox.setAttribute('aria-label', `Include ${m.title} in random rotation`);
-      checkbox.checked = this.config.rotation.entries.some(e => e.shader === m.id);
-      checkbox.addEventListener('change', () => { this.setRotation(m.id, checkbox.checked); this.queueSave(); });
-      const caption = document.createElement('span'); caption.textContent = 'Rotate';
-      rotate.append(checkbox, caption);
-      rotate.addEventListener('click', (event) => event.stopPropagation());
-      b.append(rotate);
-      b.onclick = () => { this.select(m.id); this.queueSave(); };
-      gallery.append(b);
-      const values = this.config.shaders[m.id] ??= {};
-      if (this.preview) this.stopThumbnails.push(this.preview.mount(c, m, values)); else this.stopThumbnails.push(this.animateFallback(c));
-    });
+    const gallery = this.element.querySelector('.shader-categories')!;
+    const thumbnailStates = new Map<Element, { canvas: HTMLCanvasElement; manifest: ShaderManifest; values: Record<string, Value>; stop?: () => void }>();
+    const releaseThumbnail = (state: { canvas: HTMLCanvasElement; stop?: () => void }) => {
+      if (!state.stop) return;
+      state.stop();
+      state.stop = undefined;
+    };
+    const thumbnailObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        const state = thumbnailStates.get(entry.target);
+        if (!state) continue;
+        if (entry.isIntersecting && !state.stop) {
+          state.stop = this.preview
+            ? (this.preview.mountThumbnail ?? this.preview.mount)(state.canvas, state.manifest, state.values)
+            : this.animateFallback(state.canvas);
+        } else if (!entry.isIntersecting) releaseThumbnail(state);
+      }
+    }, { rootMargin: '180px 0px' });
+    window.addEventListener('pagehide', () => {
+      thumbnailObserver.disconnect();
+      thumbnailStates.forEach(releaseThumbnail);
+    }, { once: true });
+    for (const category of shaderCategories) {
+      const shaders = this.manifests
+        .filter(shader => (shader.category ?? 'Abstract') === category)
+        .sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base', numeric: true }));
+      if (!shaders.length) continue;
+      const section = document.createElement('section');
+      section.className = 'shader-category';
+      section.dataset.category = category;
+      const heading = document.createElement('h3');
+      heading.id = `shader-category-${category.toLowerCase()}`;
+      heading.textContent = category;
+      const count = document.createElement('span');
+      count.className = 'shader-category-count';
+      count.textContent = String(shaders.length);
+      count.setAttribute('aria-label', `${shaders.length} shaders`);
+      heading.append(count);
+      section.setAttribute('aria-labelledby', heading.id);
+      const grid = document.createElement('div');
+      grid.className = 'gallery';
+      section.append(heading, grid);
+      gallery.append(section);
+      shaders.forEach(m => {
+        const b = document.createElement('button'); b.className = 'shader-card'; b.dataset.id = m.id;
+        const c = document.createElement('canvas'); c.width = 180; c.height = 90; c.setAttribute('aria-label', `${m.title} live thumbnail`); b.append(c);
+        const title = document.createElement('strong'); title.textContent = m.title; b.append(title);
+        const rotate = document.createElement('label'); rotate.className = 'rotate-toggle';
+        const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.rotate = m.id;
+        checkbox.setAttribute('aria-label', `Include ${m.title} in random rotation`);
+        checkbox.checked = this.config.rotation.entries.some(e => e.shader === m.id);
+        checkbox.addEventListener('change', () => { this.setRotation(m.id, checkbox.checked); this.queueSave(); });
+        const caption = document.createElement('span'); caption.textContent = 'Rotate';
+        rotate.append(checkbox, caption);
+        rotate.addEventListener('click', (event) => event.stopPropagation());
+        b.append(rotate);
+        b.onclick = () => { this.select(m.id); this.queueSave(); };
+        grid.append(b);
+        const values = this.config.shaders[m.id] ??= {};
+        thumbnailStates.set(b, { canvas: c, manifest: m, values });
+        thumbnailObserver.observe(b);
+      });
+    }
     this.bindRotation();
     this.bindGlobals();
     this.element.querySelector('[data-action="random"]')!.addEventListener('click', () => this.randomize());

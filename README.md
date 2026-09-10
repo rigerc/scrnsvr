@@ -26,8 +26,8 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 12 GLSL shaders: `aurora-veil`, `contour-dunes`, `ember-drift`, `flow-field`, `gradient-blobs`, `gradient-drift`, `interference`, `mesh-gradient`, `plasma`, `silk-ribbons`, `star-drift`, `tidal-caustics`
-- 12–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
+- 44 GLSL shaders: 12 native effects plus 20 compatible screensaver shaders ported from AVS and all 12 ShaderSaver effects
+- 4–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -74,6 +74,8 @@ Choose a shader and adjust its sliders for a live preview. Numeric fields accept
 
 Every shader supports speed, brightness, and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color. Existing settings and presets retain their values, with newly added parameters taking their defaults.
 
+Imported shader credits, pinned upstream revisions, license notes, exclusions, and porting details are recorded in [THIRD_PARTY_SHADERS.md](THIRD_PARTY_SHADERS.md).
+
 See the [shader parameter guide](docs/shader-parameters.md) for the available adjustments.
 
 ## Config
@@ -117,5 +119,6 @@ systemctl --user enable --now scrnsvr.service
 - `src/shared/` — Zod config, clock/Noctalia helpers, IPC keys, shader manifest schema
 - `scripts/build.mjs` — esbuild bundles for main/preload/renderer/settings + static copies
 - `scripts/generate-shader-registry.mjs` — generates `src/renderer/shaders/generated.ts`
-- `tests/` — vitest suites for CLI, config, daemon, Noctalia, uniforms (14 tests)
+- `scripts/import-upstream-shaders.mjs` — reproduces the AVS and ShaderSaver WebGL ports from local upstream clones
+- `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and imported shader contracts
 - `packaging/` — systemd unit + deb post-install script

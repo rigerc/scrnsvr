@@ -34,14 +34,14 @@ function renderChecks(registry, baseline, contextType) {
   const canvas = document.createElement('canvas');
   const gl = canvas.getContext(contextType, { preserveDrawingBuffer: true, alpha: false });
   assert(gl, `Missing ${contextType}`);
-  const compile = (type, source) => {
+  const compile = (type, source, label) => {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    assert(gl.getShaderParameter(shader, gl.COMPILE_STATUS), gl.getShaderInfoLog(shader));
+    assert(gl.getShaderParameter(shader, gl.COMPILE_STATUS), `${label}: ${gl.getShaderInfoLog(shader)}`);
     return shader;
   };
-  const vertex = compile(gl.VERTEX_SHADER, 'attribute vec2 position; varying vec2 vUv; void main(){vUv=position*.5+.5;gl_Position=vec4(position,0.,1.);}');
+  const vertex = compile(gl.VERTEX_SHADER, 'attribute vec2 position; varying vec2 vUv; void main(){vUv=position*.5+.5;gl_Position=vec4(position,0.,1.);}', 'vertex');
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
@@ -51,7 +51,7 @@ function renderChecks(registry, baseline, contextType) {
     const createProgram = shader => {
       const program = gl.createProgram();
       gl.attachShader(program, vertex);
-      const fragment = compile(gl.FRAGMENT_SHADER, shader.source);
+      const fragment = compile(gl.FRAGMENT_SHADER, shader.source, id);
       gl.attachShader(program, fragment);
       gl.linkProgram(program);
       gl.deleteShader(fragment);
@@ -69,6 +69,7 @@ function renderChecks(registry, baseline, contextType) {
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform1f(gl.getUniformLocation(selectedProgram, 'uTime'), time);
       gl.uniform2f(gl.getUniformLocation(selectedProgram, 'uResolution'), width, height);
+      gl.uniform4f(gl.getUniformLocation(selectedProgram, 'uDate'), 2026, 9, 10, 45296);
       for (const def of shader.manifest.uniforms) {
         const value = overrides[def.name] ?? def.default;
         const location = gl.getUniformLocation(selectedProgram, def.name);
@@ -93,6 +94,21 @@ function renderChecks(registry, baseline, contextType) {
     assert(difference(render(0,{speed:0}), render(100,{speed:0})) === 0, `${id}: zero speed does not freeze`);
     const gray = render(12,{saturation:0});
     for(let i=0;i<gray.length;i+=4) assert(gray[i]===gray[i+1] && gray[i]===gray[i+2], `${id}: saturation zero is not grayscale`);
+    if (id === 'shadersaver-waveform') {
+      // A zero march distance used to produce thousands of isolated black
+      // pixels inside otherwise white highlights. Check the rendered result.
+      const width = 640, height = 360;
+      const pixels = render(12, {}, width, height);
+      const white = index => pixels[index] > 220 && pixels[index+1] > 220 && pixels[index+2] > 220;
+      let speckles = 0;
+      for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
+        const index = (y * width + x) * 4;
+        if (pixels[index] < 32 && pixels[index+1] < 32 && pixels[index+2] < 32
+          && white(index - 4) && white(index + 4)
+          && white(index - width * 4) && white(index + width * 4)) speckles++;
+      }
+      assert(speckles === 0, `${id}: ${speckles} black speckles in white highlights`);
+    }
     for (const def of definition.manifest.uniforms) {
       const dependencies = def.visibleWhen ? {[def.visibleWhen.name]:def.visibleWhen.value} : {};
       const interior = def.type === 'int' ? Math.round(def.min + (def.max - def.min) * 0.37) : def.min + (def.max - def.min) * 0.37;
@@ -133,16 +149,22 @@ function renderChecks(registry, baseline, contextType) {
 app.whenReady().then(async () => {
   const { shaderRegistry } = bundle('src/renderer/shaders/index.ts');
   const { defaultConfig } = bundle('src/shared/config.ts');
+  const filter = process.env.SCRNSVR_SHADER_FILTER;
+  const testedRegistry = filter
+    ? Object.fromEntries(Object.entries(shaderRegistry).filter(([id]) => id.includes(filter)))
+    : shaderRegistry;
+  if (!Object.keys(testedRegistry).length) throw Error(`No shaders matched SCRNSVR_SHADER_FILTER=${filter}`);
   const baselineIndex = process.argv.indexOf('--baseline');
   const baseline = baselineIndex < 0 ? null : require(path.resolve(process.argv[baselineIndex+1])).shaderRegistry;
   const win = new BrowserWindow({show:false,width:1280,height:1000,webPreferences:{preload:path.join(root,'dist/preload/index.js'),contextIsolation:true,sandbox:true}});
   win.webContents.on('render-process-gone', (_event, details) => {console.error(details);app.exit(1);});
   await win.loadURL('data:text/html,<html><body></body></html>');
-  for(const context of ['webgl','webgl2']) {
-    const result=await win.webContents.executeJavaScript(`(() => { try { return (${renderChecks.toString()})(${JSON.stringify(shaderRegistry)},${JSON.stringify(baseline)},${JSON.stringify(context)}); } catch (error) { return {error: error.stack}; } })()`);
+  for(const context of (process.argv.includes('--ui-only') ? [] : ['webgl','webgl2'])) {
+    const result=await win.webContents.executeJavaScript(`(() => { try { return (${renderChecks.toString()})(${JSON.stringify(testedRegistry)},${JSON.stringify(baseline)},${JSON.stringify(context)}); } catch (error) { return {error: error.stack}; } })()`);
     if (result.error) throw Error(result.error);
     console.log(JSON.stringify(result));
   }
+  if (filter) { win.destroy(); app.quit(); return; }
   let saved = structuredClone(defaultConfig);
   ipcMain.handle('config:get',()=>saved);
   ipcMain.handle('config:set',(_event,value)=>{saved=value;});
@@ -160,11 +182,51 @@ app.whenReady().then(async () => {
       assert(control,`Missing ${name}`); control.value=String(value); control.dispatchEvent(new Event(event,{bubbles:true}));
       return control;
     };
+    const mainCanvas = document.querySelector('.preview');
+    const mainContext = mainCanvas.getContext('webgl2') ?? mainCanvas.getContext('webgl');
+    const mainRenderer = mainContext.renderer;
+    const sample = document.createElement('canvas');
+    sample.width = 96; sample.height = 54;
+    const sampleContext = sample.getContext('2d');
+    const assertScene = async (canvas, label) => {
+      // Some imported scenes fade in from black; sample before presentation
+      // clears the non-preserved WebGL drawing buffer.
+      const deadline = performance.now() + 4000;
+      do {
+        sampleContext.drawImage(canvas, 0, 0, 96, 54);
+        const pixels = sampleContext.getImageData(0, 0, 96, 54).data;
+        let min = 255, max = 0, opaque = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          min = Math.min(min, pixels[i], pixels[i+1], pixels[i+2]);
+          max = Math.max(max, pixels[i], pixels[i+1], pixels[i+2]);
+          opaque += pixels[i+3];
+        }
+        if (opaque > 0 && max - min > 5) return;
+        await new Promise(requestAnimationFrame);
+      } while (performance.now() < deadline);
+      throw Error(`${label}: blank, white or flat render`);
+    };
     for(const [id,shader] of Object.entries(registry)) {
       document.querySelector(`[data-id="${id}"]`).click();
+      const preview = document.querySelector('.preview');
+      const gl = preview.getContext('webgl2') ?? preview.getContext('webgl');
+      assert(gl.renderer === mainRenderer, `${id}: replaced renderer state on the same context`);
+      assert(!gl.isContextLost() && gl.getError() === gl.NO_ERROR, `${id}: preview context failed`);
+      await assertScene(preview, `${id} preview`);
       assert(document.querySelectorAll('[data-control]').length===shader.manifest.uniforms.length, `${id}: missing controls`);
       assert(document.querySelectorAll('.shader-control-group:not([hidden])').length>=3, `${id}: missing groups`);
     }
+    // Exercise observer release/remount in both scroll directions. 2D targets
+    // retain their last frame while offscreen and never consume a WebGL context.
+    const cards = [...document.querySelectorAll('.shader-card')];
+    for (const card of [...cards, ...cards.toReversed()]) {
+      card.scrollIntoView({block:'center'});
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const canvas = card.querySelector('canvas');
+      assert(canvas.getContext('2d'), `${card.dataset.id}: thumbnail must share the gallery GPU context`);
+      await assertScene(canvas, `${card.dataset.id} thumbnail`);
+    }
+    window.scrollTo(0, 0);
     document.querySelector('[data-id="plasma"]').click();
     assert(document.querySelector('[data-control="color1"]').hidden,'Custom colors initially hidden');
     document.querySelector('[data-action="import-noctalia"]').click();
@@ -203,7 +265,7 @@ app.whenReady().then(async () => {
     const saved=await window.scrnsvr.getConfig();
     assert(saved.presets.plasma['Integration preset'].color1==='#123456','Preset saved through IPC');
     assert(saved.shaders['contour-dunes'].lineThickness===undefined,'Reset clears saved override');
-    return 'Controls, conditional visibility, numeric entry, focus, presets, randomize, reset and IPC passed';
+    return 'All shader previews, thumbnail scroll/remounts, renderer reuse, controls, presets and IPC passed';
   }.toString()})(${JSON.stringify(shaderRegistry)}).catch(error => ({error:error.stack}))`);
   if (ui.error) throw Error(ui.error);
   console.log(ui);

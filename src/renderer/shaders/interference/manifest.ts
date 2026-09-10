@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const interferenceManifest = manifest({
   id: "interference",
   title: "Orbital Interference",
+  category: 'Abstract',
   fragment: "shader.glsl",
   uniforms: [
     { name: "speed", type: "float", default: 0.35, min: 0, max: 2, step: 0.01,

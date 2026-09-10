@@ -18,6 +18,16 @@ Speed controls the whole animation, including secondary motion and twinkling. Ze
 | Tidal Caustics | 1–4 layers, distortion, wave complexity, direction, depth shading |
 | Ember Drift | Ember size and variation, rise direction, sideways wander, fade duration, haze, background |
 | Contour Dunes | Line thickness, edge softness, terrain distortion, fine detail, angle, contour intensity |
+| Opal Film | Surface scale, iridescence, surface distortion, sheen, background |
+| Kinetic Tiles | Tile density, spacing, rotation amount, wave delay, slide, background |
+| Ink Bloom | Bloom scale, curl, pigment density, feather detail, paper background |
+| Phosphor Garden | 4–20 stems, curvature, pulse rate, growth, background |
+| Rain Glass | Rain density, streak length, background blur, refraction, background |
+| Guilloché | 3–16 symmetry lobes, line spacing, weave, rotation rate, line width, background |
+| Liquid Chrome | Ripple scale, roughness, distortion, light angle, background |
+| Prism Mosaic | Cell density, edge glow, distortion, bevel width, background |
+| Paper Lanterns | 4–20 lanterns, sway, translucency, size, background |
+| Magnetic Filaments | 2–6 poles, pole spacing, line density, curvature, background |
 
 Direction and angle controls are offsets in degrees from the original composition or motion. Negative rotation, drift, and expansion rates reverse that component; overall Speed still governs all animation. Size and intensity controls use the shader's own scale, as explained beneath each control. Fine edges remain softened at small preview sizes to reduce shimmer.
 

@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const silkRibbonsManifest = manifest({
   id: "silk-ribbons",
   title: "Silk Ribbons",
+  category: 'Ambient',
   description: "Pearlescent bands of rose and blue silk unfurl in the dark.",
   fragment: "shader.glsl",
   uniforms: [

@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const flowFieldManifest = manifest({
   id: "flow-field",
   title: "Flow Field",
+  category: 'Ambient',
   description: "Slow currents of luminous color.",
   fragment: "shader.glsl",
   uniforms: [

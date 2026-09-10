@@ -3,6 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const emberDriftManifest = manifest({
   id: "ember-drift",
   title: "Ember Drift",
+  category: 'Ambient',
   description: "Warm motes rise and softly fade against a smoky night.",
   fragment: "shader.glsl",
   uniforms: [
