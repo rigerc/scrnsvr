@@ -18,7 +18,9 @@
     "test": "vitest run",
     "render-thumbnails": "npm run build && electron dist/main/index.js --thumbnail --output assets/thumbnails --frames 3",
     "dist": "npm run build && electron-builder --config electron-builder.yml",
-    "check-shaders": "npm run build && node scripts/check-shaders.cjs"
+    "check-shaders": "npm run build && node scripts/check-shaders.cjs",
+    "check-custom-shaders": "npm run build && node scripts/check-custom-shaders.cjs",
+    "check-reactive-audio": "npm run build && node scripts/check-reactive-audio.cjs"
   },
   "dependencies": {
     "ogl": "^1.0.11",

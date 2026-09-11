@@ -70,6 +70,8 @@ function renderChecks(registry, baseline, contextType) {
       gl.uniform1f(gl.getUniformLocation(selectedProgram, 'uTime'), time);
       gl.uniform2f(gl.getUniformLocation(selectedProgram, 'uResolution'), width, height);
       gl.uniform4f(gl.getUniformLocation(selectedProgram, 'uDate'), 2026, 9, 10, 45296);
+      const audio = overrides.audio ?? [0.25, 0.3, 0.2, 0.15];
+      gl.uniform4fv(gl.getUniformLocation(selectedProgram, 'uAudio'), audio);
       for (const def of shader.manifest.uniforms) {
         const value = overrides[def.name] ?? def.default;
         const location = gl.getUniformLocation(selectedProgram, def.name);
@@ -92,6 +94,13 @@ function renderChecks(registry, baseline, contextType) {
       assert(difference(render(0,{},width,height), render(20,{},width,height)) > 0.001, `${id}: blank or static scene`);
     }
     assert(difference(render(0,{speed:0}), render(100,{speed:0})) === 0, `${id}: zero speed does not freeze`);
+    if (definition.manifest.category === 'Reactive') {
+      // Ambient response should be visible after sustained sound, but restrained.
+      const audioDelta = difference(render(12,{audio:[0,0,0,0]}), render(12,{audio:[0.6,0.8,0.5,0.4]}));
+      assert(audioDelta > 1.5 && audioDelta < 12, `${id}: audio response outside ambient range (${audioDelta})`);
+      assert(difference(render(12,{speed:0,audio:[0,0,0,0]}), render(12,{speed:0,audio:[1,1,1,1]})) > 0.25, `${id}: zero speed must retain audio response`);
+      assert(difference(render(12,{sensitivity:0,audio:[0,0,0,0]}), render(12,{sensitivity:0,audio:[1,1,1,1]})) === 0, `${id}: sensitivity zero must disable audio response`);
+    }
     const gray = render(12,{saturation:0});
     for(let i=0;i<gray.length;i+=4) assert(gray[i]===gray[i+1] && gray[i]===gray[i+2], `${id}: saturation zero is not grayscale`);
     if (id === 'shadersaver-waveform') {

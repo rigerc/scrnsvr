@@ -10,6 +10,11 @@ import { shouldInhibitScreensaver } from './inhibit';
 import { IPC } from '../shared/ipc';
 import { loadNoctaliaColors } from './noctalia';
 import { shaderIds, shaderRegistry } from '../renderer/shaders';
+import { withCustomShaders } from '../shared/custom-shaders';
+import { PlaybackAudio } from './audio';
+
+const playbackAudio = new PlaybackAudio();
+app.once('before-quit', () => playbackAudio.stop());
 
 const options = parseArgs(process.argv.slice(1));
 if (options.thumbnail) {
@@ -49,11 +54,13 @@ async function createRendererWindow(config: Config, bounds: Electron.Rectangle, 
 
 async function createRendererWindows(shaderOverride?: string, preview = false): Promise<BrowserWindow[]> {
   const config = await loadConfig();
+  playbackAudio.setEnabled(config.audio.enabled);
+  const available = withCustomShaders(shaderRegistry, config.customShaders);
   // `--shader` wins; otherwise a random enabled rotation entry wins; else the saved shader.
-  let shaderId = shaderOverride && shaderRegistry[shaderOverride] ? shaderOverride : config.shader;
+  let shaderId = shaderOverride && available[shaderOverride] ? shaderOverride : config.shader;
   let preset: string | undefined;
   if (!shaderOverride && !preview) {
-    const pick = pickRotationEntry(config.rotation, config.shaders, config.presets, shaderIds);
+    const pick = pickRotationEntry(config.rotation, config.shaders, config.presets, Object.keys(available));
     if (pick) { shaderId = pick.shaderId; preset = pick.preset; }
   }
   const displays = preview || config.global.monitors === 'primary' ? [screen.getPrimaryDisplay()] : screen.getAllDisplays();
@@ -75,7 +82,7 @@ function startWindowGroupCycling(windows: BrowserWindow[]): void {
     let currentKey: string | undefined;
     const timer = setInterval(async () => {
       const latest = await loadConfig();
-      const pick = pickRotationEntry(latest.rotation, latest.shaders, latest.presets, shaderIds, Math.random, currentKey);
+      const pick = pickRotationEntry(latest.rotation, latest.shaders, latest.presets, Object.keys(withCustomShaders(shaderRegistry, latest.customShaders)), Math.random, currentKey);
       if (!pick) return;
       currentKey = rotationEntryKey(pick.shaderId, pick.preset);
       for (const window of windows) {
@@ -133,12 +140,33 @@ async function launchWindowGroup(): Promise<RendererChild> {
 function registerIpc(): void {
   ipcMain.handle(IPC.getConfig, () => loadConfig());
   ipcMain.handle(IPC.importNoctaliaColors, () => loadNoctaliaColors());
-  ipcMain.handle(IPC.setConfig, (_event, candidate: unknown) => saveConfig(ConfigSchema.parse(candidate)));
+  ipcMain.handle(IPC.setConfig, async (_event, candidate: unknown) => {
+    const config = ConfigSchema.parse(candidate);
+    await saveConfig(config);
+    playbackAudio.setEnabled(config.audio.enabled);
+  });
+  const subscriptions = new Map<number, () => void>();
+  ipcMain.on(IPC.audioSubscribe, event => {
+    const sender = event.sender;
+    if (subscriptions.has(sender.id)) return;
+    const unsubscribe = playbackAudio.subscribe(frame => { if (!sender.isDestroyed()) sender.send(IPC.audio, frame); });
+    const cleanup = () => {
+      unsubscribe();
+      subscriptions.delete(sender.id);
+      sender.removeListener('destroyed', cleanup);
+      sender.removeListener('did-start-loading', cleanup);
+    };
+    subscriptions.set(sender.id, cleanup);
+    sender.once('destroyed', cleanup);
+    sender.once('did-start-loading', cleanup);
+  });
+  ipcMain.on(IPC.audioUnsubscribe, event => subscriptions.get(event.sender.id)?.());
   ipcMain.on(IPC.close, (event) => BrowserWindow.fromWebContents(event.sender)?.close());
 }
 
 app.whenReady().then(async () => {
   registerIpc();
+  playbackAudio.setEnabled((await loadConfig()).audio.enabled);
   const mode = resolveMode(options);
   if (mode === 'thumbnail') {
     await captureThumbnails(path.resolve(options.output ?? 'assets/thumbnails'), options.frames);

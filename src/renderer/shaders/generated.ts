@@ -73,32 +73,38 @@ import { prismMosaicManifest } from './prism-mosaic/manifest';
 import shader35 from './prism-mosaic/shader.glsl';
 import { rainGlassManifest } from './rain-glass/manifest';
 import shader36 from './rain-glass/shader.glsl';
+import { audioRibbonsManifest } from './reactive-audio-ribbons/manifest';
+import shader37 from './reactive-audio-ribbons/shader.glsl';
+import { bassBloomManifest } from './reactive-bass-bloom/manifest';
+import shader38 from './reactive-bass-bloom/shader.glsl';
+import { pulseRingsManifest } from './reactive-pulse-rings/manifest';
+import shader39 from './reactive-pulse-rings/shader.glsl';
 import { shadersaverGhostsManifest } from './shadersaver-ghosts/manifest';
-import shader37 from './shadersaver-ghosts/shader.glsl';
+import shader40 from './shadersaver-ghosts/shader.glsl';
 import { shadersaverOrigamiManifest } from './shadersaver-origami/manifest';
-import shader38 from './shadersaver-origami/shader.glsl';
+import shader41 from './shadersaver-origami/shader.glsl';
 import { shadersaverRainbowRoadManifest } from './shadersaver-rainbow-road/manifest';
-import shader39 from './shadersaver-rainbow-road/shader.glsl';
+import shader42 from './shadersaver-rainbow-road/shader.glsl';
 import { shadersaverShieldManifest } from './shadersaver-shield/manifest';
-import shader40 from './shadersaver-shield/shader.glsl';
+import shader43 from './shadersaver-shield/shader.glsl';
 import { shadersaverSimplexManifest } from './shadersaver-simplex/manifest';
-import shader41 from './shadersaver-simplex/shader.glsl';
+import shader44 from './shadersaver-simplex/shader.glsl';
 import { shadersaverSingularityManifest } from './shadersaver-singularity/manifest';
-import shader42 from './shadersaver-singularity/shader.glsl';
+import shader45 from './shadersaver-singularity/shader.glsl';
 import { shadersaverStarshipManifest } from './shadersaver-starship/manifest';
-import shader43 from './shadersaver-starship/shader.glsl';
+import shader46 from './shadersaver-starship/shader.glsl';
 import { shadersaverSunsetManifest } from './shadersaver-sunset/manifest';
-import shader44 from './shadersaver-sunset/shader.glsl';
+import shader47 from './shadersaver-sunset/shader.glsl';
 import { shadersaverWaterRipplesManifest } from './shadersaver-water-ripples/manifest';
-import shader45 from './shadersaver-water-ripples/shader.glsl';
+import shader48 from './shadersaver-water-ripples/shader.glsl';
 import { shadersaverWaveformManifest } from './shadersaver-waveform/manifest';
-import shader46 from './shadersaver-waveform/shader.glsl';
+import shader49 from './shadersaver-waveform/shader.glsl';
 import { silkRibbonsManifest } from './silk-ribbons/manifest';
-import shader47 from './silk-ribbons/shader.glsl';
+import shader50 from './silk-ribbons/shader.glsl';
 import { starDriftManifest } from './star-drift/manifest';
-import shader48 from './star-drift/shader.glsl';
+import shader51 from './star-drift/shader.glsl';
 import { tidalCausticsManifest } from './tidal-caustics/manifest';
-import shader49 from './tidal-caustics/shader.glsl';
+import shader52 from './tidal-caustics/shader.glsl';
 
 export const shaderRegistry: Record<string, { manifest: import('../../shared/manifest').ShaderManifest; source: string }> = {
   [auroraVeilManifest.id]: { manifest: auroraVeilManifest, source: shader0 },
@@ -138,18 +144,21 @@ export const shaderRegistry: Record<string, { manifest: import('../../shared/man
   [plasmaManifest.id]: { manifest: plasmaManifest, source: shader34 },
   [prismMosaicManifest.id]: { manifest: prismMosaicManifest, source: shader35 },
   [rainGlassManifest.id]: { manifest: rainGlassManifest, source: shader36 },
-  [shadersaverGhostsManifest.id]: { manifest: shadersaverGhostsManifest, source: shader37 },
-  [shadersaverOrigamiManifest.id]: { manifest: shadersaverOrigamiManifest, source: shader38 },
-  [shadersaverRainbowRoadManifest.id]: { manifest: shadersaverRainbowRoadManifest, source: shader39 },
-  [shadersaverShieldManifest.id]: { manifest: shadersaverShieldManifest, source: shader40 },
-  [shadersaverSimplexManifest.id]: { manifest: shadersaverSimplexManifest, source: shader41 },
-  [shadersaverSingularityManifest.id]: { manifest: shadersaverSingularityManifest, source: shader42 },
-  [shadersaverStarshipManifest.id]: { manifest: shadersaverStarshipManifest, source: shader43 },
-  [shadersaverSunsetManifest.id]: { manifest: shadersaverSunsetManifest, source: shader44 },
-  [shadersaverWaterRipplesManifest.id]: { manifest: shadersaverWaterRipplesManifest, source: shader45 },
-  [shadersaverWaveformManifest.id]: { manifest: shadersaverWaveformManifest, source: shader46 },
-  [silkRibbonsManifest.id]: { manifest: silkRibbonsManifest, source: shader47 },
-  [starDriftManifest.id]: { manifest: starDriftManifest, source: shader48 },
-  [tidalCausticsManifest.id]: { manifest: tidalCausticsManifest, source: shader49 },
+  [audioRibbonsManifest.id]: { manifest: audioRibbonsManifest, source: shader37 },
+  [bassBloomManifest.id]: { manifest: bassBloomManifest, source: shader38 },
+  [pulseRingsManifest.id]: { manifest: pulseRingsManifest, source: shader39 },
+  [shadersaverGhostsManifest.id]: { manifest: shadersaverGhostsManifest, source: shader40 },
+  [shadersaverOrigamiManifest.id]: { manifest: shadersaverOrigamiManifest, source: shader41 },
+  [shadersaverRainbowRoadManifest.id]: { manifest: shadersaverRainbowRoadManifest, source: shader42 },
+  [shadersaverShieldManifest.id]: { manifest: shadersaverShieldManifest, source: shader43 },
+  [shadersaverSimplexManifest.id]: { manifest: shadersaverSimplexManifest, source: shader44 },
+  [shadersaverSingularityManifest.id]: { manifest: shadersaverSingularityManifest, source: shader45 },
+  [shadersaverStarshipManifest.id]: { manifest: shadersaverStarshipManifest, source: shader46 },
+  [shadersaverSunsetManifest.id]: { manifest: shadersaverSunsetManifest, source: shader47 },
+  [shadersaverWaterRipplesManifest.id]: { manifest: shadersaverWaterRipplesManifest, source: shader48 },
+  [shadersaverWaveformManifest.id]: { manifest: shadersaverWaveformManifest, source: shader49 },
+  [silkRibbonsManifest.id]: { manifest: silkRibbonsManifest, source: shader50 },
+  [starDriftManifest.id]: { manifest: starDriftManifest, source: shader51 },
+  [tidalCausticsManifest.id]: { manifest: tidalCausticsManifest, source: shader52 },
 };
 export const shaderIds = Object.keys(shaderRegistry);

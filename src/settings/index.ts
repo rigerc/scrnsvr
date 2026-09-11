@@ -6,6 +6,7 @@ import { mountClock } from '../renderer/core/clock';
 import { mountClockControls } from './clock';
 import { mountShaderControls } from './shader-controls';
 import { randomizeUniforms } from '../renderer/core/uniforms';
+import { openCustomShaderEditor } from './custom-shader-editor';
 
 type Value = number | boolean | string;
 export interface PreviewRuntime {
@@ -30,22 +31,31 @@ export class SettingsPanel {
   constructor(options: SettingsOptions) {
     this.manifests = options.manifests;
     this.preview = options.preview;
-    this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, shaders: {}, presets: {} } as Config);
+this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, audio: { enabled: false }, customShaders: [], shaders: {}, presets: {} } as Config);
     this.config.clock = { ...defaultClockConfig, ...this.config.clock };
     this.config.rotation ??= { enabled: false, entries: [], intervalMinutes: 0 };
+    this.config.audio ??= { enabled: false };
     this.element = options.root;
     this.element.className = 'scrnsvr-settings';
     this.render();
   }
   private render() {
     this.element.innerHTML = `
-      <header><div><small>SCRNSVR / SETTINGS</small><h1>Shape your atmosphere</h1></div><button data-action="random">Randomize</button></header>
+      <header><div><small>SCRNSVR / SETTINGS</small><h1>Shape your atmosphere</h1></div><div><button data-action="add-shader">Add shader</button> <button data-action="random">Randomize</button></div></header>
       <section class="editor" aria-label="Shader editor">
         <div class="preview-column">
           <section class="preview-panel" aria-labelledby="preview-title">
             <div class="preview-heading"><h2 id="preview-title"></h2><span class="live-badge">Live preview</span></div>
             <div class="clock-stage"><canvas class="preview" width="720" height="405" aria-label="Live shader preview"></canvas></div>
             <p class="preview-description"></p>
+            <button data-action="edit-source" hidden>Edit source</button>
+          </section>
+          <section class="audio-settings" aria-label="Reactive shader audio">
+            <label><input type="checkbox" data-audio-enabled>React to playing audio</label>
+            <p>Source: default output monitor (Linux PulseAudio / PipeWire-Pulse). No microphone access, recording, or upload.</p>
+            <meter data-audio-level min="0" max="1" value="0" aria-label="Playback audio level"></meter>
+            <p data-audio-status role="status">Audio response is off.</p>
+            <p>Leave “Don't start while audio is playing” unchecked to use reactive shaders with the idle daemon.</p>
           </section>
           <h2 class="gallery-heading">Choose a shader</h2>
           <p class="rotation-hint">Click a shader to edit it. Tick <strong>Rotate</strong> to include it in the random shuffle when the screensaver opens.</p>
@@ -76,6 +86,16 @@ export class SettingsPanel {
       <section class="global" aria-label="Global settings"><label>Idle threshold (seconds)<input data-global="idleThresholdSeconds" type="number" min="0" step="1"></label><label>Frame rate <output data-output="fps"></output><input data-global="fps" type="range" min="1" max="240" step="1"></label><label>Fade in/out <output data-output="fadeSeconds"></output><input data-global="fadeSeconds" type="range" min="0" max="5" step="0.1"></label><label>Monitors<select data-global="monitors"><option value="primary">Primary monitor</option><option value="all">All monitors</option></select></label><label class="clock-toggle"><input data-global-check="inhibitOnAudio" type="checkbox">Don't start while audio is playing</label><label class="clock-toggle"><input data-global-check="inhibitOnFullscreen" type="checkbox">Don't start over fullscreen apps</label></section>
       <footer><span data-status role="status">All changes saved locally</span><button data-action="reset">Reset shader</button></footer>`;
     this.controls = this.element.querySelector('.controls')!; this.status = this.element.querySelector('[data-status]')!;
+    const audioEnabled = this.element.querySelector<HTMLInputElement>('[data-audio-enabled]')!;
+    audioEnabled.checked = this.config.audio.enabled;
+    audioEnabled.addEventListener('change', () => { this.config.audio.enabled = audioEnabled.checked; this.queueSave(); });
+    const audioStatus = this.element.querySelector<HTMLElement>('[data-audio-status]')!;
+    const audioMeter = this.element.querySelector<HTMLMeterElement>('[data-audio-level]')!;
+    const stopAudio = window.scrnsvrAudio?.subscribe(frame => {
+      audioStatus.textContent = frame.status;
+      audioMeter.value = frame.level;
+    });
+    window.addEventListener('pagehide', () => stopAudio?.(), { once: true });
     const clock = mountClock(this.element.querySelector('.clock-stage') as HTMLElement, this.config.clock);
     mountClockControls(this.element.querySelector('#clock-settings') as HTMLElement, this.config.clock, () => {
       clock.update(this.config.clock);
@@ -165,6 +185,20 @@ export class SettingsPanel {
       });
     }
     this.bindRotation();
+    const editSource = (existing = false) => openCustomShaderEditor(
+      existing ? this.config.customShaders?.find(shader => shader.id === this.shader.id) : undefined,
+      async shader => {
+        if (this.timer) clearTimeout(this.timer);
+        const next = structuredClone(this.config);
+        next.customShaders = [...(next.customShaders ?? []).filter(item => item.id !== shader.id), shader];
+        next.shader = shader.id;
+        try { await window.scrnsvr.setConfig(next); }
+        catch (error) { this.queueSave(); throw error; }
+        location.reload();
+      },
+    );
+    this.element.querySelector('[data-action="add-shader"]')!.addEventListener('click', () => editSource());
+    this.element.querySelector('[data-action="edit-source"]')!.addEventListener('click', () => editSource(true));
     this.bindGlobals();
     this.element.querySelector('[data-action="random"]')!.addEventListener('click', () => this.randomize());
     this.element.querySelector('[data-action="reset"]')!.addEventListener('click', () => { this.replaceValues({}); this.renderControls(); this.queueSave(); });
@@ -176,6 +210,7 @@ export class SettingsPanel {
     this.shader = this.manifests.find(m => m.id === id) ?? this.manifests[0];
     if (!this.shader) return;
     this.config.shader = this.shader.id;
+    (this.element.querySelector('[data-action="edit-source"]') as HTMLButtonElement).hidden = !this.config.customShaders?.some(shader => shader.id === this.shader.id);
     this.element.querySelector('#preview-title')!.textContent = this.shader.title;
     this.element.querySelector('.preview-description')!.textContent = this.shader.description ?? 'Adjust the controls to see your changes here immediately.';
     this.renderControls();

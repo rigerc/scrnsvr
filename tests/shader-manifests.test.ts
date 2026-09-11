@@ -23,10 +23,14 @@ import { liquidChromeManifest } from '../src/renderer/shaders/liquid-chrome/mani
 import { prismMosaicManifest } from '../src/renderer/shaders/prism-mosaic/manifest';
 import { paperLanternsManifest } from '../src/renderer/shaders/paper-lanterns/manifest';
 import { magneticFilamentsManifest } from '../src/renderer/shaders/magnetic-filaments/manifest';
+import { pulseRingsManifest } from '../src/renderer/shaders/reactive-pulse-rings/manifest';
+import { audioRibbonsManifest } from '../src/renderer/shaders/reactive-audio-ribbons/manifest';
+import { bassBloomManifest } from '../src/renderer/shaders/reactive-bass-bloom/manifest';
 
 const manifests = [auroraVeilManifest, contourDunesManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest,
   opalFilmManifest, kineticTilesManifest, inkBloomManifest, phosphorGardenManifest, rainGlassManifest,
-  guillocheManifest, liquidChromeManifest, prismMosaicManifest, paperLanternsManifest, magneticFilamentsManifest];
+  guillocheManifest, liquidChromeManifest, prismMosaicManifest, paperLanternsManifest, magneticFilamentsManifest,
+  pulseRingsManifest, audioRibbonsManifest, bassBloomManifest];
 
 describe('shader parameter contracts', () => {
   for (const manifest of manifests) {

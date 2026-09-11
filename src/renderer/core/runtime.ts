@@ -2,6 +2,8 @@ import { Color, Mesh, Program, Renderer, Triangle } from 'ogl';
 import type { ShaderManifest, UniformManifest } from '../../shared/manifest';
 import { bindUniforms } from './uniforms';
 import { startLoop } from './loop';
+import { silentAudio } from '../../shared/audio';
+import { AmbientAudio } from './ambient-audio';
 
 export interface ShaderDefinition { manifest: ShaderManifest; source: string; }
 
@@ -23,8 +25,14 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const gl = renderer.gl;
   const resolved = bindUniforms(shader.manifest.uniforms, values);
   const mountedAt = new Date();
+  let audio = silentAudio;
+  const ambientAudio = new AmbientAudio();
+  let previousTime = 0;
+  const unsubscribeAudio = /\buAudio\b/.test(shader.source)
+    ? window.scrnsvrAudio?.subscribe(frame => { audio = frame; }) : undefined;
   const uniforms: Record<string, { value: unknown }> = {
     uTime: { value: 0 },
+    uAudio: { value: [0, 0, 0, 0] },
     uResolution: { value: [1, 1] },
     // Imported clock shaders use Shadertoy's year/month/day/seconds format.
     // The shader adds scaled uTime so the Speed control can also freeze clocks.
@@ -51,6 +59,8 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   return {
     draw(time: number) {
       uniforms.uTime.value = time;
+      uniforms.uAudio.value = ambientAudio.update(audio, time - previousTime);
+      previousTime = time;
       uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
       const latest = bindUniforms(shader.manifest.uniforms, values);
       for (const definition of shader.manifest.uniforms) {
@@ -59,6 +69,7 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
       renderer.render({ scene: mesh });
     },
     dispose() {
+      unsubscribeAudio?.();
       geometry.remove();
       // OGL retains uploaded uniform values in its renderer cache.
       for (const location of program.uniformLocations.values()) renderer.state.uniformLocations.delete(location);

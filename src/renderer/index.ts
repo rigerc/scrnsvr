@@ -1,4 +1,5 @@
-import { shaderRegistry } from './shaders';
+import { shaderRegistry as builtins } from './shaders';
+import { withCustomShaders } from '../shared/custom-shaders';
 import { mountShader } from './core/runtime';
 import type { Config } from '../shared/config';
 import { defaultClockConfig } from '../shared/clock';
@@ -8,6 +9,7 @@ import { mountFadeOverlay } from './core/fade';
 
 void (async () => {
   const config = await window.scrnsvr.getConfig() as Config;
+  let shaderRegistry = withCustomShaders(builtins, config.customShaders);
   const params = new URLSearchParams(location.search);
   const requested = params.get('shader') || config.shader;
   const chosen = shaderRegistry[requested] ?? shaderRegistry['flow-field'] ?? Object.values(shaderRegistry)[0];
@@ -23,7 +25,9 @@ void (async () => {
   const fade = params.has('nofade') ? undefined : mountFadeOverlay(document.body, config.global.fadeSeconds ?? 1);
 
   // Cycling is coordinated by the main process so every monitor swaps together.
-  const unsubscribeCycle = window.scrnsvr.onCycle?.((pick) => {
+  const unsubscribeCycle = window.scrnsvr.onCycle?.(async (pick) => {
+    Object.assign(config, await window.scrnsvr.getConfig());
+    shaderRegistry = withCustomShaders(builtins, config.customShaders);
     const next = shaderRegistry[pick.shader];
     if (!next) return;
     const key = rotationEntryKey(pick.shader, pick.preset);
@@ -37,7 +41,7 @@ void (async () => {
     else swap();
   });
 
-  const teardown = () => { unsubscribeCycle?.(); fade?.destroy(); clock.destroy(); };
+  const teardown = () => { unsubscribeCycle?.(); stopScene(); fade?.destroy(); clock.destroy(); };
   addEventListener('pagehide', teardown, { once: true });
 
   let dismissed = false;

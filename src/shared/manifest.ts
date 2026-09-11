@@ -1,4 +1,4 @@
-export const shaderCategories = ['Abstract', 'Ambient', 'Clocks', 'Digital', 'Landscapes', 'Space', 'Water'] as const;
+export const shaderCategories = ['Abstract', 'Ambient', 'Clocks', 'Custom', 'Digital', 'Landscapes', 'Reactive', 'Space', 'Water'] as const;
 export type ShaderCategory = typeof shaderCategories[number];
 export type UniformType = 'float'|'int'|'bool'|'color'|'select';
 export type UniformValue = number | boolean | string;

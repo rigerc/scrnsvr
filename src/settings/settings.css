@@ -99,3 +99,15 @@ html,body{margin:0;min-height:100%;background:#080c14}
 .shader-settings :focus-visible{outline:2px solid #62c9ff;outline-offset:3px}
 @media(min-width:781px){.shader-settings .controls{max-height:70vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}}
 @media(max-width:780px){.global,.editor{grid-template-columns:1fr}.scrnsvr-settings{padding:28px 18px}.scrnsvr-settings header{align-items:flex-start}.control{grid-template-columns:100px 1fr}}
+.custom-shader-editor{box-sizing:border-box;width:min(900px,94vw);max-height:92vh;overflow:auto;background:#0a1220;color:#eef4ff;border:1px solid #38557c;border-radius:12px;padding:24px;font:14px system-ui}
+.custom-shader-editor::backdrop{background:#000b}
+.custom-shader-editor label{display:grid;gap:8px;margin:14px 0}
+.custom-shader-editor input,.custom-shader-editor textarea{box-sizing:border-box;width:100%;padding:10px;background:#080c14;color:#eef4ff;border:1px solid #38557c;border-radius:6px}
+.custom-shader-editor textarea{font:13px/1.5 monospace;resize:vertical;tab-size:2}
+.custom-shader-editor canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#000}
+.custom-shader-editor pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#b7d8f4}
+.custom-editor-actions{display:flex;justify-content:flex-end;gap:12px}
+.custom-editor-actions button{padding:10px 16px;background:#182e49;color:#eef4ff;border:1px solid #38557c;border-radius:6px;cursor:pointer}
+.audio-settings { padding: 16px; margin: 16px 0; border: 1px solid #26354a; border-radius: 12px; }
+.audio-settings p { color: #9cacc2; font-size: 12px; line-height: 1.5; }
+.audio-settings meter { width: 100%; }
