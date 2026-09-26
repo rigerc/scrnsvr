@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
-export const RotationEntrySchema = z.object({
+const RotationEntrySchema = z.object({
   shader: z.string().min(1),
   preset: z.string().min(1).optional(),
 });
-export type RotationEntry = z.infer<typeof RotationEntrySchema>;
 
 export const RotationSchema = z.object({
   enabled: z.boolean().default(false),

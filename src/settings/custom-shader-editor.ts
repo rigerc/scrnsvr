@@ -1,7 +1,7 @@
 import { CustomShaderSchema, customShaderDefinition, customShaderTemplate, customVertex, type CustomShader } from '../shared/custom-shaders';
 import { mountShader } from '../renderer/core/runtime';
 
-export function validateCustomShader(gl: WebGLRenderingContext | WebGL2RenderingContext, shader: CustomShader): void {
+function validateCustomShader(gl: WebGLRenderingContext | WebGL2RenderingContext, shader: CustomShader): void {
   const definition = customShaderDefinition(shader);
   const program = gl.createProgram();
   const stages: WebGLShader[] = [];

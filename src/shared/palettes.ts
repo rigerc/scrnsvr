@@ -2,7 +2,7 @@ import type { ShaderManifest, UniformValue } from './manifest';
 import { palettes, type ColorRoles, type Palette } from './palettes.generated';
 
 export { palettes };
-export type { ColorRoles, Palette, PaletteVariant } from './palettes.generated';
+export type { ColorRoles, Palette } from './palettes.generated';
 
 /** Sentinel meaning "keep the shader's built-in palette". */
 export const SCHEME_NONE = 'none';

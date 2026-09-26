@@ -44,7 +44,8 @@ export interface PreviewRuntime {
 }
 export interface SettingsOptions { root: HTMLElement; manifests: ShaderManifest[]; initial?: Config; preview?: PreviewRuntime; }
 
-/** Vanilla settings UI. The host supplies manifests so this stays independent of the renderer registry. */
+/** Vanilla settings UI. The host supplies manifests so this stays independent of the renderer registry.
+ *  Exported because `mountSettings` returns it and hosts/tests drive it directly. */
 export class SettingsPanel {
   readonly element: HTMLElement;
   private config: Config;

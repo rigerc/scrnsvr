@@ -1,7 +1,7 @@
 import type { UniformManifest, UniformValue } from '../../shared/manifest';
 
 /** Normalize persisted values without snapping legacy presets to new UI steps. */
-export function uniformValue(def: UniformManifest, value: unknown): UniformValue {
+function uniformValue(def: UniformManifest, value: unknown): UniformValue {
   if (value === undefined || value === null) return def.default;
   if (def.type === 'float' || def.type === 'int') {
     let number = typeof value === 'number' || (typeof value === 'string' && value.trim())
