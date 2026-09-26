@@ -3,7 +3,8 @@ export const settingsMarkup = `
   <header class="app-header">
     <div class="app-brand" aria-label="scrnsvr">scrnsvr</div>
     <nav class="main-tabs" role="tablist" aria-label="Settings views">
-      <button id="shader-tab" type="button" role="tab" aria-selected="true" aria-controls="shader-settings" data-tab="shader-settings">Shaders</button>
+      <button id="shader-tab" type="button" role="tab" aria-selected="true" aria-controls="shader-settings" data-tab="shader-settings">Visuals</button>
+      <button id="looks-tab" type="button" role="tab" aria-selected="false" aria-controls="looks-settings" tabindex="-1" data-tab="looks-settings">Looks &amp; Shuffle</button>
       <button id="clock-tab" type="button" role="tab" aria-selected="false" aria-controls="clock-settings" tabindex="-1" data-tab="clock-settings">Clock</button>
       <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="system-settings" tabindex="-1" data-tab="system-settings">Settings</button>
     </nav>
@@ -13,7 +14,7 @@ export const settingsMarkup = `
   <div class="workspace">
     <aside class="shader-bank" aria-labelledby="bank-title">
       <div class="bank-heading">
-        <h1 id="bank-title">Shader bank</h1>
+        <h1 id="bank-title">Choose a visual</h1>
         <button type="button" data-action="add-shader" aria-label="Add custom shader" title="Add custom shader">Add shader</button>
       </div>
       <div class="shader-categories" aria-label="Choose a shader"></div>
@@ -31,10 +32,35 @@ export const settingsMarkup = `
           <button type="button" data-action="edit-source" hidden>Edit source</button>
         </div>
       </div>
+      <section class="looks-workspace" aria-labelledby="looks-title" hidden>
+        <div class="looks-heading">
+          <h2 id="looks-title">Saved looks</h2>
+          <p>For <strong data-look-shader></strong>. Looks save its adjustments; color schemes follow your current choice.</p>
+        </div>
+        <div class="current-look">
+          <div><strong>Current edits</strong><p>Follows the adjustments you make to this visual.</p></div>
+          <button type="button" data-current-shuffle></button>
+        </div>
+        <form class="look-save-form" data-look-save-form>
+          <label for="look-name">Save current edits as a look</label>
+          <div class="preset-row">
+            <input id="look-name" data-preset aria-label="Look name" placeholder="Name this look" maxlength="80" required>
+            <button type="submit" data-action="save">Save look</button>
+          </div>
+        </form>
+        <div class="look-confirm" data-look-confirm hidden>
+          <p data-look-confirm-text></p>
+          <button type="button" data-action="update-look">Update saved look</button>
+          <button type="button" data-action="cancel-update">Cancel</button>
+        </div>
+        <p class="look-message" data-look-message role="status" aria-live="polite"></p>
+        <div class="preset-list" aria-label="Saved looks for the selected visual"></div>
+      </section>
     </section>
 
     <aside class="inspector" aria-label="Settings inspector">
       <section id="shader-settings" class="shader-settings" role="tabpanel" aria-labelledby="shader-tab">
+        <div class="inspector-heading"><h2>Adjust visual</h2><button type="button" data-action="open-save-look">Save look</button></div>
         <div class="controls" aria-label="Shader controls"></div>
         <div class="shader-actions">
           <button type="button" data-action="random">Randomize</button>
@@ -49,14 +75,22 @@ export const settingsMarkup = `
           <button type="button" data-action="import-noctalia">Import Noctalia colors</button>
           <p data-import-status role="status">Apply your desktop palette to this shader.</p>
         </section>
-        <section class="presets" aria-labelledby="presets-title">
-          <h2 id="presets-title">Presets</h2>
-          <div class="preset-row">
-            <input data-preset aria-label="Preset name" placeholder="Preset name">
-            <button type="button" data-action="save">Save</button>
-          </div>
-          <div class="preset-list"></div>
-        </section>
+      </section>
+
+      <section id="looks-settings" class="looks-settings" role="tabpanel" aria-labelledby="looks-tab" hidden>
+        <div class="shuffle-heading"><h2>Shuffle list</h2><span data-shuffle-count></span></div>
+        <p class="shuffle-intro">Click a look to load it in Visuals. Remove only takes it out of shuffle.</p>
+        <ul class="rotation-list" data-rotation-list></ul>
+        <p class="rotation-empty" data-rotation-empty hidden>Choose a visual, then add its current edits or a saved look.</p>
+        <div class="shuffle-behavior">
+          <label class="toggle-row"><input type="checkbox" data-rotation="enabled">Shuffle when the screensaver starts</label>
+          <label class="toggle-row"><input type="checkbox" data-rotation="cycle">Also change while it runs</label>
+          <label class="rotation-interval">Change every
+            <input type="number" data-rotation="intervalMinutes" min="1" max="180" step="1" aria-label="Minutes between changes">
+            <span>minutes</span>
+          </label>
+          <p class="shuffle-summary" data-shuffle-summary role="status"></p>
+        </div>
       </section>
 
       <section id="clock-settings" class="clock-settings" role="tabpanel" aria-labelledby="clock-tab" hidden></section>
@@ -84,18 +118,6 @@ export const settingsMarkup = `
           <label>Global color scheme
             <select data-global="scheme" aria-label="Global color scheme"></select>
           </label>
-        </section>
-
-        <section class="rotation" aria-label="Random rotation">
-          <h2>Rotation</h2>
-          <label class="toggle-row"><input type="checkbox" data-rotation="enabled">Shuffle on open</label>
-          <label class="rotation-interval">Change shader every
-            <input type="number" data-rotation="intervalMinutes" min="0" max="180" step="1">
-            <span>min</span>
-          </label>
-          <p class="field-hint" data-rotation-interval-hint>0 means only on open</p>
-          <ul class="rotation-list" data-rotation-list></ul>
-          <p class="rotation-empty" data-rotation-empty hidden>No shaders selected. Use the add control on any shader tile.</p>
         </section>
 
         <section class="audio-settings" aria-label="Reactive shader audio">

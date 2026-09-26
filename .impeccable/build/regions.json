@@ -1,0 +1,365 @@
+{
+  "regions": [
+    {
+      "id": "top-bar",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 54
+      },
+      "note": "matte charcoal application bar and thin lower rule"
+    },
+    {
+      "id": "brand",
+      "kind": "text",
+      "pixelBox": {
+        "x": 20,
+        "y": 16,
+        "w": 104,
+        "h": 28
+      },
+      "note": "scrnsvr wordmark in warm ivory"
+    },
+    {
+      "id": "nav-shaders",
+      "kind": "control",
+      "pixelBox": {
+        "x": 482,
+        "y": 15,
+        "w": 100,
+        "h": 39
+      },
+      "note": "Shaders active tab with coral underline"
+    },
+    {
+      "id": "nav-clock",
+      "kind": "control",
+      "pixelBox": {
+        "x": 604,
+        "y": 15,
+        "w": 64,
+        "h": 30
+      },
+      "note": "Clock tab"
+    },
+    {
+      "id": "nav-settings",
+      "kind": "control",
+      "pixelBox": {
+        "x": 709,
+        "y": 15,
+        "w": 80,
+        "h": 30
+      },
+      "note": "Settings tab"
+    },
+    {
+      "id": "bank-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 21,
+        "y": 84,
+        "w": 132,
+        "h": 20
+      },
+      "note": "SHADER BANK silkscreen label"
+    },
+    {
+      "id": "thumb-1",
+      "kind": "control",
+      "pixelBox": {
+        "x": 20,
+        "y": 123,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-1",
+      "kind": "text",
+      "pixelBox": {
+        "x": 20,
+        "y": 284,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Aurora Veil name"
+    },
+    {
+      "id": "thumb-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 157,
+        "y": 123,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-2",
+      "kind": "text",
+      "pixelBox": {
+        "x": 157,
+        "y": 284,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Chromatic Plasma name"
+    },
+    {
+      "id": "thumb-3",
+      "kind": "control",
+      "pixelBox": {
+        "x": 20,
+        "y": 323,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-3",
+      "kind": "text",
+      "pixelBox": {
+        "x": 20,
+        "y": 484,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Tidal Caustics name"
+    },
+    {
+      "id": "thumb-4",
+      "kind": "control",
+      "pixelBox": {
+        "x": 157,
+        "y": 323,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-4",
+      "kind": "text",
+      "pixelBox": {
+        "x": 157,
+        "y": 484,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Silk Ribbons name"
+    },
+    {
+      "id": "thumb-5",
+      "kind": "control",
+      "pixelBox": {
+        "x": 20,
+        "y": 523,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-5",
+      "kind": "text",
+      "pixelBox": {
+        "x": 20,
+        "y": 684,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Mesh Gradient name"
+    },
+    {
+      "id": "thumb-6",
+      "kind": "control",
+      "pixelBox": {
+        "x": 157,
+        "y": 523,
+        "w": 125,
+        "h": 157
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true
+    },
+    {
+      "id": "thumb-label-6",
+      "kind": "text",
+      "pixelBox": {
+        "x": 157,
+        "y": 684,
+        "w": 127,
+        "h": 23
+      },
+      "note": "Flow Field name"
+    },
+    {
+      "id": "preview",
+      "kind": "control",
+      "pixelBox": {
+        "x": 311,
+        "y": 75,
+        "w": 657,
+        "h": 523
+      },
+      "note": "Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.",
+      "codeDrawn": true,
+      "container": true
+    },
+    {
+      "id": "live-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 313,
+        "y": 619,
+        "w": 116,
+        "h": 22
+      },
+      "note": "LIVE PREVIEW status label"
+    },
+    {
+      "id": "preview-name",
+      "kind": "text",
+      "pixelBox": {
+        "x": 313,
+        "y": 651,
+        "w": 250,
+        "h": 50
+      },
+      "note": "Aurora Veil selected shader title"
+    },
+    {
+      "id": "inspector-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1002,
+        "y": 84,
+        "w": 193,
+        "h": 22
+      },
+      "note": "ADJUST SHADER silkscreen inspector title"
+    },
+    {
+      "id": "inspector-control-1",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 134,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Speed labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 207,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Waves labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-3",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 279,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Spread labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-4",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 351,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Brightness labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-5",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 421,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Color 1 labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-6",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 472,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Color 2 labeled shader control with exact current value"
+    },
+    {
+      "id": "inspector-control-7",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1000,
+        "y": 544,
+        "w": 260,
+        "h": 53
+      },
+      "note": "Saturation labeled shader control with exact current value"
+    },
+    {
+      "id": "reset",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1003,
+        "y": 637,
+        "w": 153,
+        "h": 39
+      },
+      "note": "Reset shader outline button"
+    },
+    {
+      "id": "bank-rule",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 20,
+        "y": 103,
+        "w": 258,
+        "h": 1
+      },
+      "note": "hairline below bank heading"
+    },
+    {
+      "id": "inspector-rule",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1002,
+        "y": 103,
+        "w": 258,
+        "h": 1
+      },
+      "note": "hairline below inspector heading"
+    }
+  ],
+  "allowUncovered": true
+}

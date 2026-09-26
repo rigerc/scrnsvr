@@ -116,9 +116,10 @@ Controls and shader images use 4–5px corners; the custom editor uses 8px. The 
 
 ## Components
 
-- **Shader tile:** portrait live canvas, one-line name, separate rotation toggle. The active canvas gains a coral border and name.
+- **Visual tile:** portrait live canvas and one-line name. The active canvas gains a coral border and name.
 - **Live preview:** large WebGL canvas with the actual clock overlay, followed by a ruled caption and shader description.
 - **Inspector control:** group label, compact name/reset row, slider or field, and numeric value where useful. Advanced controls collapse below the primary set.
+- **Looks & Shuffle:** the selected visual's saved looks sit beside a compact live preview, with the shuffle list and timing controls in the inspector. Named looks and current edits have separate, explicit add/remove actions.
 - **Navigation tabs:** plain text in the top bar; the selected tab receives a coral underline.
 - **Action button and input:** charcoal fills and fine borders, with coral hover and focus treatments.
 
@@ -134,4 +135,4 @@ Controls and shader images use 4–5px corners; the custom editor uses 8px. The 
 
 - Add decorative shadows or bright panel colors to the shell.
 - Hide the real shader or clock behind a static illustration.
-- Merge shader selection and rotation into one click target.
+- Hide saved looks and shuffle timing under unrelated settings.

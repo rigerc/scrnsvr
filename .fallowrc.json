@@ -1,0 +1,3 @@
+{
+  "entry": ["src/renderer/index.ts", "src/settings/bootstrap.ts"]
+}

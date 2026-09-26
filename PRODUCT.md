@@ -16,7 +16,7 @@ scrnsvr runs shader-based screensavers after desktop idle time. The settings win
 
 ## Positioning
 
-The settings window connects a live WebGL shader preview with direct controls for that shader, optional clock overlay, color schemes, saved presets, and a rotation playlist.
+The settings window connects a live WebGL shader preview with direct controls for that shader, optional clock overlay, color schemes, saved looks for each visual, and a shuffle list.
 
 ## Operating Context
 

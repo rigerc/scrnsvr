@@ -38,7 +38,8 @@ export function pickRotationEntry(
 ): RotationPick | undefined {
   if (!rotation?.enabled || rotation.entries.length === 0) return undefined;
   const valid = new Set(validIds);
-  const candidates = rotation.entries.filter((entry) => valid.has(entry.shader));
+  const candidates = rotation.entries.filter((entry) =>
+    valid.has(entry.shader) && (!entry.preset || Boolean(presets[entry.shader]?.[entry.preset])));
   if (candidates.length === 0) return undefined;
   const rest = excludeKey ? candidates.filter((e) => rotationEntryKey(e.shader, e.preset) !== excludeKey) : candidates;
   const pool = rest.length > 0 ? rest : candidates;
@@ -47,16 +48,16 @@ export function pickRotationEntry(
   return {
     shaderId: entry.shader,
     preset: entry.preset,
-    values: { ...(shaders[entry.shader] ?? {}), ...(presetValues ?? {}) },
+    values: { ...(presetValues ?? shaders[entry.shader] ?? {}) },
   };
 }
 
-/** Resolve display values for a picked entry (preset overlaid on current values). */
+/** A saved look is a snapshot; current edits do not leak into it. */
 export function resolveRotationValues(
   shaders: Record<string, ShaderValues>,
   presets: Record<string, Record<string, ShaderValues>>,
   shaderId: string,
   preset?: string,
 ): ShaderValues {
-  return { ...(shaders[shaderId] ?? {}), ...(preset ? presets[shaderId]?.[preset] ?? {} : {}) };
+  return { ...(preset ? presets[shaderId]?.[preset] ?? shaders[shaderId] ?? {} : shaders[shaderId] ?? {}) };
 }

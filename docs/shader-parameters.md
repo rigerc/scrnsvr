@@ -1,6 +1,6 @@
 # Shader parameters
 
-Controls are grouped into Motion, Shape, and Color. Open Advanced for additional adjustments. Sliders and numeric inputs share the same range and step; direct numeric entry commits on Enter or when you leave the field. Reset beside a control restores only that parameter. Presets save the whole combination of overrides.
+Controls are grouped into Motion, Shape, and Color. Open Advanced for additional adjustments. Sliders and numeric inputs share the same range and step; direct numeric entry commits on Enter or when you leave the field. Reset beside a control restores only that parameter. **Save look** keeps that visual's adjustments. In **Looks & Shuffle**, apply a saved look to current edits or add several looks from the same visual to the shuffle list. Color scheme choices apply separately.
 
 Speed controls the whole animation, including secondary motion and twinkling. Zero freezes it. Brightness changes light intensity, while saturation adjusts color intensity (0 = grayscale, 1 = original colors). Aurora Veil retains its existing brightness control for the light curtains.
 
@@ -35,7 +35,7 @@ Plasma shows custom colors only with the Custom palette. Noctalia import selects
 
 Global and per-shader color schemes apply ANSI-derived role colors (background, text, and three accent roles) to every shader with color controls. Choosing a scheme clears that shader's stored color overrides so the scheme is visible; individual color edits then persist until the scheme changes. Randomize keeps scheme colors. The shaders without color controls keep their built-in palettes.
 
-Randomize uses conservative ranges near the original appearance, preserves background colors, and respects dependent controls and numeric steps. Manual controls expose wider ranges. Old presets remain readable and retain their existing values; missing parameters use their defaults without rounding previously saved floating-point values to newer slider steps.
+Randomize uses conservative ranges near the original appearance, preserves background colors, and respects dependent controls and numeric steps. Manual controls expose wider ranges. Existing presets appear as saved looks and retain their values; missing parameters use their defaults without rounding previously saved floating-point values to newer slider steps.
 
 Parameter definitions, including exact ranges, steps, defaults, and randomization ranges, live in each shader's `src/renderer/shaders/<id>/manifest.ts`.
 

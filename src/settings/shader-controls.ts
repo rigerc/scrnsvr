@@ -10,9 +10,6 @@ export function mountShaderControls(
 ) {
   const wasOpen = root.querySelector('details')?.open ?? false;
   root.replaceChildren();
-  const title = document.createElement('h2');
-  title.textContent = 'Adjust shader';
-  root.append(title);
   const advanced = document.createElement('details');
   advanced.className = 'shader-advanced';
   advanced.open = wasOpen;

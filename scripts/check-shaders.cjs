@@ -216,7 +216,7 @@ app.whenReady().then(async () => {
       throw Error(`${label}: blank, white or flat render`);
     };
     for(const [id,shader] of Object.entries(registry)) {
-      document.querySelector(`[data-id="${id}"]`).click();
+      document.querySelector(`.shader-select[data-id="${id}"]`).click();
       const preview = document.querySelector('.preview');
       const gl = preview.getContext('webgl2') ?? preview.getContext('webgl');
       assert(gl.renderer === mainRenderer, `${id}: replaced renderer state on the same context`);
@@ -236,7 +236,23 @@ app.whenReady().then(async () => {
       await assertScene(canvas, `${card.dataset.id} thumbnail`);
     }
     window.scrollTo(0, 0);
-    document.querySelector('[data-id="plasma"]').click();
+    document.querySelector('.shader-select[data-id="plasma"]').click();
+    input('brightness', 0);
+    const activeProgram = mainContext.getParameter(mainContext.CURRENT_PROGRAM);
+    assert(activeProgram, 'Settings preview has an active WebGL program');
+    const brightnessLocation = mainContext.getUniformLocation(activeProgram, 'brightness');
+    assert(brightnessLocation, 'Plasma brightness uniform is active');
+    const assertBrightness = async (expected, label) => {
+      const deadline = performance.now() + 4000;
+      do {
+        if (Math.abs(mainContext.getUniform(activeProgram, brightnessLocation) - expected) < 0.001) return;
+        await new Promise(requestAnimationFrame);
+      } while (performance.now() < deadline);
+      throw Error(`${label}: got ${mainContext.getUniform(activeProgram, brightnessLocation)}, expected ${expected}`);
+    };
+    await assertBrightness(0, 'Slider updates the running preview uniform');
+    document.querySelector('[data-control="brightness"] .uniform-reset').click();
+    await assertBrightness(1, 'Reset updates the running preview uniform');
     assert(document.querySelector('[data-control="color1"]').hidden,'Custom colors initially hidden');
     document.querySelector('[data-action="import-noctalia"]').click();
     for(let i=0;i<100 && document.querySelector('[data-action="import-noctalia"]').disabled;i++) await new Promise(resolve=>setTimeout(resolve,20));
@@ -249,14 +265,21 @@ app.whenReady().then(async () => {
     document.querySelector('[data-preset]').value='Integration preset';
     document.querySelector('[data-action="save"]').click();
     input('speed',1.5);
-    const preset=[...document.querySelectorAll('.preset-list button')].find(b=>b.textContent==='Integration preset');
-    preset.click();
+    const preset=[...document.querySelectorAll('.look-item')].find(item=>item.querySelector('strong')?.textContent==='Integration preset');
+    assert(preset,'Saved look appears in the list');
+    preset.querySelector('button[aria-label="Apply Integration preset to current edits"]').click();
     assert(document.querySelector('[data-name="speed"]').value==='0.5','Preset restores motion');
     assert(document.querySelector('[data-name="color1"]').value==='#123456','Preset restores custom colors');
+    preset.querySelector('button[aria-label="Add Integration preset to shuffle"]').click();
+    document.querySelector('[data-preset]').value='Integration alternate';
+    document.querySelector('[data-action="save"]').click();
+    const alternate=[...document.querySelectorAll('.look-item')].find(item=>item.querySelector('strong')?.textContent==='Integration alternate');
+    alternate.querySelector('button[aria-label="Add Integration alternate to shuffle"]').click();
+    assert(document.querySelectorAll('.shuffle-item').length===2,'Two looks from one visual stay in shuffle');
     document.querySelector('[data-control="speed"] .uniform-reset').click();
     assert(Number(document.querySelector('[data-name="speed"]').value)===registry.plasma.manifest.uniforms.find(d=>d.name==='speed').default,'Individual reset');
     assert(document.querySelector('[data-name="color1"]').value==='#123456','Individual reset preserves other controls');
-    document.querySelector('[data-id="contour-dunes"]').click();
+    document.querySelector('.shader-select[data-id="contour-dunes"]').click();
     const advanced=document.querySelector('.shader-advanced'); advanced.open=true;
     const number=document.querySelector('[data-control="lineThickness"] input[type="number"]');
     number.focus(); number.value='0.027'; number.dispatchEvent(new Event('change',{bubbles:true}));
@@ -270,7 +293,11 @@ app.whenReady().then(async () => {
     assert(document.querySelector('.shader-advanced').open,'Advanced remains open after randomize');
     document.querySelector('[data-action="reset"]').click();
     assert(document.querySelector('[data-name="lineThickness"]').value==='0.025','Shader reset restores new parameters');
-    document.querySelector('[data-id="plasma"]').click();
+    document.querySelector('button[aria-label="Load Chromatic Plasma, Integration preset"]').click();
+    assert(document.querySelector('#shader-tab').getAttribute('aria-selected')==='true','Loading a shuffle look opens Visuals');
+    assert(document.querySelector('.shader-select[data-id="plasma"]').getAttribute('aria-pressed')==='true','Loading a shuffle look selects its visual');
+    assert(document.querySelector('[data-name="speed"]').value==='0.5','Loading a shuffle look applies saved motion');
+    assert(document.querySelector('[data-name="color1"]').value==='#123456','Loading a shuffle look applies saved color');
     const globalScheme=document.querySelector('[data-global="scheme"]');
     assert(globalScheme,'Missing global color scheme picker');
     globalScheme.value='dracula';
@@ -288,6 +315,7 @@ app.whenReady().then(async () => {
     await new Promise(resolve=>setTimeout(resolve,450));
     const saved=await window.scrnsvr.getConfig();
     assert(saved.presets.plasma['Integration preset'].color1==='#123456','Preset saved through IPC');
+    assert(saved.rotation.entries.filter(entry=>entry.shader==='plasma').length===2,'Multiple looks from one visual saved through IPC');
     assert(saved.shaders['contour-dunes'].lineThickness===undefined,'Reset clears saved override');
     assert(saved.colors.scheme==='dracula','Global scheme saved through IPC');
     assert(saved.colors.overrides.plasma===undefined,'Cleared per-shader override is not persisted');
@@ -300,7 +328,7 @@ app.whenReady().then(async () => {
     if(await win.webContents.executeJavaScript('Boolean(document.querySelector("[data-control]"))'))break;
     await new Promise(resolve=>setTimeout(resolve,50));
   }
-  const restored=await win.webContents.executeJavaScript('document.querySelector("[data-id=contour-dunes]").getAttribute("aria-pressed") === "true" && document.querySelector("[data-name=lineThickness]").value === "0.025"');
+  const restored=await win.webContents.executeJavaScript('document.querySelector(".shader-select[data-id=plasma]").getAttribute("aria-pressed") === "true" && document.querySelector("[data-name=speed]").value === "0.5"');
   if (!restored) throw Error('Settings did not restore after reload');
   console.log('Shader checks passed');
   win.destroy();

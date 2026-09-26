@@ -1,0 +1,415 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-09-26T18:08:49.879Z",
+  "comp": ".impeccable/mocks/decision/model-pick.png",
+  "direction": null,
+  "breakpoint": "1280x800",
+  "artifact": "src/settings/index.ts",
+  "phase": "hero",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-09-26T18:08:49.879Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-09-26T18:08:49.879Z",
+      "closedAt": "2026-09-26T18:11:23.686Z",
+      "attempts": 3,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "34 regions, 7 plates, 11 text regions measured",
+        "at": "2026-09-26T18:11:23.686Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "closed",
+      "openedAt": "2026-09-26T18:11:23.686Z",
+      "closedAt": "2026-09-26T18:25:11.526Z",
+      "attempts": 4,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-09-26T18:25:11.526Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "open",
+      "openedAt": "2026-09-26T18:25:11.526Z",
+      "closedAt": null,
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": false,
+        "reasons": [
+          "hero overall 62.0% < 72% (structure 58%, color 81%, detail 55%)",
+          "region nav-shaders is missing (detail 13%, structure 70%): the comp shows material the build does not",
+          "region nav-clock is missing (detail 14%, structure 73%): the comp shows material the build does not",
+          "region thumb-label-1 is missing (detail 0%, structure 72%): the comp shows material the build does not",
+          "region thumb-label-2 is missing (detail 0%, structure 48%): the comp shows material the build does not",
+          "region thumb-label-3 is missing (detail 8%, structure 48%): the comp shows material the build does not",
+          "region thumb-label-5 is missing (detail 1%, structure 66%): the comp shows material the build does not",
+          "region thumb-label-6 is missing (detail 1%, structure 78%): the comp shows material the build does not",
+          "region inspector-control-1 is missing (detail 0%, structure 72%): the comp shows material the build does not",
+          "region inspector-control-2 is missing (detail 0%, structure 73%): the comp shows material the build does not",
+          "region inspector-control-3 is missing (detail 3%, structure 63%): the comp shows material the build does not",
+          "region inspector-control-4 is missing (detail 2%, structure 69%): the comp shows material the build does not",
+          "region inspector-control-6 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+          "region inspector-control-7 is missing (detail 6%, structure 61%): the comp shows material the build does not",
+          "region reset is missing (detail 6%, structure 72%): the comp shows material the build does not",
+          "region brand (text) is contradicted (structure 49%, detail added 2%): the composition of this text region differs from the comp; re-derive it from the spec box",
+          "region thumb-1 (control) is contradicted (structure 47%, detail added 10%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region thumb-2 (control) is contradicted (structure 26%, detail added 41%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region thumb-3 (control) is contradicted (structure 40%, detail added 8%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region thumb-4 (control) is contradicted (structure 30%, detail added 4%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region thumb-5 (control) is contradicted (structure 63%, detail added 11%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region thumb-6 (control) is contradicted (structure 28%, detail added 0%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+          "region live-label (text) is contradicted (structure 50%, detail added 10%): the composition of this text region differs from the comp; re-derive it from the spec box",
+          "control nav-settings drifts to 62% (structure 67%, color 83%): open .impeccable/review/diff/hero/regions/nav-settings.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+          "control preview drifts to 62% (structure 68%, color 57%): open .impeccable/review/diff/hero/regions/preview.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+          "control inspector-control-5 drifts to 56% (structure 63%, color 76%): open .impeccable/review/diff/hero/regions/inspector-control-5.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+          "region nav-clock: its ink sits in a 43x14px box in the comp and 26x4px in the build (padding, row height, or size); match the box, not only the position",
+          "region nav-settings: its ink sits in a 64x17px box in the comp and 50x13px in the build (padding, row height, or size); match the box, not only the position",
+          "region inspector-control-2: its ink sits in a 127x38px box in the comp and 36x35px in the build (padding, row height, or size); match the box, not only the position",
+          "region inspector-control-3: its ink sits in a 219x37px box in the comp and 220x48px in the build (padding, row height, or size); match the box, not only the position",
+          "region inspector-control-4: its ink sits in a 124x38px box in the comp and 218x44px in the build (padding, row height, or size); match the box, not only the position",
+          "region inspector-control-6: its ink sits in a 152x34px box in the comp and 47x48px in the build (padding, row height, or size); match the box, not only the position",
+          "region inspector-control-7: its ink sits in a 201x37px box in the comp and 46x42px in the build (padding, row height, or size); match the box, not only the position",
+          "text inspector-heading: ink is #737371 in the build, #bdbbb8 in the comp; use the comp's colour",
+          "the build carries ink in 5 grid cells where the comp is calm (F3, E4, F4, A9, B9); nothing exists on the page that the comp does not show (a kicker, an extra nav item, a divider, a second row of controls); remove it or name it in a stated decision after the hero passes"
+        ],
+        "regionReasons": {
+          "nav-shaders": [
+            "region nav-shaders is missing (detail 13%, structure 70%): the comp shows material the build does not"
+          ],
+          "nav-clock": [
+            "region nav-clock is missing (detail 14%, structure 73%): the comp shows material the build does not",
+            "region nav-clock: its ink sits in a 43x14px box in the comp and 26x4px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "thumb-label-1": [
+            "region thumb-label-1 is missing (detail 0%, structure 72%): the comp shows material the build does not"
+          ],
+          "thumb-label-2": [
+            "region thumb-label-2 is missing (detail 0%, structure 48%): the comp shows material the build does not"
+          ],
+          "thumb-label-3": [
+            "region thumb-label-3 is missing (detail 8%, structure 48%): the comp shows material the build does not"
+          ],
+          "thumb-label-5": [
+            "region thumb-label-5 is missing (detail 1%, structure 66%): the comp shows material the build does not"
+          ],
+          "thumb-label-6": [
+            "region thumb-label-6 is missing (detail 1%, structure 78%): the comp shows material the build does not"
+          ],
+          "inspector-control-1": [
+            "region inspector-control-1 is missing (detail 0%, structure 72%): the comp shows material the build does not"
+          ],
+          "inspector-control-2": [
+            "region inspector-control-2 is missing (detail 0%, structure 73%): the comp shows material the build does not",
+            "region inspector-control-2: its ink sits in a 127x38px box in the comp and 36x35px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "inspector-control-3": [
+            "region inspector-control-3 is missing (detail 3%, structure 63%): the comp shows material the build does not",
+            "region inspector-control-3: its ink sits in a 219x37px box in the comp and 220x48px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "inspector-control-4": [
+            "region inspector-control-4 is missing (detail 2%, structure 69%): the comp shows material the build does not",
+            "region inspector-control-4: its ink sits in a 124x38px box in the comp and 218x44px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "inspector-control-6": [
+            "region inspector-control-6 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region inspector-control-6: its ink sits in a 152x34px box in the comp and 47x48px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "inspector-control-7": [
+            "region inspector-control-7 is missing (detail 6%, structure 61%): the comp shows material the build does not",
+            "region inspector-control-7: its ink sits in a 201x37px box in the comp and 46x42px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "reset": [
+            "region reset is missing (detail 6%, structure 72%): the comp shows material the build does not"
+          ],
+          "brand": [
+            "region brand (text) is contradicted (structure 49%, detail added 2%): the composition of this text region differs from the comp; re-derive it from the spec box"
+          ],
+          "thumb-1": [
+            "region thumb-1 (control) is contradicted (structure 47%, detail added 10%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "thumb-2": [
+            "region thumb-2 (control) is contradicted (structure 26%, detail added 41%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "thumb-3": [
+            "region thumb-3 (control) is contradicted (structure 40%, detail added 8%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "thumb-4": [
+            "region thumb-4 (control) is contradicted (structure 30%, detail added 4%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "thumb-5": [
+            "region thumb-5 (control) is contradicted (structure 63%, detail added 11%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "thumb-6": [
+            "region thumb-6 (control) is contradicted (structure 28%, detail added 0%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification"
+          ],
+          "live-label": [
+            "region live-label (text) is contradicted (structure 50%, detail added 10%): the composition of this text region differs from the comp; re-derive it from the spec box"
+          ],
+          "nav-settings": [
+            "control nav-settings drifts to 62% (structure 67%, color 83%): open .impeccable/review/diff/hero/regions/nav-settings.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+            "region nav-settings: its ink sits in a 64x17px box in the comp and 50x13px in the build (padding, row height, or size); match the box, not only the position"
+          ],
+          "preview": [
+            "control preview drifts to 62% (structure 68%, color 57%): open .impeccable/review/diff/hero/regions/preview.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ],
+          "inspector-control-5": [
+            "control inspector-control-5 drifts to 56% (structure 63%, color 76%): open .impeccable/review/diff/hero/regions/inspector-control-5.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ],
+          "inspector-heading": [
+            "text inspector-heading: ink is #737371 in the build, #bdbbb8 in the comp; use the comp's colour"
+          ]
+        },
+        "summary": "hero 62% (drift)",
+        "score": 0.62,
+        "verdict": "drift",
+        "report": ".impeccable/review/diff/hero/report.json",
+        "sideBySide": "/mnt/extra-ssd/dev/projects2/scrnsvr/.impeccable/review/diff/hero/side-by-side.png",
+        "worst": [
+          "thumb-2 contradicted 23%",
+          "thumb-6 contradicted 24%",
+          "thumb-4 contradicted 25%"
+        ],
+        "worstIds": [
+          "thumb-2",
+          "thumb-6",
+          "thumb-4"
+        ],
+        "worstCrops": [
+          {
+            "id": "thumb-2",
+            "verdict": "contradicted",
+            "score": {
+              "overall": 0.2318,
+              "structure": 0.2649,
+              "color": 0.095,
+              "colorIntersection": 0.0428,
+              "paletteMatch": 0.123,
+              "detail": 0.3966,
+              "detailRaw": 0.5998,
+              "detailAdded": 0.4063,
+              "bands": 0.8
+            },
+            "file": ".impeccable/review/diff/hero/regions/thumb-2.png"
+          },
+          {
+            "id": "thumb-6",
+            "verdict": "contradicted",
+            "score": {
+              "overall": 0.2444,
+              "structure": 0.2774,
+              "color": 0.1547,
+              "colorIntersection": 0.0303,
+              "paletteMatch": 0.2216,
+              "detail": 0.3273,
+              "detailRaw": 0.3273,
+              "detailAdded": 0,
+              "bands": 0
+            },
+            "file": ".impeccable/review/diff/hero/regions/thumb-6.png"
+          },
+          {
+            "id": "thumb-4",
+            "verdict": "contradicted",
+            "score": {
+              "overall": 0.2498,
+              "structure": 0.301,
+              "color": 0.2096,
+              "colorIntersection": 0.0428,
+              "paletteMatch": 0.2995,
+              "detail": 0.2046,
+              "detailRaw": 0.2255,
+              "detailAdded": 0.0417,
+              "bands": 0
+            },
+            "file": ".impeccable/review/diff/hero/regions/thumb-4.png"
+          }
+        ],
+        "regionVerdicts": {
+          "top-bar": "drift",
+          "brand": "contradicted",
+          "nav-shaders": "missing",
+          "nav-clock": "missing",
+          "nav-settings": "drift",
+          "bank-heading": "drift",
+          "thumb-1": "contradicted",
+          "thumb-label-1": "missing",
+          "thumb-2": "contradicted",
+          "thumb-label-2": "missing",
+          "thumb-3": "contradicted",
+          "thumb-label-3": "missing",
+          "thumb-4": "contradicted",
+          "thumb-label-4": "drift",
+          "thumb-5": "contradicted",
+          "thumb-label-5": "missing",
+          "thumb-6": "contradicted",
+          "thumb-label-6": "missing",
+          "preview": "drift",
+          "live-label": "contradicted",
+          "preview-name": "drift",
+          "inspector-heading": "drift",
+          "inspector-control-1": "missing",
+          "inspector-control-2": "missing",
+          "inspector-control-3": "missing",
+          "inspector-control-4": "missing",
+          "inspector-control-5": "drift",
+          "inspector-control-6": "missing",
+          "inspector-control-7": "missing",
+          "reset": "missing",
+          "bank-rule": "drift",
+          "inspector-rule": "drift"
+        },
+        "at": "2026-09-26T18:25:30.509Z"
+      },
+      "forced": null,
+      "readingsSeen": {
+        "text inspector-heading: ink is #737371 in the build, #bdbbb8 in the comp; use the comp's colour": 2
+      },
+      "records": 1,
+      "history": [
+        {
+          "at": "2026-09-26T18:25:30.509Z",
+          "score": 0.62,
+          "worstIds": [
+            "thumb-2",
+            "thumb-6",
+            "thumb-4"
+          ],
+          "blockingReasons": [
+            "hero overall 62.0% < 72% (structure 58%, color 81%, detail 55%)",
+            "region nav-shaders is missing (detail 13%, structure 70%): the comp shows material the build does not",
+            "region nav-clock is missing (detail 14%, structure 73%): the comp shows material the build does not",
+            "region thumb-label-1 is missing (detail 0%, structure 72%): the comp shows material the build does not",
+            "region thumb-label-2 is missing (detail 0%, structure 48%): the comp shows material the build does not",
+            "region thumb-label-3 is missing (detail 8%, structure 48%): the comp shows material the build does not",
+            "region thumb-label-5 is missing (detail 1%, structure 66%): the comp shows material the build does not",
+            "region thumb-label-6 is missing (detail 1%, structure 78%): the comp shows material the build does not",
+            "region inspector-control-1 is missing (detail 0%, structure 72%): the comp shows material the build does not",
+            "region inspector-control-2 is missing (detail 0%, structure 73%): the comp shows material the build does not",
+            "region inspector-control-3 is missing (detail 3%, structure 63%): the comp shows material the build does not",
+            "region inspector-control-4 is missing (detail 2%, structure 69%): the comp shows material the build does not",
+            "region inspector-control-6 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region inspector-control-7 is missing (detail 6%, structure 61%): the comp shows material the build does not",
+            "region reset is missing (detail 6%, structure 72%): the comp shows material the build does not",
+            "region brand (text) is contradicted (structure 49%, detail added 2%): the composition of this text region differs from the comp; re-derive it from the spec box",
+            "region thumb-1 (control) is contradicted (structure 47%, detail added 10%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region thumb-2 (control) is contradicted (structure 26%, detail added 41%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region thumb-3 (control) is contradicted (structure 40%, detail added 8%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region thumb-4 (control) is contradicted (structure 30%, detail added 4%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region thumb-5 (control) is contradicted (structure 63%, detail added 11%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region thumb-6 (control) is contradicted (structure 28%, detail added 0%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "region live-label (text) is contradicted (structure 50%, detail added 10%): the composition of this text region differs from the comp; re-derive it from the spec box",
+            "control nav-settings drifts to 62% (structure 67%, color 83%): open .impeccable/review/diff/hero/regions/nav-settings.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+            "control preview drifts to 62% (structure 68%, color 57%): open .impeccable/review/diff/hero/regions/preview.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+            "control inspector-control-5 drifts to 56% (structure 63%, color 76%): open .impeccable/review/diff/hero/regions/inspector-control-5.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification",
+            "region nav-clock: its ink sits in a 43x14px box in the comp and 26x4px in the build (padding, row height, or size); match the box, not only the position",
+            "region nav-settings: its ink sits in a 64x17px box in the comp and 50x13px in the build (padding, row height, or size); match the box, not only the position",
+            "region inspector-control-2: its ink sits in a 127x38px box in the comp and 36x35px in the build (padding, row height, or size); match the box, not only the position",
+            "region inspector-control-3: its ink sits in a 219x37px box in the comp and 220x48px in the build (padding, row height, or size); match the box, not only the position",
+            "region inspector-control-4: its ink sits in a 124x38px box in the comp and 218x44px in the build (padding, row height, or size); match the box, not only the position",
+            "region inspector-control-6: its ink sits in a 152x34px box in the comp and 47x48px in the build (padding, row height, or size); match the box, not only the position",
+            "region inspector-control-7: its ink sits in a 201x37px box in the comp and 46x42px in the build (padding, row height, or size); match the box, not only the position",
+            "text inspector-heading: ink is #737371 in the build, #bdbbb8 in the comp; use the comp's colour",
+            "the build carries ink in 5 grid cells where the comp is calm (F3, E4, F4, A9, B9); nothing exists on the page that the comp does not show (a kicker, an extra nav item, a divider, a second row of controls); remove it or name it in a stated decision after the hero passes"
+          ],
+          "regionVerdicts": {
+            "top-bar": "drift",
+            "brand": "contradicted",
+            "nav-shaders": "missing",
+            "nav-clock": "missing",
+            "nav-settings": "drift",
+            "bank-heading": "drift",
+            "thumb-1": "contradicted",
+            "thumb-label-1": "missing",
+            "thumb-2": "contradicted",
+            "thumb-label-2": "missing",
+            "thumb-3": "contradicted",
+            "thumb-label-3": "missing",
+            "thumb-4": "contradicted",
+            "thumb-label-4": "drift",
+            "thumb-5": "contradicted",
+            "thumb-label-5": "missing",
+            "thumb-6": "contradicted",
+            "thumb-label-6": "missing",
+            "preview": "drift",
+            "live-label": "contradicted",
+            "preview-name": "drift",
+            "inspector-heading": "drift",
+            "inspector-control-1": "missing",
+            "inspector-control-2": "missing",
+            "inspector-control-3": "missing",
+            "inspector-control-4": "missing",
+            "inspector-control-5": "drift",
+            "inspector-control-6": "missing",
+            "inspector-control-7": "missing",
+            "reset": "missing",
+            "bank-rule": "drift",
+            "inspector-rule": "drift"
+          },
+          "artifactHash": "7f28bd0b691d"
+        }
+      ]
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": null,
+  "sessionId": "01a0ded0-e604-7402-8a91-5e067bae759c",
+  "plates": {}
+}

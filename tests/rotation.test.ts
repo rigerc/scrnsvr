@@ -25,7 +25,7 @@ describe('pickRotationEntry', () => {
     expect(pick?.values).toEqual({ scale: 2 });
   });
 
-  it('overlays preset values on current shader values', () => {
+  it('keeps a saved look independent of later current edits', () => {
     const pick = pickRotationEntry(
       { enabled: true, entries: [{ shader: 'plasma', preset: 'neon' }], intervalMinutes: 0 },
       shaders, presets, ids, () => 0,
@@ -33,6 +33,23 @@ describe('pickRotationEntry', () => {
     expect(pick).toMatchObject({ shaderId: 'plasma', preset: 'neon', values: { speed: 9 } });
     expect(resolveRotationValues(shaders, presets, 'plasma', 'neon')).toEqual({ speed: 9 });
     expect(resolveRotationValues(shaders, presets, 'plasma')).toEqual({ speed: 1 });
+    expect(resolveRotationValues({ plasma: { speed: 1, brightness: 0.3 } }, presets, 'plasma', 'neon'))
+      .toEqual({ speed: 9 });
+  });
+
+  it('can choose multiple saved looks from the same shader', () => {
+    const picks = { enabled: true, entries: [
+      { shader: 'plasma', preset: 'neon' },
+      { shader: 'plasma', preset: 'soft' },
+    ], intervalMinutes: 0 };
+    const saved = { plasma: { neon: { speed: 9 }, soft: { speed: 0.25 } } };
+    expect(pickRotationEntry(picks, shaders, saved, ids, () => 0, rotationEntryKey('plasma', 'neon')))
+      .toMatchObject({ shaderId: 'plasma', preset: 'soft', values: { speed: 0.25 } });
+  });
+
+  it('skips a deleted look instead of showing current edits in its place', () => {
+    const picks = { enabled: true, entries: [{ shader: 'plasma', preset: 'deleted' }], intervalMinutes: 0 };
+    expect(pickRotationEntry(picks, shaders, presets, ids)).toBeUndefined();
   });
 
   it('avoids repeating the current entry when cycling', () => {

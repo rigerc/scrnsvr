@@ -1,0 +1,46 @@
+WROTE .impeccable/build/spec.json
+SPEC comp .impeccable/mocks/decision/model-pick.png 1280x800 landscape
+PALETTE #171719(76%) #0a193a(9%) #0e3a51(8%) #186378(4%) #1d3567(3%)
+BANDS 20% 73%
+REGION top-bar            chrome   semantic box x0% y0% w100% h7% (1280x54px, 23.7037:1) palette #181919 #182818 #464545  # matte charcoal application bar and thin lower rule
+REGION brand              text     semantic box x2% y2% w8% h4% (104x28px, 3.7143:1) palette #1a1a1a #6f6d6a #1c2919  # scrnsvr wordmark in warm ivory
+REGION nav-shaders        control  semantic box x38% y2% w8% h5% (100x39px, 2.5641:1) palette #1a1a19 #f8894b #192818  # Shaders active tab with coral underline
+REGION nav-clock          control  semantic box x47% y2% w5% h4% (64x30px, 2.1333:1) palette #191a1a #858380 #182818  # Clock tab
+REGION nav-settings       control  semantic box x55% y2% w6% h4% (80x30px, 2.6667:1) palette #191919 #676765 #403f40  # Settings tab
+REGION bank-heading       text     semantic box x2% y11% w10% h3% (132x20px, 6.6:1) palette #181819 #bdb9b7 #484845  # SHADER BANK silkscreen label
+REGION thumb-1            control  semantic box x2% y15% w10% h20% (125x157px, 0.7962:1) palette #092131 #185566 #1b4067  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-1      text     semantic box x2% y36% w10% h3% (127x23px, 5.5217:1) palette #181818 #c56e41 #1f2818  # Aurora Veil name
+REGION thumb-2            control  semantic box x12% y15% w10% h20% (125x157px, 0.7962:1) palette #0e0f35 #171a22 #2b165d  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-2      text     semantic box x12% y36% w10% h3% (127x23px, 5.5217:1) palette #171717 #b6afaf #142111  # Chromatic Plasma name
+REGION thumb-3            control  semantic box x2% y40% w10% h20% (125x157px, 0.7962:1) palette #084671 #0875ab #08a5d7  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-3      text     semantic box x2% y61% w10% h3% (127x23px, 5.5217:1) palette #191919 #c4bfbc #424242  # Tidal Caustics name
+REGION thumb-4            control  semantic box x12% y40% w10% h20% (125x157px, 0.7962:1) palette #341e56 #42193b #69273d  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-4      text     semantic box x12% y61% w10% h3% (127x23px, 5.5217:1) palette #181818 #ccc9c4 #182717  # Silk Ribbons name
+REGION thumb-5            control  semantic box x2% y65% w10% h20% (125x157px, 0.7962:1) palette #3839b1 #6a47da #21217b  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-5      text     semantic box x2% y86% w10% h3% (127x23px, 5.5217:1) palette #191919 #9d9b9a #686765  # Mesh Gradient name
+REGION thumb-6            control  semantic box x12% y65% w10% h20% (125x157px, 0.7962:1) palette #091932 #0c174d #0c4059  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION thumb-label-6      text     semantic box x12% y86% w10% h3% (127x23px, 5.5217:1) palette #191919 #adaba6 #4b4846  # Flow Field name
+REGION preview            control  semantic box x24% y9% w51% h65% (657x523px, 1.2562:1) palette #081121 #0b1a3b #11425b  # Live WebGL shader canvas rendered by the actual scrnsvr shader runtime.
+REGION live-label         text     semantic box x24% y77% w9% h3% (116x22px, 5.2727:1) palette #181818 #343434 #72706b  # LIVE PREVIEW status label
+REGION preview-name       text     semantic box x24% y81% w20% h6% (250x50px, 5:1) palette #181919 #e7e0d9 #938f8b  # Aurora Veil selected shader title
+REGION inspector-heading  text     semantic box x78% y11% w15% h3% (193x22px, 8.7727:1) palette #181919 #bdbbb8 #182717  # ADJUST SHADER silkscreen inspector title
+REGION inspector-control-1 control  semantic box x78% y17% w20% h7% (260x53px, 4.9057:1) palette #181818 #2c2e28 #f87b54  # Speed labeled shader control with exact current value
+REGION inspector-control-2 control  semantic box x78% y26% w20% h7% (260x53px, 4.9057:1) palette #191919 #393839 #f87d57  # Waves labeled shader control with exact current value
+REGION inspector-control-3 control  semantic box x78% y35% w20% h7% (260x53px, 4.9057:1) palette #1a1919 #f87c55 #9e5838  # Spread labeled shader control with exact current value
+REGION inspector-control-4 control  semantic box x78% y44% w20% h7% (260x53px, 4.9057:1) palette #191919 #393331 #f87950  # Brightness labeled shader control with exact current value
+REGION inspector-control-5 control  semantic box x78% y53% w20% h7% (260x53px, 4.9057:1) palette #181818 #38c9b9 #2a5e5e  # Color 1 labeled shader control with exact current value
+REGION inspector-control-6 control  semantic box x78% y59% w20% h7% (260x53px, 4.9057:1) palette #181818 #a87af8 #464444  # Color 2 labeled shader control with exact current value
+REGION inspector-control-7 control  semantic box x78% y68% w20% h7% (260x53px, 4.9057:1) palette #191818 #f88858 #30312e  # Saturation labeled shader control with exact current value
+REGION reset              control  semantic box x78% y80% w12% h5% (153x39px, 3.9231:1) palette #171819 #6a462e #d47e4c  # Reset shader outline button
+REGION bank-rule          chrome   semantic box x2% y13% w20% h0% (258x1px, 258:1) palette #383838 #181818  # hairline below bank heading
+REGION inspector-rule     chrome   semantic box x78% y13% w20% h0% (258x1px, 258:1) palette #383838  # hairline below inspector heading
+PLATES 0 to produce: none
+WARN region thumb-1: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region thumb-2: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region thumb-3: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region thumb-4: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region thumb-5: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region thumb-6: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region preview: "codeDrawn": true set in the regions file (the painted-material refusal is overridden: code draws this region)
+WARN region preview: "container": true set in the regions file (the region-size refusal is overridden: one undivided element)
+RULE anything not in this list does not exist on the page: no borders, rules, chrome, or containers the comp does not show. Every raster region ships as its plate, never as CSS.
