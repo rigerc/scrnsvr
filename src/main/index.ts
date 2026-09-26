@@ -11,19 +11,14 @@ import { IPC } from '../shared/ipc';
 import { loadNoctaliaColors } from './noctalia';
 import { shaderIds, shaderRegistry } from '../renderer/shaders';
 import { withCustomShaders } from '../shared/custom-shaders';
+import { applySoftwareGl } from '../shared/gpu-flags';
 import { PlaybackAudio } from './audio';
 
 const playbackAudio = new PlaybackAudio();
 app.once('before-quit', () => playbackAudio.stop());
 
 const options = parseArgs(process.argv.slice(1));
-if (options.thumbnail) {
-  app.commandLine.appendSwitch('disable-vulkan');
-  app.commandLine.appendSwitch('use-gl', 'angle');
-  app.commandLine.appendSwitch('use-angle', 'swiftshader-webgl');
-  app.commandLine.appendSwitch('enable-unsafe-swiftshader');
-  if (process.env.DISPLAY) app.commandLine.appendSwitch('ozone-platform', 'x11');
-}
+if (options.thumbnail) applySoftwareGl(app.commandLine);
 const rendererHtml = path.join(__dirname, '../renderer/index.html');
 const settingsHtml = path.join(__dirname, '../settings/index.html');
 const preload = path.join(__dirname, '../preload/index.js');

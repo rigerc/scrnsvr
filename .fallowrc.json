@@ -1,3 +1,10 @@
 {
-  "entry": ["src/renderer/index.ts", "src/settings/bootstrap.ts"]
+  "entry": [
+    "src/renderer/index.html",
+    "src/settings/index.html",
+    "scripts/capture-frames.cjs",
+    "scripts/render-thumbnails.mjs",
+    "scripts/import-upstream-shaders.mjs"
+  ],
+  "ignorePatterns": ["docs/refs/**"]
 }
