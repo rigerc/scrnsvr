@@ -7,5 +7,15 @@
     "scripts/import-upstream-shaders.mjs"
   ],
   "ignorePatterns": ["docs/refs/**"],
-  "health": { "coverage": "coverage/coverage-final.json" }
+  "health": {
+    "coverage": "coverage/coverage-final.json",
+    "thresholdOverrides": [
+      {
+        "files": ["scripts/lib/browser-checks.cjs"],
+        "functions": ["uiChecks", "assertScene"],
+        "maxCrap": 100,
+        "reason": "Electron-only browser checklist. It drives the mounted settings UI against a display-backed WebGL context, so the headless test runner cannot execute it; the ceiling keeps it visible instead of suppressing it."
+      }
+    ]
+  }
 }
