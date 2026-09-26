@@ -6,5 +6,6 @@
     "scripts/render-thumbnails.mjs",
     "scripts/import-upstream-shaders.mjs"
   ],
-  "ignorePatterns": ["docs/refs/**"]
+  "ignorePatterns": ["docs/refs/**"],
+  "health": { "coverage": "coverage/coverage-final.json" }
 }

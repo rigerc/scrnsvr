@@ -4,3 +4,4 @@ release/
 assets/thumbnails/
 *.log
 .code-graph/
+coverage/
