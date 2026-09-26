@@ -1,337 +1,78 @@
 // Real Chromium/WebGL checks. Run with `npm run check-shaders` on a desktop or Xvfb.
 const path = require('node:path');
-const fs = require('node:fs');
-const os = require('node:os');
+const { reexecUnderElectron, createHarness, bundleModule, waitForControls, finish } = require('./lib/electron-harness.cjs');
 
-if (!process.versions.electron || process.env.ELECTRON_RUN_AS_NODE) {
-  const { spawnSync } = require('node:child_process');
-  const env = { ...process.env };
-  delete env.ELECTRON_RUN_AS_NODE;
-  const result = spawnSync(require('electron'), [__filename, ...process.argv.slice(2)], { env, stdio: 'inherit' });
-  if (result.error) console.error(result.error);
-  process.exit(result.status ?? 1);
-}
+reexecUnderElectron();
 
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { buildSync } = require('esbuild');
+const browser = require('./lib/browser-checks.cjs');
 const root = path.resolve(__dirname, '..');
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'scrnsvr-check-'));
-app.setPath('userData', temporary);
-app.commandLine.appendSwitch('disable-vulkan');
-app.commandLine.appendSwitch('use-gl', 'angle');
-app.commandLine.appendSwitch('use-angle', 'swiftshader-webgl');
-app.commandLine.appendSwitch('enable-unsafe-swiftshader');
-if (process.env.DISPLAY) app.commandLine.appendSwitch('ozone-platform', 'x11');
+const temporary = createHarness({ prefix: 'scrnsvr-check-' });
+const { shaderRegistry } = bundleModule('src/renderer/shaders/index.ts', { outDir: temporary });
+const { defaultConfig } = bundleModule('src/shared/config.ts', { outDir: temporary });
 
-function bundle(entry) {
-  const file = path.join(temporary, path.basename(entry) + '.cjs');
-  buildSync({ entryPoints: [path.join(root, entry)], outfile: file, bundle: true, platform: 'node', format: 'cjs', loader: { '.glsl': 'text' } });
-  return require(file);
+function loadTestRegistry(filter) {
+  if (!filter) return shaderRegistry;
+  const tested = Object.fromEntries(Object.entries(shaderRegistry).filter(([id]) => id.includes(filter)));
+  if (!Object.keys(tested).length) throw Error(`No shaders matched SCRNSVR_SHADER_FILTER=${filter}`);
+  return tested;
 }
 
-function renderChecks(registry, baseline, contextType) {
-  const assert = (condition, message) => { if (!condition) throw Error(message); };
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext(contextType, { preserveDrawingBuffer: true, alpha: false });
-  assert(gl, `Missing ${contextType}`);
-  const compile = (type, source, label) => {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    assert(gl.getShaderParameter(shader, gl.COMPILE_STATUS), `${label}: ${gl.getShaderInfoLog(shader)}`);
-    return shader;
-  };
-  const vertex = compile(gl.VERTEX_SHADER, 'attribute vec2 position; varying vec2 vUv; void main(){vUv=position*.5+.5;gl_Position=vec4(position,0.,1.);}', 'vertex');
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
-  let checks = 0;
-  const reports = [];
-  for (const [id, definition] of Object.entries(registry)) {
-    const createProgram = shader => {
-      const program = gl.createProgram();
-      gl.attachShader(program, vertex);
-      const fragment = compile(gl.FRAGMENT_SHADER, shader.source, id);
-      gl.attachShader(program, fragment);
-      gl.linkProgram(program);
-      gl.deleteShader(fragment);
-      assert(gl.getProgramParameter(program, gl.LINK_STATUS), `${id}: ${gl.getProgramInfoLog(program)}`);
-      return program;
-    };
-    const program = createProgram(definition);
-    const render = (time = 12, overrides = {}, width = 320, height = 180, shader = definition, selectedProgram = program) => {
-      checks++;
-      canvas.width = width; canvas.height = height;
-      gl.viewport(0, 0, width, height);
-      gl.useProgram(selectedProgram);
-      const position = gl.getAttribLocation(selectedProgram, 'position');
-      gl.enableVertexAttribArray(position);
-      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform1f(gl.getUniformLocation(selectedProgram, 'uTime'), time);
-      gl.uniform2f(gl.getUniformLocation(selectedProgram, 'uResolution'), width, height);
-      gl.uniform4f(gl.getUniformLocation(selectedProgram, 'uDate'), 2026, 9, 10, 45296);
-      const audio = overrides.audio ?? [0.25, 0.3, 0.2, 0.15];
-      gl.uniform4fv(gl.getUniformLocation(selectedProgram, 'uAudio'), audio);
-      for (const def of shader.manifest.uniforms) {
-        const value = overrides[def.name] ?? def.default;
-        const location = gl.getUniformLocation(selectedProgram, def.name);
-        assert(location !== null, `${id}: unused uniform ${def.name}`);
-        if (def.type === 'color') {
-          const n = parseInt(value.slice(1), 16);
-          gl.uniform3f(location, ((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
-        } else if (def.type === 'select') gl.uniform1i(location, def.options.indexOf(value));
-        else if (def.type === 'int' || def.type === 'bool') gl.uniform1i(location, Number(value));
-        else gl.uniform1f(location, value);
-      }
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      const pixels = new Uint8Array(width * height * 4);
-      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      assert(gl.getError() === gl.NO_ERROR, `${id}: GL error`);
-      return pixels;
-    };
-    const difference = (a, b) => a.reduce((sum, value, i) => sum + Math.abs(value - b[i]), 0) / (a.length * 0.75);
-    for (const [width,height] of [[640,360],[360,640],[180,90],[960,270]]) {
-      assert(difference(render(0,{},width,height), render(20,{},width,height)) > 0.001, `${id}: blank or static scene`);
-    }
-    assert(difference(render(0,{speed:0}), render(100,{speed:0})) === 0, `${id}: zero speed does not freeze`);
-    if (definition.manifest.category === 'Reactive') {
-      // Ambient response should be visible after sustained sound, but restrained.
-      const audioDelta = difference(render(12,{audio:[0,0,0,0]}), render(12,{audio:[0.6,0.8,0.5,0.4]}));
-      assert(audioDelta > 1.5 && audioDelta < 12, `${id}: audio response outside ambient range (${audioDelta})`);
-      assert(difference(render(12,{speed:0,audio:[0,0,0,0]}), render(12,{speed:0,audio:[1,1,1,1]})) > 0.25, `${id}: zero speed must retain audio response`);
-      assert(difference(render(12,{sensitivity:0,audio:[0,0,0,0]}), render(12,{sensitivity:0,audio:[1,1,1,1]})) === 0, `${id}: sensitivity zero must disable audio response`);
-    }
-    const gray = render(12,{saturation:0});
-    for(let i=0;i<gray.length;i+=4) assert(gray[i]===gray[i+1] && gray[i]===gray[i+2], `${id}: saturation zero is not grayscale`);
-    if (id === 'shadersaver-waveform') {
-      // A zero march distance used to produce thousands of isolated black
-      // pixels inside otherwise white highlights. Check the rendered result.
-      const width = 640, height = 360;
-      const pixels = render(12, {}, width, height);
-      const white = index => pixels[index] > 220 && pixels[index+1] > 220 && pixels[index+2] > 220;
-      let speckles = 0;
-      for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
-        const index = (y * width + x) * 4;
-        if (pixels[index] < 32 && pixels[index+1] < 32 && pixels[index+2] < 32
-          && white(index - 4) && white(index + 4)
-          && white(index - width * 4) && white(index + width * 4)) speckles++;
-      }
-      assert(speckles === 0, `${id}: ${speckles} black speckles in white highlights`);
-    }
-    for (const def of definition.manifest.uniforms) {
-      const dependencies = def.visibleWhen ? {[def.visibleWhen.name]:def.visibleWhen.value} : {};
-      const interior = def.type === 'int' ? Math.round(def.min + (def.max - def.min) * 0.37) : def.min + (def.max - def.min) * 0.37;
-      const variants = def.type === 'color' ? ['#000000','#ffffff'] : def.type === 'bool' ? [false,true] : def.type === 'select' ? def.options : [def.min,interior,def.default,def.max];
-      const frames = variants.map(value => render(12,{...dependencies,[def.name]:value},640,360));
-      assert(frames.slice(1).some(frame => difference(frames[0],frame)>0.001), `${id}: ${def.name} has no visual effect`);
-    }
-    for (const bound of ['min','max']) {
-      const values = Object.fromEntries(definition.manifest.uniforms.filter(d=>d.type==='float'||d.type==='int').map(d=>[d.name,d[bound]]));
-      render(86400,values,180,320);
-    }
-    render(86400);
-    let defaultDifference;
-    if (baseline?.[id]) {
-      const oldProgram = createProgram(baseline[id]);
-      defaultDifference = 0;
-      const legacy = Object.fromEntries(baseline[id].manifest.uniforms.map(d=>[d.name,d.type==='color'?'#376ba9':d.type==='float'?Math.min(d.max,Number(d.default)*1.17):d.default]));
-      for(const values of [{},legacy]) for(const time of [0,12,120]) {
-        const delta = difference(render(time,values), render(time,values,320,180,baseline[id],oldProgram));
-        defaultDifference = Math.max(defaultDifference,delta);
-        assert(delta < 0.8, `${id}: default/preset appearance changed (${delta.toFixed(3)} channel levels)`);
-      }
-      gl.deleteProgram(oldProgram);
-    }
-    // CPU readback includes software rendering; this is a regression measurement, not hardware FPS.
-    render(12,{},1920,1080);
-    const start = performance.now();
-    render(13,{},1920,1080);
-    const renderMs = performance.now()-start;
-    reports.push({id,parameters:definition.manifest.uniforms.length,renderMs:Math.round(renderMs),...(defaultDifference===undefined?{}:{defaultDifference:Number(defaultDifference.toFixed(3))})});
-    gl.deleteProgram(program);
-  }
-  gl.deleteShader(vertex); gl.deleteBuffer(buffer);
-  gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return {contextType,checks,reports};
+function loadBaseline() {
+  const index = process.argv.indexOf('--baseline');
+  return index < 0 ? null : require(path.resolve(process.argv[index + 1])).shaderRegistry;
 }
 
-app.whenReady().then(async () => {
-  const { shaderRegistry } = bundle('src/renderer/shaders/index.ts');
-  const { defaultConfig } = bundle('src/shared/config.ts');
-  const filter = process.env.SCRNSVR_SHADER_FILTER;
-  const testedRegistry = filter
-    ? Object.fromEntries(Object.entries(shaderRegistry).filter(([id]) => id.includes(filter)))
-    : shaderRegistry;
-  if (!Object.keys(testedRegistry).length) throw Error(`No shaders matched SCRNSVR_SHADER_FILTER=${filter}`);
-  const baselineIndex = process.argv.indexOf('--baseline');
-  const baseline = baselineIndex < 0 ? null : require(path.resolve(process.argv[baselineIndex+1])).shaderRegistry;
-  const win = new BrowserWindow({show:false,width:1280,height:1000,webPreferences:{preload:path.join(root,'dist/preload/index.js'),contextIsolation:true,sandbox:true}});
-  win.webContents.on('render-process-gone', (_event, details) => {console.error(details);app.exit(1);});
-  await win.loadURL('data:text/html,<html><body></body></html>');
-  for(const context of (process.argv.includes('--ui-only') ? [] : ['webgl','webgl2'])) {
-    const result=await win.webContents.executeJavaScript(`(() => { try { return (${renderChecks.toString()})(${JSON.stringify(testedRegistry)},${JSON.stringify(baseline)},${JSON.stringify(context)}); } catch (error) { return {error: error.stack}; } })()`);
+function createCheckWindow() {
+  const win = new BrowserWindow({ show: false, width: 1280, height: 1000, webPreferences: { preload: path.join(root, 'dist/preload/index.js'), contextIsolation: true, sandbox: true } });
+  win.webContents.on('render-process-gone', (_event, details) => { console.error(details); app.exit(1); });
+  return win;
+}
+
+/** Compile and render every shader in each available WebGL context. */
+async function runContextChecks(win, registry, baseline) {
+  if (process.argv.includes('--ui-only')) return;
+  for (const context of ['webgl', 'webgl2']) {
+    const result = await win.webContents.executeJavaScript(`(() => { ${browser.browserPrelude()}
+      try { return renderChecks(${JSON.stringify(registry)}, ${JSON.stringify(baseline)}, ${JSON.stringify(context)}); } catch (error) { return { error: error.stack }; } })()`);
     if (result.error) throw Error(result.error);
     console.log(JSON.stringify(result));
   }
-  if (filter) { win.destroy(); app.quit(); return; }
-  let saved = structuredClone(defaultConfig);
-  ipcMain.handle('config:get',()=>saved);
-  ipcMain.handle('config:set',(_event,value)=>{saved=value;});
-  ipcMain.handle('colors:import-noctalia',()=>({ok:true,palette:{mPrimary:'#ebbcba',mSecondary:'#9ccfd8',mTertiary:'#31748f',mSurface:'#191724',mOnSurface:'#e0def4'}}));
-  await win.loadFile(path.join(root,'dist/settings/index.html'));
-  // Renderer bootstrap reads configuration asynchronously over IPC.
-  for(let i=0;i<100;i++) {
-    if(await win.webContents.executeJavaScript('Boolean(document.querySelector("[data-control]"))'))break;
-    await new Promise(resolve=>setTimeout(resolve,50));
-  }
-  const ui=await win.webContents.executeJavaScript(`(${async function uiChecks(registry) {
-    const assert=(ok,message)=>{if(!ok)throw Error(message);};
-    const input=(name,value,event='input')=>{
-      const control=document.querySelector(`[data-name="${name}"]`);
-      assert(control,`Missing ${name}`); control.value=String(value); control.dispatchEvent(new Event(event,{bubbles:true}));
-      return control;
-    };
-    const mainCanvas = document.querySelector('.preview');
-    const mainContext = mainCanvas.getContext('webgl2') ?? mainCanvas.getContext('webgl');
-    const mainRenderer = mainContext.renderer;
-    const sample = document.createElement('canvas');
-    sample.width = 96; sample.height = 54;
-    const sampleContext = sample.getContext('2d');
-    const assertScene = async (canvas, label) => {
-      // Some imported scenes fade in from black; sample before presentation
-      // clears the non-preserved WebGL drawing buffer.
-      const deadline = performance.now() + 4000;
-      do {
-        sampleContext.drawImage(canvas, 0, 0, 96, 54);
-        const pixels = sampleContext.getImageData(0, 0, 96, 54).data;
-        let min = 255, max = 0, opaque = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          min = Math.min(min, pixels[i], pixels[i+1], pixels[i+2]);
-          max = Math.max(max, pixels[i], pixels[i+1], pixels[i+2]);
-          opaque += pixels[i+3];
-        }
-        if (opaque > 0 && max - min > 5) return;
-        await new Promise(requestAnimationFrame);
-      } while (performance.now() < deadline);
-      throw Error(`${label}: blank, white or flat render`);
-    };
-    for(const [id,shader] of Object.entries(registry)) {
-      document.querySelector(`.shader-select[data-id="${id}"]`).click();
-      const preview = document.querySelector('.preview');
-      const gl = preview.getContext('webgl2') ?? preview.getContext('webgl');
-      assert(gl.renderer === mainRenderer, `${id}: replaced renderer state on the same context`);
-      assert(!gl.isContextLost() && gl.getError() === gl.NO_ERROR, `${id}: preview context failed`);
-      await assertScene(preview, `${id} preview`);
-      assert(document.querySelectorAll('[data-control]').length===shader.manifest.uniforms.length, `${id}: missing controls`);
-      assert(document.querySelectorAll('.shader-control-group:not([hidden])').length>=3, `${id}: missing groups`);
-    }
-    // Exercise observer release/remount in both scroll directions. 2D targets
-    // retain their last frame while offscreen and never consume a WebGL context.
-    const cards = [...document.querySelectorAll('.shader-card')];
-    for (const card of [...cards, ...cards.toReversed()]) {
-      card.scrollIntoView({block:'center'});
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const canvas = card.querySelector('canvas');
-      assert(canvas.getContext('2d'), `${card.dataset.id}: thumbnail must share the gallery GPU context`);
-      await assertScene(canvas, `${card.dataset.id} thumbnail`);
-    }
-    window.scrollTo(0, 0);
-    document.querySelector('.shader-select[data-id="plasma"]').click();
-    input('brightness', 0);
-    const activeProgram = mainContext.getParameter(mainContext.CURRENT_PROGRAM);
-    assert(activeProgram, 'Settings preview has an active WebGL program');
-    const brightnessLocation = mainContext.getUniformLocation(activeProgram, 'brightness');
-    assert(brightnessLocation, 'Plasma brightness uniform is active');
-    const assertBrightness = async (expected, label) => {
-      const deadline = performance.now() + 4000;
-      do {
-        if (Math.abs(mainContext.getUniform(activeProgram, brightnessLocation) - expected) < 0.001) return;
-        await new Promise(requestAnimationFrame);
-      } while (performance.now() < deadline);
-      throw Error(`${label}: got ${mainContext.getUniform(activeProgram, brightnessLocation)}, expected ${expected}`);
-    };
-    await assertBrightness(0, 'Slider updates the running preview uniform');
-    document.querySelector('[data-control="brightness"] .uniform-reset').click();
-    await assertBrightness(1, 'Reset updates the running preview uniform');
-    assert(document.querySelector('[data-control="color1"]').hidden,'Custom colors initially hidden');
-    document.querySelector('[data-action="import-noctalia"]').click();
-    for(let i=0;i<100 && document.querySelector('[data-action="import-noctalia"]').disabled;i++) await new Promise(resolve=>setTimeout(resolve,20));
-    assert(document.querySelector('[data-name="palette"]').value==='custom','Noctalia selects custom palette');
-    assert(document.querySelector('[data-name="color1"]').value==='#ebbcba','Noctalia updates custom colors');
-    input('palette','custom');
-    assert(!document.querySelector('[data-control="color1"]').hidden,'Custom colors appear on mode change');
-    input('color1','#123456');
-    input('speed',0.5);
-    document.querySelector('[data-preset]').value='Integration preset';
-    document.querySelector('[data-action="save"]').click();
-    input('speed',1.5);
-    const preset=[...document.querySelectorAll('.look-item')].find(item=>item.querySelector('strong')?.textContent==='Integration preset');
-    assert(preset,'Saved look appears in the list');
-    preset.querySelector('button[aria-label="Apply Integration preset to current edits"]').click();
-    assert(document.querySelector('[data-name="speed"]').value==='0.5','Preset restores motion');
-    assert(document.querySelector('[data-name="color1"]').value==='#123456','Preset restores custom colors');
-    preset.querySelector('button[aria-label="Add Integration preset to shuffle"]').click();
-    document.querySelector('[data-preset]').value='Integration alternate';
-    document.querySelector('[data-action="save"]').click();
-    const alternate=[...document.querySelectorAll('.look-item')].find(item=>item.querySelector('strong')?.textContent==='Integration alternate');
-    alternate.querySelector('button[aria-label="Add Integration alternate to shuffle"]').click();
-    assert(document.querySelectorAll('.shuffle-item').length===2,'Two looks from one visual stay in shuffle');
-    document.querySelector('[data-control="speed"] .uniform-reset').click();
-    assert(Number(document.querySelector('[data-name="speed"]').value)===registry.plasma.manifest.uniforms.find(d=>d.name==='speed').default,'Individual reset');
-    assert(document.querySelector('[data-name="color1"]').value==='#123456','Individual reset preserves other controls');
-    document.querySelector('.shader-select[data-id="contour-dunes"]').click();
-    const advanced=document.querySelector('.shader-advanced'); advanced.open=true;
-    const number=document.querySelector('[data-control="lineThickness"] input[type="number"]');
-    number.focus(); number.value='0.027'; number.dispatchEvent(new Event('change',{bubbles:true}));
-    assert(number.value==='0.025','Numeric entry snaps to step');
-    assert(document.activeElement===number,'Numeric entry preserves focus');
-    number.value='0.04';number.dispatchEvent(new Event('change',{bubbles:true}));
-    assert(document.querySelector('[data-name="lineThickness"]').value==='0.04','Numeric entry updates slider');
-    number.value='';number.dispatchEvent(new Event('change',{bubbles:true}));
-    assert(number.value==='0.025','Empty numeric entry recovers default');
-    document.querySelector('[data-action="random"]').click();
-    assert(document.querySelector('.shader-advanced').open,'Advanced remains open after randomize');
-    document.querySelector('[data-action="reset"]').click();
-    assert(document.querySelector('[data-name="lineThickness"]').value==='0.025','Shader reset restores new parameters');
-    document.querySelector('button[aria-label="Load Chromatic Plasma, Integration preset"]').click();
-    assert(document.querySelector('#shader-tab').getAttribute('aria-selected')==='true','Loading a shuffle look opens Visuals');
-    assert(document.querySelector('.shader-select[data-id="plasma"]').getAttribute('aria-pressed')==='true','Loading a shuffle look selects its visual');
-    assert(document.querySelector('[data-name="speed"]').value==='0.5','Loading a shuffle look applies saved motion');
-    assert(document.querySelector('[data-name="color1"]').value==='#123456','Loading a shuffle look applies saved color');
-    const globalScheme=document.querySelector('[data-global="scheme"]');
-    assert(globalScheme,'Missing global color scheme picker');
-    globalScheme.value='dracula';
-    globalScheme.dispatchEvent(new Event('input',{bubbles:true}));
-    assert(document.querySelector('[data-name="palette"]').value==='custom','Scheme selects Plasma custom palette');
-    assert(document.querySelector('[data-name="color1"]').value==='#bd93f9','Global scheme applies Dracula colors');
-    const shaderScheme=document.querySelector('[data-shader-scheme]');
-    assert(shaderScheme,'Missing per-shader color scheme picker');
-    shaderScheme.value='nord';
-    shaderScheme.dispatchEvent(new Event('input',{bubbles:true}));
-    assert(document.querySelector('[data-name="color1"]').value==='#81a1c1','Per-shader override applies Nord colors');
-    shaderScheme.value='';
-    shaderScheme.dispatchEvent(new Event('input',{bubbles:true}));
-    assert(document.querySelector('[data-name="color1"]').value==='#bd93f9','Clearing the override restores the global scheme');
-    await new Promise(resolve=>setTimeout(resolve,450));
-    const saved=await window.scrnsvr.getConfig();
-    assert(saved.presets.plasma['Integration preset'].color1==='#123456','Preset saved through IPC');
-    assert(saved.rotation.entries.filter(entry=>entry.shader==='plasma').length===2,'Multiple looks from one visual saved through IPC');
-    assert(saved.shaders['contour-dunes'].lineThickness===undefined,'Reset clears saved override');
-    assert(saved.colors.scheme==='dracula','Global scheme saved through IPC');
-    assert(saved.colors.overrides.plasma===undefined,'Cleared per-shader override is not persisted');
-    return 'All shader previews, thumbnail scroll/remounts, renderer reuse, controls, presets and IPC passed';
-  }.toString()})(${JSON.stringify(shaderRegistry)}).catch(error => ({error:error.stack}))`);
+}
+
+/** Exercise the mounted settings UI and assert persisted state through real preload IPC. */
+async function runUiChecks(win) {
+  await waitForControls(win, { root });
+  const ui = await win.webContents.executeJavaScript(`(async () => { ${browser.browserPrelude()}
+    return await uiChecks(${JSON.stringify(shaderRegistry)}); })().catch(error => ({ error: error.stack }))`);
   if (ui.error) throw Error(ui.error);
   console.log(ui);
-  await win.loadFile(path.join(root,'dist/settings/index.html'));
-  for(let i=0;i<100;i++) {
-    if(await win.webContents.executeJavaScript('Boolean(document.querySelector("[data-control]"))'))break;
-    await new Promise(resolve=>setTimeout(resolve,50));
-  }
-  const restored=await win.webContents.executeJavaScript('document.querySelector(".shader-select[data-id=plasma]").getAttribute("aria-pressed") === "true" && document.querySelector("[data-name=speed]").value === "0.5"');
+}
+
+function registerSettingsIpc() {
+  let saved = structuredClone(defaultConfig);
+  ipcMain.handle('config:get', () => saved);
+  ipcMain.handle('config:set', (_event, value) => { saved = value; });
+  ipcMain.handle('colors:import-noctalia', () => ({ ok: true, palette: { mPrimary: '#ebbcba', mSecondary: '#9ccfd8', mTertiary: '#31748f', mSurface: '#191724', mOnSurface: '#e0def4' } }));
+}
+
+async function assertSettingsRestore(win) {
+  await waitForControls(win, { root });
+  const restored = await win.webContents.executeJavaScript('document.querySelector(".shader-select[data-id=plasma]").getAttribute("aria-pressed") === "true" && document.querySelector("[data-name=speed]").value === "0.5"');
   if (!restored) throw Error('Settings did not restore after reload');
+}
+
+app.whenReady().then(async () => {
+  const filter = process.env.SCRNSVR_SHADER_FILTER;
+  const registry = loadTestRegistry(filter);
+  const baseline = loadBaseline();
+  const win = createCheckWindow();
+  await win.loadURL('data:text/html,<html><body></body></html>');
+  await runContextChecks(win, registry, baseline);
+  if (filter) { finish(app, { win, temporary }); return; }
+  registerSettingsIpc();
+  await runUiChecks(win, registry);
+  await assertSettingsRestore(win);
   console.log('Shader checks passed');
-  win.destroy();
-  app.quit();
-}).catch(error=>{console.error(error);app.exit(1);});
-app.on('quit',()=>fs.rmSync(temporary,{recursive:true,force:true}));
+  finish(app, { win, temporary });
+}).catch(error => { console.error(error); app.exit(1); });

@@ -17,12 +17,9 @@ const width = Number(arg('--width', '640'));
 const height = Number(arg('--height', '360'));
 
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { applySoftwareGl } = require('./lib/electron-harness.cjs');
 
-app.commandLine.appendSwitch('disable-vulkan');
-app.commandLine.appendSwitch('use-gl', 'angle');
-app.commandLine.appendSwitch('use-angle', 'swiftshader-webgl');
-app.commandLine.appendSwitch('enable-unsafe-swiftshader');
-if (process.env.DISPLAY) app.commandLine.appendSwitch('ozone-platform', 'x11');
+applySoftwareGl(app.commandLine);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

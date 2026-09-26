@@ -1,24 +1,13 @@
 // Exercise real preload IPC, runtime smoothing and GPU uploads together.
 const path = require('node:path');
 const fs = require('node:fs');
-const os = require('node:os');
-if (!process.versions.electron || process.env.ELECTRON_RUN_AS_NODE) {
-  const env = { ...process.env };
-  delete env.ELECTRON_RUN_AS_NODE;
-  const result = require('node:child_process').spawnSync(require('electron'), [__filename], { env, stdio: 'inherit' });
-  if (result.error) console.error(result.error);
-  process.exit(result.status ?? 1);
-}
+const { reexecUnderElectron, createHarness, bundleSource, finish } = require('./lib/electron-harness.cjs');
+
+reexecUnderElectron();
+
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { buildSync } = require('esbuild');
 const root = path.resolve(__dirname, '..');
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'scrnsvr-reactive-check-'));
-app.setPath('userData', temporary);
-app.commandLine.appendSwitch('disable-vulkan');
-app.commandLine.appendSwitch('use-gl', 'angle');
-app.commandLine.appendSwitch('use-angle', 'swiftshader-webgl');
-app.commandLine.appendSwitch('enable-unsafe-swiftshader');
-if (process.env.DISPLAY) app.commandLine.appendSwitch('ozone-platform', 'x11');
+const temporary = createHarness({ prefix: 'scrnsvr-reactive-check-' });
 
 app.whenReady().then(async () => {
   let frame = { level: 0, bass: 0, mid: 0, treble: 0, status: 'Test audio' };
@@ -34,12 +23,9 @@ app.whenReady().then(async () => {
   const preload = path.join(temporary, 'preload.cjs');
   fs.writeFileSync(preload, fs.readFileSync(path.join(root, 'dist/preload/index.js'), 'utf8') +
     '\nrequire("electron").contextBridge.exposeInMainWorld("testAudio", { send: value => require("electron").ipcRenderer.invoke("test:audio", value) });');
-  const source = buildSync({
-    stdin: { contents: `import { mountShader } from './src/renderer/core/runtime';
-      import { shaderRegistry } from './src/renderer/shaders';
-      window.testShaders = { mountShader, shaderRegistry };`, resolveDir: root },
-    bundle: true, write: false, platform: 'browser', loader: { '.glsl': 'text' },
-  }).outputFiles[0].text;
+  const source = bundleSource(`import { mountShader } from './src/renderer/core/runtime';
+    import { shaderRegistry } from './src/renderer/shaders';
+    window.testShaders = { mountShader, shaderRegistry };`);
   const win = new BrowserWindow({ show: false, width: 400, height: 260,
     webPreferences: { preload, contextIsolation: true, sandbox: true, backgroundThrottling: false } });
   await win.loadURL('data:text/html,<body style="margin:0"><canvas style="width:320px;height:180px"></canvas>');
@@ -94,7 +80,5 @@ app.whenReady().then(async () => {
   }.toString()})()`);
   console.log(JSON.stringify(result));
   console.log('Reactive IPC, runtime upload, response time, silence recovery and zero influence passed');
-  win.destroy();
-  app.quit();
+  finish(app, { win, temporary });
 }).catch(error => { console.error(error); app.exit(1); });
-app.on('quit', () => fs.rmSync(temporary, { recursive: true, force: true }));
