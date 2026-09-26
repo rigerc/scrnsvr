@@ -33,6 +33,8 @@ Direction and angle controls are offsets in degrees from the original compositio
 
 Plasma shows custom colors only with the Custom palette. Noctalia import selects that palette automatically. Flow Field shows its secondary color in Duotone mode, and glow strength/width only when Edge glow is enabled. Hidden controls keep their saved values.
 
+Global and per-shader color schemes apply ANSI-derived role colors (background, text, and three accent roles) to every shader with color controls. Choosing a scheme clears that shader's stored color overrides so the scheme is visible; individual color edits then persist until the scheme changes. Randomize keeps scheme colors. The shaders without color controls keep their built-in palettes.
+
 Randomize uses conservative ranges near the original appearance, preserves background colors, and respects dependent controls and numeric steps. Manual controls expose wider ranges. Old presets remain readable and retain their existing values; missing parameters use their defaults without rounding previously saved floating-point values to newer slider steps.
 
 Parameter definitions, including exact ranges, steps, defaults, and randomization ranges, live in each shader's `src/renderer/shaders/<id>/manifest.ts`.

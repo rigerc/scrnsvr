@@ -74,6 +74,10 @@ Choose a shader and adjust its sliders for a live preview. Numeric fields accept
 
 Every shader supports speed, brightness, and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color. Existing settings and presets retain their values, with newly added parameters taking their defaults.
 
+### Color schemes
+
+Pick one of 30 well-known color schemes (Dracula, Nord, Gruvbox, Solarized, Monokai, One Dark, Tokyo Night, Night Owl, Palenight, Zenburn, Ayu, Rosé Pine, Kanagawa, GitHub, Material, Everforest, and Iceberg) under **Global settings → Color scheme**. The scheme supplies background, text, and accent colors to every shader that exposes color controls, using the same role mapping as the Noctalia import. Each shader can override the global choice or opt out with **Built-in colors** in its Colors section; adjusting an individual color afterwards keeps that change until you pick another scheme. Randomize leaves scheme colors alone. Scheme data is generated from the Ghostty/iTerm2 color-scheme YAMLs in `reference/` by `scripts/generate-palettes.mjs`.
+
 Imported shader credits, pinned upstream revisions, license notes, exclusions, and porting details are recorded in [THIRD_PARTY_SHADERS.md](THIRD_PARTY_SHADERS.md).
 
 See the [shader parameter guide](docs/shader-parameters.md) for the available adjustments.
@@ -82,7 +86,7 @@ See the [shader parameter guide](docs/shader-parameters.md) for the available ad
 
 Resolved by `configPath()` in `src/shared/config.ts`:
 
-- active shader, global FPS / idle threshold / monitor scope, clock block, `shaders` values, `presets`
+- active shader, global FPS / idle threshold / monitor scope, clock block, `colors` scheme and per-shader overrides, `shaders` values, `presets`
 - legacy top-level `fps`/`monitor` keys are migrated into `global` on load
 
 Example (`~/.config/scrnsvr/config.json`):

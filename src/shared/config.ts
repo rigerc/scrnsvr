@@ -22,6 +22,12 @@ const ClockSchema = z.object({
   shadow: z.boolean().default(defaultClockConfig.shadow),
 }).default({});
 
+const ColorSchemeSchema = z.object({
+  /** Global color scheme id, or 'none' for each shader's built-in palette. */
+  scheme: z.string().default('none'),
+  /** Per-shader overrides: '' inherits the global scheme, 'none' opts out. */
+  overrides: z.record(z.string(), z.string()).default({}),
+}).default({});
 const GlobalSchema = z.object({
   idleThresholdSeconds: z.number().min(0).default(300),
   fps: z.number().int().min(1).max(240).default(60),
@@ -38,6 +44,7 @@ const ConfigObjectSchema = z.object({
   global: GlobalSchema,
   clock: ClockSchema,
   rotation: RotationSchema,
+  colors: ColorSchemeSchema,
   customShaders: CustomShadersSchema,
   audio: z.object({ enabled: z.boolean().default(false) }).default({}),
   shaders: z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()]))).default({}),

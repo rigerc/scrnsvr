@@ -6,6 +6,7 @@ export function mountShaderControls(
   definitions: UniformManifest[],
   values: Record<string, UniformValue>,
   onChange: () => void,
+  resolveValues: () => Record<string, UniformValue> = () => values,
 ) {
   const wasOpen = root.querySelector('details')?.open ?? false;
   root.replaceChildren();
@@ -21,7 +22,7 @@ export function mountShaderControls(
   const sections: HTMLFieldSetElement[] = [];
   const rows: Array<{ def: UniformManifest; row: HTMLElement }> = [];
   const refreshVisibility = () => {
-    const resolved = bindUniforms(definitions, values);
+    const resolved = bindUniforms(definitions, resolveValues());
     rows.forEach(({ def, row }) => { row.hidden = !uniformVisible(def, resolved); });
     sections.forEach(section => { section.hidden = !section.querySelector('.shader-control:not([hidden])'); });
     advanced.hidden = !advanced.querySelector('fieldset:not([hidden])');
@@ -87,7 +88,7 @@ export function mountShaderControls(
         input.dataset.name = def.name;
         input.setAttribute('aria-describedby', description.id);
         const sync = () => {
-          const value = bindUniforms([def], values)[def.name];
+          const value = bindUniforms([def], resolveValues())[def.name];
           input.value = String(value);
           if (input instanceof HTMLInputElement && def.type === 'bool') input.checked = Boolean(value);
           if (number) number.value = String(value);

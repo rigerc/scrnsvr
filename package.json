@@ -14,7 +14,7 @@
     "open": "npm run build && electron dist/main/index.js --open",
     "settings": "npm run build && electron dist/main/index.js --settings",
     "daemon": "npm run build && electron dist/main/index.js --daemon",
-    "typecheck": "node scripts/generate-shader-registry.mjs && tsc -p tsconfig.json --noEmit",
+    "typecheck": "node scripts/generate-palettes.mjs && node scripts/generate-shader-registry.mjs && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "render-thumbnails": "npm run build && electron dist/main/index.js --thumbnail --output assets/thumbnails --frames 3",
     "dist": "npm run build && electron-builder --config electron-builder.yml",

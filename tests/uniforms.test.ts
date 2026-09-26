@@ -52,4 +52,20 @@ describe('bindUniforms', () => {
       else expect(values.custom).not.toBe('#abcdef');
     }
   });
+
+  it('leaves protected color uniforms untouched when a scheme is active', () => {
+    const defs: UniformManifest[] = [
+      { name: 'color1', type: 'color', default: '#111111' },
+      { name: 'background', type: 'color', default: '#000000', random: false },
+      { name: 'palette', type: 'select', default: 'custom', options: ['custom'] },
+      { name: 'speed', type: 'float', default: 1, min: 0, max: 3 },
+    ];
+    const stored = { color1: '#abcdef', background: '#222222', palette: 'custom', speed: 0.4 };
+    const protectedNames = new Set(['color1', 'background', 'palette']);
+    const values = randomizeUniforms(defs, stored, () => 0.5, protectedNames);
+    expect(values.color1).toBe('#abcdef');
+    expect(values.background).toBe('#222222');
+    expect(values.palette).toBe('custom');
+    expect(values.speed).not.toBe(0.4);
+  });
 });

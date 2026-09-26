@@ -32,11 +32,11 @@ export function uniformVisible(def: UniformManifest, values: Record<string, Unif
   return !def.visibleWhen || values[def.visibleWhen.name] === def.visibleWhen.value;
 }
 
-export function randomizeUniforms(defs: UniformManifest[], current: Record<string, unknown>, random = Math.random): Record<string, UniformValue> {
+export function randomizeUniforms(defs: UniformManifest[], current: Record<string, unknown>, random = Math.random, protectedNames?: ReadonlySet<string>): Record<string, UniformValue> {
   const values = bindUniforms(defs, current);
   // Choose modes before dependent controls, regardless of manifest ordering.
   for (const def of [...defs].sort((a, b) => Number(Boolean(a.visibleWhen)) - Number(Boolean(b.visibleWhen)))) {
-    if (def.random === false || !uniformVisible(def, values)) continue;
+    if (def.random === false || protectedNames?.has(def.name) || !uniformVisible(def, values)) continue;
     if (def.type === 'float' || def.type === 'int') {
       const step = def.step ?? (def.type === 'int' ? 1 : 0.01);
       const origin = def.min ?? 0;

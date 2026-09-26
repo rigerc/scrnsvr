@@ -4,6 +4,7 @@ import { mountShader } from './core/runtime';
 import type { Config } from '../shared/config';
 import { defaultClockConfig } from '../shared/clock';
 import { resolveRotationValues, rotationEntryKey } from '../shared/rotation';
+import { effectiveShaderValues } from '../shared/palettes';
 import { mountClock } from './core/clock';
 import { mountFadeOverlay } from './core/fade';
 
@@ -16,9 +17,13 @@ void (async () => {
   if (!chosen) throw new Error('No shaders are registered');
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
   const initialPreset = params.get('preset') ?? undefined;
-  const valuesFor = (shaderId: string, preset?: string) => preset
-    ? resolveRotationValues(config.shaders, config.presets, shaderId, preset)
-    : config.shaders[shaderId] ?? {};
+  const valuesFor = (shaderId: string, preset?: string) => {
+    const stored = preset
+      ? resolveRotationValues(config.shaders, config.presets, shaderId, preset)
+      : config.shaders[shaderId] ?? {};
+    const manifest = shaderRegistry[shaderId]?.manifest;
+    return manifest ? effectiveShaderValues(manifest, stored, config.colors) : stored;
+  };
   let currentKey = rotationEntryKey(chosen.manifest.id, initialPreset);
   let stopScene = mountShader(canvas, chosen, valuesFor(chosen.manifest.id, initialPreset), config.global.fps);
   const clock = mountClock(document.body, config.clock ?? defaultClockConfig);

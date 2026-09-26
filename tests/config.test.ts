@@ -27,6 +27,21 @@ describe('config', () => {
     expect(ConfigSchema.parse({}).global).toMatchObject({ inhibitOnAudio: false, inhibitOnFullscreen: true });
   });
 
+  it('defaults color schemes to built-in colors', () => {
+    expect(ConfigSchema.parse({}).colors).toEqual({ scheme: 'none', overrides: {} });
+    expect(defaultConfig.colors).toEqual({ scheme: 'none', overrides: {} });
+  });
+
+  it('round-trips a global scheme and per-shader override', () => {
+    const parsed = ConfigSchema.parse({ colors: { scheme: 'dracula', overrides: { plasma: 'nord', 'flow-field': 'none' } } });
+    expect(parsed.colors).toEqual({ scheme: 'dracula', overrides: { plasma: 'nord', 'flow-field': 'none' } });
+    expect(ConfigSchema.parse({ colors: { scheme: 'does-not-exist' } }).colors.scheme).toBe('does-not-exist');
+  });
+
+  it('keeps legacy configs without colors readable', () => {
+    expect(ConfigSchema.parse({ shader: 'plasma' }).colors).toEqual({ scheme: 'none', overrides: {} });
+  });
+
   it('defaults fade duration and accepts updates', () => {
     expect(ConfigSchema.parse({}).global.fadeSeconds).toBe(1);
     expect(ConfigSchema.parse({ global: { fadeSeconds: 2.5 } }).global.fadeSeconds).toBe(2.5);

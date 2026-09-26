@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T18:34:08.389154+00:00",
+  "title": "Design System: scrnsvr",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas Charcoal",
+        "canonical": "#171819",
+        "tonalRamp": [
+          "#252628",
+          "#3d4042",
+          "#56595d",
+          "#6e7378",
+          "#878c91",
+          "#a7abae",
+          "#caccce",
+          "#ecedee"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Mixer Surface",
+        "canonical": "#191a1b",
+        "tonalRamp": [
+          "#252628",
+          "#3d4042",
+          "#56595d",
+          "#6e7377",
+          "#888c91",
+          "#a8abae",
+          "#caccce",
+          "#ecedee"
+        ]
+      },
+      "preview-surface": {
+        "role": "neutral",
+        "displayName": "Preview Surface",
+        "canonical": "#1a1b1c",
+        "tonalRamp": [
+          "#252628",
+          "#3d4042",
+          "#56595d",
+          "#6e7377",
+          "#888c90",
+          "#a8abae",
+          "#caccce",
+          "#ecedee"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised Control",
+        "canonical": "#222425",
+        "tonalRamp": [
+          "#252728",
+          "#3d4142",
+          "#555b5d",
+          "#6e7478",
+          "#878e91",
+          "#a7acae",
+          "#cacdce",
+          "#ecedee"
+        ]
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Control Charcoal",
+        "canonical": "#252728",
+        "tonalRamp": [
+          "#252728",
+          "#3d4142",
+          "#565a5d",
+          "#6e7477",
+          "#888e91",
+          "#a8acae",
+          "#cacdce",
+          "#ecedee"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fine Rule",
+        "canonical": "#343738",
+        "tonalRamp": [
+          "#252728",
+          "#3d4142",
+          "#565b5d",
+          "#6e7577",
+          "#888e90",
+          "#a8acae",
+          "#cacdce",
+          "#ecedee"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "#505455",
+        "tonalRamp": [
+          "#252727",
+          "#3e4142",
+          "#575b5c",
+          "#6f7576",
+          "#898e90",
+          "#a8acad",
+          "#cacdce",
+          "#ededee"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#ebe9e2",
+        "tonalRamp": [
+          "#2d2a1f",
+          "#4b4634",
+          "#6a6249",
+          "#887e5e",
+          "#a19877",
+          "#bab39b",
+          "#d5d1c3",
+          "#f0efea"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#b6b5ae",
+        "tonalRamp": [
+          "#282824",
+          "#43423c",
+          "#5e5d55",
+          "#79776d",
+          "#929186",
+          "#afaea6",
+          "#cfcec9",
+          "#eeeeec"
+        ]
+      },
+      "quiet": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "canonical": "#898c89",
+        "tonalRamp": [
+          "#262726",
+          "#3f413f",
+          "#585a58",
+          "#717471",
+          "#8b8e8b",
+          "#aaacaa",
+          "#cbcdcb",
+          "#ededed"
+        ]
+      },
+      "signal": {
+        "role": "primary",
+        "displayName": "Signal Coral",
+        "canonical": "#ef7b4d",
+        "tonalRamp": [
+          "#461806",
+          "#75290b",
+          "#a4390f",
+          "#d34913",
+          "#ec632c",
+          "#f18c65",
+          "#f7baa1",
+          "#fce7de"
+        ]
+      },
+      "signal-hover": {
+        "role": "primary",
+        "displayName": "Signal Hover",
+        "canonical": "#ff976d",
+        "tonalRamp": [
+          "#4c1600",
+          "#802500",
+          "#b23300",
+          "#e64200",
+          "#ff5c1a",
+          "#ff8757",
+          "#ffb699",
+          "#ffe6db"
+        ]
+      },
+      "saved": {
+        "role": "secondary",
+        "displayName": "Saved Mint",
+        "canonical": "#85c6a1",
+        "tonalRamp": [
+          "#183424",
+          "#29573d",
+          "#397a55",
+          "#499c6d",
+          "#63b686",
+          "#8cc9a7",
+          "#b9dfc9",
+          "#e7f4ec"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Preview title",
+        "purpose": "Selected shader name beneath the preview."
+      },
+      "body": {
+        "displayName": "Interface body",
+        "purpose": "Controls and general interface copy."
+      },
+      "label": {
+        "displayName": "Section label",
+        "purpose": "Uppercase bank and inspector headings."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "tile-feedback",
+        "value": "180ms ease",
+        "purpose": "Tile hover and rotation affordance feedback."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stacked-inspector",
+        "value": "980px"
+      },
+      {
+        "name": "single-column",
+        "value": "620px"
+      },
+      {
+        "name": "three-tile-bank",
+        "value": "1700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Action button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Compact charcoal action in inspector sections.",
+      "html": "<button class=\"ds-action\">Randomize</button>",
+      "css": ".ds-action{padding:8px 11px;border:1px solid #505455;border-radius:5px;background:#252728;color:#ebe9e2;font:12px/1.45 \"Inter Tight\",system-ui,sans-serif;cursor:pointer}.ds-action:hover{border-color:#ef7b4d;background:#38302c}.ds-action:focus-visible{outline:2px solid #ef7b4d;outline-offset:2px}"
+    },
+    {
+      "name": "Text input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Inset field for preset and numeric entry.",
+      "html": "<input class=\"ds-input\" aria-label=\"Preset name\" placeholder=\"Preset name\">",
+      "css": ".ds-input{padding:7px 8px;border:1px solid #505455;border-radius:5px;background:#222425;color:#ebe9e2;font:12px/1.45 \"Inter Tight\",system-ui,sans-serif}.ds-input:focus-visible{outline:2px solid #ef7b4d;outline-offset:2px}.ds-input::placeholder{color:#979a96}"
+    },
+    {
+      "name": "Navigation tabs",
+      "kind": "nav",
+      "description": "Top bar sections with a coral active rule.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Settings\"><button aria-current=\"page\">Shaders</button><button>Clock</button><button>Settings</button></nav>",
+      "css": ".ds-tabs{display:flex;gap:18px;background:#1b1c1d}.ds-tabs button{min-width:82px;padding:12px 10px;border:0;border-bottom:2px solid transparent;background:transparent;color:#898c89;font:16px \"Inter Tight\",system-ui,sans-serif;cursor:pointer}.ds-tabs button[aria-current=page]{border-bottom-color:#ef7b4d;color:#ebe9e2}.ds-tabs button:hover{color:#ebe9e2}.ds-tabs button:focus-visible{outline:2px solid #ef7b4d;outline-offset:2px}"
+    },
+    {
+      "name": "Shader tile",
+      "kind": "card",
+      "refersTo": "shader-tile",
+      "description": "Portrait shader image and one-line title.",
+      "html": "<button class=\"ds-shader-tile\" aria-pressed=\"true\"><span class=\"ds-shader-art\"></span><strong>Aurora Veil</strong></button>",
+      "css": ".ds-shader-tile{display:grid;gap:6px;width:140px;padding:0;border:0;background:transparent;color:#ef7b4d;text-align:left;font:13px \"Inter Tight\",system-ui,sans-serif;cursor:pointer}.ds-shader-art{display:block;width:100%;aspect-ratio:125/157;border:2px solid #ef7b4d;border-radius:5px;background:linear-gradient(145deg,#071022 10%,#32778b 45%,#8a70c2 65%,#070d1a 90%)}.ds-shader-tile strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.ds-shader-tile:hover .ds-shader-art{filter:brightness(1.1)}.ds-shader-tile:focus-visible{outline:2px solid #ef7b4d;outline-offset:2px}"
+    },
+    {
+      "name": "Save status",
+      "kind": "chip",
+      "description": "Small local-save confirmation in the top bar.",
+      "html": "<span class=\"ds-save\">All changes saved locally</span>",
+      "css": ".ds-save{display:inline-flex;align-items:center;gap:8px;color:#898c89;font:12px \"Inter Tight\",system-ui,sans-serif}.ds-save::before{content:\"\";width:6px;height:6px;border-radius:50%;background:#85c6a1}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Visual Mixer",
+    "overview": "The settings screen is an editing desk for shader exploration. Shader images provide the color; the surrounding interface is matte charcoal, precise, and quiet. A single warm signal color identifies the active shader, selected tab, and focused control. The first action is choosing and previewing a shader; tuning and system controls stay adjacent without overwhelming the image.",
+    "keyCharacteristics": [
+      "Three fluid desktop columns: shader bank, live preview, and inspector.",
+      "Portrait shader tiles and a large live WebGL preview with clock overlay.",
+      "Matte neutral surfaces, fine rules, warm coral interaction signal.",
+      "Compact Inter Tight typography, with spaced uppercase section labels."
+    ],
+    "rules": [
+      {
+        "name": "The Shader Color Rule",
+        "body": "Let shader canvases carry saturated color. Reserve coral for actions and state.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Keep shader selection and the live preview visible together on wide screens.",
+      "Let sidebars expand with the viewport so tile and control space remains useful.",
+      "Use coral consistently for selected, focused, and adjustable states."
+    ],
+    "donts": [
+      "Add decorative shadows or bright panel colors to the shell.",
+      "Hide the real shader or clock behind a static illustration.",
+      "Merge shader selection and rotation into one click target."
+    ]
+  }
+}

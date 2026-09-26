@@ -1,4 +1,5 @@
 import type { ShaderManifest } from './manifest';
+import { applyColorRoles } from './palettes';
 
 const roles = ['mPrimary', 'mSecondary', 'mTertiary', 'mSurface', 'mOnSurface'] as const;
 export type NoctaliaPalette = Record<typeof roles[number], string>;
@@ -24,23 +25,13 @@ export function parseNoctaliaPalette(value: unknown): NoctaliaPalette {
 }
 
 export function noctaliaShaderValues(shader: ShaderManifest, palette: NoctaliaPalette): Record<string, string> {
-  const named: Record<string, string> = {
-    color: palette.mPrimary,
-    color1: palette.mPrimary,
-    color2: palette.mSecondary,
-    color3: palette.mTertiary,
-    color4: palette.mOnSurface,
-    background: palette.mSurface,
-    backgroundTop: palette.mSurface,
-    shadow: palette.mSurface,
-    midtone: palette.mPrimary,
-    highlight: palette.mOnSurface,
-  };
-  const accents = [palette.mPrimary, palette.mSecondary, palette.mTertiary];
-  const values = Object.fromEntries(shader.uniforms.filter(u => u.type === 'color')
-    .map((u, index) => [u.name, named[u.name] ?? accents[index % accents.length]]));
-  // Flow Field's monochrome mode ignores its color control.
-  if (shader.id === 'flow-field' && values.color) values.palette = 'aurora';
-  if (shader.id === 'plasma' && values.color1) values.palette = 'custom';
-  return values;
+  const values = applyColorRoles(shader, {
+    primary: palette.mPrimary,
+    secondary: palette.mSecondary,
+    tertiary: palette.mTertiary,
+    surface: palette.mSurface,
+    onSurface: palette.mOnSurface,
+  });
+  // Noctalia always imports explicit colors; schemes do not run on top of them.
+  return values as Record<string, string>;
 }
