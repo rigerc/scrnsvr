@@ -13,6 +13,7 @@ import { shaderIds, shaderRegistry } from '../renderer/shaders';
 import { withCustomShaders } from '../shared/custom-shaders';
 import { applySoftwareGl } from '../shared/gpu-flags';
 import { PlaybackAudio } from './audio';
+import { rendererQuery, rendererWindowOptions, resolveRendererTarget } from './windows';
 
 const playbackAudio = new PlaybackAudio();
 app.once('before-quit', () => playbackAudio.stop());
@@ -28,22 +29,9 @@ function webPreferences(): Electron.WebPreferences {
 }
 
 async function createRendererWindow(config: Config, bounds: Electron.Rectangle, shaderId: string, preview: boolean, preset?: string): Promise<BrowserWindow> {
-  const window = new BrowserWindow({
-    x: bounds.x, y: bounds.y,
-    width: preview ? 960 : bounds.width,
-    height: preview ? 540 : bounds.height,
-    fullscreen: !preview,
-    kiosk: !preview && config.kiosk,
-    frame: preview,
-    autoHideMenuBar: true,
-    show: false,
-    backgroundColor: '#000000',
-    webPreferences: webPreferences(),
-  });
+  const window = new BrowserWindow({ ...rendererWindowOptions(config, bounds, preview), webPreferences: webPreferences() });
   window.once('ready-to-show', () => { if (!window.isDestroyed()) window.show(); });
-  const query: Record<string, string> = { shader: shaderId };
-  if (preset) query.preset = preset;
-  await window.loadFile(rendererHtml, { query });
+  await window.loadFile(rendererHtml, { query: rendererQuery(shaderId, preset) });
   return window;
 }
 
@@ -51,18 +39,16 @@ async function createRendererWindows(shaderOverride?: string, preview = false): 
   const config = await loadConfig();
   playbackAudio.setEnabled(config.audio.enabled);
   const available = withCustomShaders(shaderRegistry, config.customShaders);
-  // `--shader` wins; otherwise a random enabled rotation entry wins; else the saved shader.
-  let shaderId = shaderOverride && available[shaderOverride] ? shaderOverride : config.shader;
-  let preset: string | undefined;
-  if (!shaderOverride && !preview) {
-    const pick = pickRotationEntry(config.rotation, config.shaders, config.presets, Object.keys(available));
-    if (pick) { shaderId = pick.shaderId; preset = pick.preset; }
-  }
-  const displays = preview || config.global.monitors === 'primary' ? [screen.getPrimaryDisplay()] : screen.getAllDisplays();
-  const windows = await Promise.all(displays.map((display) => createRendererWindow(config, display.bounds, shaderId, preview, preset)));
+  const { shaderId, preset } = resolveRendererTarget(config, shaderOverride, preview, available);
+  const windows = await Promise.all(renderDisplays(config, preview).map((display) => createRendererWindow(config, display.bounds, shaderId, preview, preset)));
   // Auto-cycle needs an anchor so --open (one-shot) can swap while it runs too.
   if (!preview && intervalEnabled(config) && windows.length > 0) startWindowGroupCycling(windows);
   return windows;
+}
+
+/** Preview and single-monitor mode render on the primary display only. */
+function renderDisplays(config: Config, preview: boolean): Electron.Display[] {
+  return preview || config.global.monitors === 'primary' ? [screen.getPrimaryDisplay()] : screen.getAllDisplays();
 }
 
 /** Screensaver mode (`--open`) has no daemon group; cycle its windows directly. */
@@ -159,33 +145,41 @@ function registerIpc(): void {
   ipcMain.on(IPC.close, (event) => BrowserWindow.fromWebContents(event.sender)?.close());
 }
 
-app.whenReady().then(async () => {
+async function startDaemon(): Promise<void> {
+  const config = await loadConfig();
+  const daemon = new IdleDaemon({
+    thresholdSeconds: config.global.idleThresholdSeconds,
+    launchRenderer: launchWindowGroup,
+    inhibited: async () => {
+      const latest = await loadConfig();
+      const { inhibited, reasons } = await shouldInhibitScreensaver({
+        inhibitOnAudio: latest.global.inhibitOnAudio,
+        inhibitOnFullscreen: latest.global.inhibitOnFullscreen,
+      });
+      if (inhibited) console.log(`scrnsvr inhibited: ${reasons.join(', ')}`);
+      return inhibited;
+    },
+  });
+  attachPowerResume(daemon);
+  daemon.start();
+  app.once('before-quit', () => daemon.stop());
+}
+
+async function startThumbnail(): Promise<void> {
+  await captureThumbnails(path.resolve(options.output ?? 'assets/thumbnails'), options.frames);
+  app.quit();
+}
+
+async function start(): Promise<void> {
   registerIpc();
   playbackAudio.setEnabled((await loadConfig()).audio.enabled);
   const mode = resolveMode(options);
   if (mode === 'thumbnail') {
-    await captureThumbnails(path.resolve(options.output ?? 'assets/thumbnails'), options.frames);
-    app.quit();
+    await startThumbnail();
     return;
   }
   if (mode === 'daemon') {
-    const config = await loadConfig();
-    const daemon = new IdleDaemon({
-      thresholdSeconds: config.global.idleThresholdSeconds,
-      launchRenderer: launchWindowGroup,
-      inhibited: async () => {
-        const latest = await loadConfig();
-        const { inhibited, reasons } = await shouldInhibitScreensaver({
-          inhibitOnAudio: latest.global.inhibitOnAudio,
-          inhibitOnFullscreen: latest.global.inhibitOnFullscreen,
-        });
-        if (inhibited) console.log(`scrnsvr inhibited: ${reasons.join(', ')}`);
-        return inhibited;
-      },
-    });
-    attachPowerResume(daemon);
-    daemon.start();
-    app.once('before-quit', () => daemon.stop());
+    await startDaemon();
     return;
   }
   if (mode === 'screensaver') {
@@ -193,7 +187,9 @@ app.whenReady().then(async () => {
     return;
   }
   await createSettingsWindow();
-}).catch((error) => {
+}
+
+app.whenReady().then(start).catch((error) => {
   console.error('scrnsvr failed to start', error);
   app.exit(1);
 });

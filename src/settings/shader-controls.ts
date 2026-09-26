@@ -1,6 +1,126 @@
 import type { UniformManifest, UniformValue } from '../shared/manifest';
 import { bindUniforms, snapUniformValue, uniformVisible } from '../renderer/core/uniforms';
 
+type ControlInput = HTMLInputElement | HTMLSelectElement;
+
+interface ControlContext {
+  values: Record<string, UniformValue>;
+  resolveValues: () => Record<string, UniformValue>;
+  refreshVisibility: () => void;
+  onChange: () => void;
+}
+
+interface ControlRow { def: UniformManifest; row: HTMLElement; }
+
+/** Build the `<select>` or range/number/checkbox/color input for one control. */
+function createSelectInput(def: UniformManifest): HTMLSelectElement {
+  const input = document.createElement('select');
+  for (const option of def.options ?? []) {
+    const element = document.createElement('option');
+    element.value = option;
+    element.textContent = option.charAt(0).toUpperCase() + option.slice(1);
+    input.append(element);
+  }
+  return input;
+}
+
+function createRangeInput(def: UniformManifest, name: string, descriptionId: string): { input: HTMLInputElement; number: HTMLInputElement } {
+  const input = document.createElement('input');
+  input.type = 'range';
+  const number = document.createElement('input');
+  number.type = 'number';
+  number.setAttribute('aria-label', `${name} value${def.unit ? ` (${def.unit})` : ''}`);
+  number.setAttribute('aria-describedby', descriptionId);
+  for (const control of [input, number]) {
+    control.min = String(def.min ?? 0);
+    control.max = String(def.max ?? 1);
+    control.step = String(def.step ?? (def.type === 'int' ? 1 : 0.01));
+  }
+  return { input, number };
+}
+
+function createControlInput(def: UniformManifest, name: string, descriptionId: string): { input: ControlInput; number?: HTMLInputElement } {
+  if (def.type === 'select') return { input: createSelectInput(def) };
+  if (def.type === 'float' || def.type === 'int') return createRangeInput(def, name, descriptionId);
+  const input = document.createElement('input');
+  input.type = def.type === 'bool' ? 'checkbox' : 'color';
+  return { input };
+}
+
+function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
+  const name = def.label ?? def.name;
+  const id = `uniform-${def.name}`;
+  const row = document.createElement('div');
+  row.className = 'shader-control';
+  row.dataset.control = def.name;
+  const heading = document.createElement('div');
+  heading.className = 'shader-control-heading';
+  const label = document.createElement('label');
+  label.htmlFor = id;
+  label.textContent = name + (def.unit ? ` (${def.unit})` : '');
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'uniform-reset';
+  reset.textContent = 'Reset';
+  reset.setAttribute('aria-label', `Reset ${name}`);
+  heading.append(label, reset);
+  row.append(heading);
+  const description = document.createElement('p');
+  description.id = `${id}-hint`;
+  description.textContent = def.description ?? '';
+  const { input, number } = createControlInput(def, name, description.id);
+  input.id = id;
+  input.dataset.name = def.name;
+  input.setAttribute('aria-describedby', description.id);
+  const sync = () => {
+    const value = bindUniforms([def], context.resolveValues())[def.name];
+    input.value = String(value);
+    if (input instanceof HTMLInputElement && def.type === 'bool') input.checked = Boolean(value);
+    if (number) number.value = String(value);
+    reset.disabled = value === def.default;
+  };
+  const commit = (value: unknown) => {
+    context.values[def.name] = snapUniformValue(def, value);
+    sync();
+    context.refreshVisibility();
+    context.onChange();
+  };
+  input.addEventListener('input', () => commit(input instanceof HTMLInputElement && def.type === 'bool' ? input.checked : input.value));
+  // Preserve intermediate text such as "-" or "0." until direct entry is committed.
+  number?.addEventListener('change', () => commit(number.value));
+  number?.addEventListener('blur', sync);
+  number?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { commit(number.value); event.preventDefault(); }
+  });
+  reset.addEventListener('click', () => {
+    delete context.values[def.name];
+    sync();
+    context.refreshVisibility();
+    context.onChange();
+  });
+  const inputs = document.createElement('div');
+  inputs.className = 'shader-control-inputs';
+  inputs.append(input);
+  if (number) inputs.append(number);
+  row.append(inputs, description);
+  sync();
+  return { def, row };
+}
+
+function buildGroup(group: string, defs: UniformManifest[], context: ControlContext): { section: HTMLFieldSetElement; rows: ControlRow[] } {
+  const section = document.createElement('fieldset');
+  section.className = 'shader-control-group';
+  const legend = document.createElement('legend');
+  legend.textContent = group;
+  section.append(legend);
+  const rows = defs.map(def => {
+    const built = buildRow(def, context);
+    section.append(built.row);
+    return built;
+  });
+  return { section, rows };
+}
+
 export function mountShaderControls(
   root: HTMLElement,
   definitions: UniformManifest[],
@@ -17,108 +137,22 @@ export function mountShaderControls(
   summary.textContent = 'Advanced';
   advanced.append(summary);
   const sections: HTMLFieldSetElement[] = [];
-  const rows: Array<{ def: UniformManifest; row: HTMLElement }> = [];
+  const rows: ControlRow[] = [];
   const refreshVisibility = () => {
     const resolved = bindUniforms(definitions, resolveValues());
     rows.forEach(({ def, row }) => { row.hidden = !uniformVisible(def, resolved); });
     sections.forEach(section => { section.hidden = !section.querySelector('.shader-control:not([hidden])'); });
     advanced.hidden = !advanced.querySelector('fieldset:not([hidden])');
   };
+  const context: ControlContext = { values, resolveValues, refreshVisibility, onChange };
   for (const isAdvanced of [false, true]) {
     for (const group of ['Motion', 'Shape', 'Color'] as const) {
       const defs = definitions.filter(def => Boolean(def.advanced) === isAdvanced && (def.group ?? 'Shape') === group);
       if (!defs.length) continue;
-      const section = document.createElement('fieldset');
-      section.className = 'shader-control-group';
-      const legend = document.createElement('legend');
-      legend.textContent = group;
-      section.append(legend);
-      sections.push(section);
-      (isAdvanced ? advanced : root).append(section);
-      for (const def of defs) {
-        const name = def.label ?? def.name;
-        const id = `uniform-${def.name}`;
-        const row = document.createElement('div');
-        row.className = 'shader-control';
-        row.dataset.control = def.name;
-        const heading = document.createElement('div');
-        heading.className = 'shader-control-heading';
-        const label = document.createElement('label');
-        label.htmlFor = id;
-        label.textContent = name + (def.unit ? ` (${def.unit})` : '');
-        const reset = document.createElement('button');
-        reset.type = 'button';
-        reset.className = 'uniform-reset';
-        reset.textContent = 'Reset';
-        reset.setAttribute('aria-label', `Reset ${name}`);
-        heading.append(label, reset);
-        row.append(heading);
-        const description = document.createElement('p');
-        description.id = `${id}-hint`;
-        description.textContent = def.description ?? '';
-        let input: HTMLInputElement | HTMLSelectElement;
-        let number: HTMLInputElement | undefined;
-        if (def.type === 'select') {
-          input = document.createElement('select');
-          for (const option of def.options ?? []) {
-            const element = document.createElement('option');
-            element.value = option;
-            element.textContent = option.charAt(0).toUpperCase() + option.slice(1);
-            input.append(element);
-          }
-        } else {
-          input = document.createElement('input');
-          input.type = def.type === 'bool' ? 'checkbox' : def.type === 'color' ? 'color' : 'range';
-          if (def.type === 'float' || def.type === 'int') {
-            number = document.createElement('input');
-            number.type = 'number';
-            number.setAttribute('aria-label', `${name} value${def.unit ? ` (${def.unit})` : ''}`);
-            number.setAttribute('aria-describedby', description.id);
-            for (const control of [input, number]) {
-              control.min = String(def.min ?? 0);
-              control.max = String(def.max ?? 1);
-              control.step = String(def.step ?? (def.type === 'int' ? 1 : 0.01));
-            }
-          }
-        }
-        input.id = id;
-        input.dataset.name = def.name;
-        input.setAttribute('aria-describedby', description.id);
-        const sync = () => {
-          const value = bindUniforms([def], resolveValues())[def.name];
-          input.value = String(value);
-          if (input instanceof HTMLInputElement && def.type === 'bool') input.checked = Boolean(value);
-          if (number) number.value = String(value);
-          reset.disabled = value === def.default;
-        };
-        const commit = (value: unknown) => {
-          values[def.name] = snapUniformValue(def, value);
-          sync();
-          refreshVisibility();
-          onChange();
-        };
-        input.addEventListener('input', () => commit(input instanceof HTMLInputElement && def.type === 'bool' ? input.checked : input.value));
-        // Preserve intermediate text such as "-" or "0." until direct entry is committed.
-        number?.addEventListener('change', () => commit(number!.value));
-        number?.addEventListener('blur', sync);
-        number?.addEventListener('keydown', event => {
-          if (event.key === 'Enter') { commit(number!.value); event.preventDefault(); }
-        });
-        reset.addEventListener('click', () => {
-          delete values[def.name];
-          sync();
-          refreshVisibility();
-          onChange();
-        });
-        const inputs = document.createElement('div');
-        inputs.className = 'shader-control-inputs';
-        inputs.append(input);
-        if (number) inputs.append(number);
-        row.append(inputs, description);
-        section.append(row);
-        rows.push({ def, row });
-        sync();
-      }
+      const built = buildGroup(group, defs, context);
+      sections.push(built.section);
+      rows.push(...built.rows);
+      (isAdvanced ? advanced : root).append(built.section);
     }
   }
   root.append(advanced);

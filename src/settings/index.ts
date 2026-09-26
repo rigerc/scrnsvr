@@ -418,37 +418,40 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.renderRotationList();
     this.renderPresets();
   }
-  private renderRotationList() {
-    const list = this.element.querySelector('[data-rotation-list]') as HTMLUListElement;
-    const empty = this.element.querySelector('[data-rotation-empty]') as HTMLElement;
-    list.replaceChildren();
-    const titles = new Map(this.manifests.map(m => [m.id, m.title]));
-    empty.hidden = this.config.rotation.entries.length > 0;
-    this.config.rotation.entries.forEach(entry => {
-      const item = document.createElement('li');
-      item.className = 'shuffle-item';
-      const load = document.createElement('button');
-      load.type = 'button';
-      load.className = 'shuffle-load shuffle-item-label';
-      const title = document.createElement('strong');
-      title.textContent = titles.get(entry.shader) ?? entry.shader;
-      const look = document.createElement('span');
-      const missing = Boolean(entry.preset && !this.config.presets[entry.shader]?.[entry.preset]);
-      look.textContent = missing ? `${entry.preset} · missing look` : entry.preset ?? 'Current edits';
-      if (missing) look.className = 'look-missing';
-      load.append(title, look);
-      load.disabled = missing || !titles.has(entry.shader);
-      load.setAttribute('aria-label', `Load ${title.textContent}, ${entry.preset ?? 'current edits'}`);
-      load.addEventListener('click', () => this.loadShuffleEntry(entry.shader, entry.preset));
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Remove';
-      remove.setAttribute('aria-label', `Remove ${title.textContent}, ${entry.preset ?? 'current edits'} from shuffle`);
-      remove.addEventListener('click', () => { this.setRotation(entry.shader, false, entry.preset); this.queueSave(); });
-      item.append(load, remove);
-      list.append(item);
-    });
+  private buildRotationRow(entry: { shader: string; preset?: string }) {
+    const item = document.createElement('li');
+    item.className = 'shuffle-item';
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.className = 'shuffle-load shuffle-item-label';
+    const title = document.createElement('strong');
+    title.textContent = this.manifests.find(manifest => manifest.id === entry.shader)?.title ?? entry.shader;
+    const look = document.createElement('span');
+    const missing = Boolean(entry.preset && !this.config.presets[entry.shader]?.[entry.preset]);
+    look.textContent = missing ? `${entry.preset} · missing look` : entry.preset ?? 'Current edits';
+    if (missing) look.className = 'look-missing';
+    load.append(title, look);
+    load.disabled = missing || !this.manifests.some(manifest => manifest.id === entry.shader);
+    load.setAttribute('aria-label', `Load ${title.textContent}, ${entry.preset ?? 'current edits'}`);
+    load.addEventListener('click', () => this.loadShuffleEntry(entry.shader, entry.preset));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove ${title.textContent}, ${entry.preset ?? 'current edits'} from shuffle`);
+    remove.addEventListener('click', () => { this.setRotation(entry.shader, false, entry.preset); this.queueSave(); });
+    item.append(load, remove);
+    return item;
+  }
+  private rotationSummary(count: number): string {
+    const look = count === 1 ? 'look' : 'looks';
+    if (count === 0) return 'Add a look to start shuffling.';
+    if (!this.config.rotation.enabled) return `${count} ${look} ${count === 1 ? 'is' : 'are'} ready. Shuffle is off.`;
+    if (this.config.rotation.intervalMinutes > 0) return `Shuffling ${count} ${look} on start and every ${this.config.rotation.intervalMinutes} minutes.`;
+    return `Shuffling ${count} ${look} when the screensaver starts.`;
+  }
+  private refreshRotationEmptyState() {
     const count = this.config.rotation.entries.length;
+    (this.element.querySelector('[data-rotation-empty]') as HTMLElement).hidden = count > 0;
     const toggle = this.element.querySelector('[data-rotation="enabled"]') as HTMLInputElement;
     const cycle = this.element.querySelector('[data-rotation="cycle"]') as HTMLInputElement;
     const interval = this.element.querySelector('[data-rotation="intervalMinutes"]') as HTMLInputElement;
@@ -458,12 +461,13 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     interval.disabled = !this.config.rotation.enabled || !cycle.checked;
     interval.value = String(this.lastIntervalMinutes);
     this.element.querySelector('[data-shuffle-count]')!.textContent = `${count} ${count === 1 ? 'look' : 'looks'}`;
-    const summary = this.element.querySelector('[data-shuffle-summary]')!;
-    summary.textContent = count === 0 ? 'Add a look to start shuffling.'
-      : !this.config.rotation.enabled ? `${count} ${count === 1 ? 'look is' : 'looks are'} ready. Shuffle is off.`
-      : this.config.rotation.intervalMinutes > 0
-        ? `Shuffling ${count} ${count === 1 ? 'look' : 'looks'} on start and every ${this.config.rotation.intervalMinutes} minutes.`
-        : `Shuffling ${count} ${count === 1 ? 'look' : 'looks'} when the screensaver starts.`;
+    this.element.querySelector('[data-shuffle-summary]')!.textContent = this.rotationSummary(count);
+  }
+  private renderRotationList() {
+    const list = this.element.querySelector('[data-rotation-list]') as HTMLUListElement;
+    list.replaceChildren();
+    for (const entry of this.config.rotation.entries) list.append(this.buildRotationRow(entry));
+    this.refreshRotationEmptyState();
   }
   private loadShuffleEntry(shaderId: string, preset?: string) {
     if (!this.manifests.some(manifest => manifest.id === shaderId)) return;

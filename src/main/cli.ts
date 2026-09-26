@@ -11,21 +11,33 @@ export interface CliOptions {
 
 export type LaunchMode = 'thumbnail' | 'daemon' | 'screensaver' | 'settings';
 
+const flagHandlers: Record<string, (out: CliOptions) => void> = {
+  '--settings': (out) => { out.settings = true; },
+  '-s': (out) => { out.settings = true; },
+  '--daemon': (out) => { out.daemon = true; },
+  '--open': (out) => { out.open = true; },
+  '--preview': (out) => { out.preview = true; },
+  '--thumbnail': (out) => { out.thumbnail = true; },
+};
+
+const valueHandlers: Record<string, (out: CliOptions, value: string) => void> = {
+  '--shader': (out, value) => { out.shader = value; },
+  '--output': (out, value) => { out.output = value; },
+  '--frames': (out, value) => {
+    const frames = Number(value);
+    if (Number.isInteger(frames) && frames > 0) out.frames = frames;
+  },
+};
+
 export function parseArgs(args: string[]): CliOptions {
   const out: CliOptions = { settings: false, daemon: false, open: false, preview: false, thumbnail: false, frames: 3 };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--settings' || argument === '-s') out.settings = true;
-    else if (argument === '--daemon') out.daemon = true;
-    else if (argument === '--open') out.open = true;
-    else if (argument === '--preview') out.preview = true;
-    else if (argument === '--thumbnail') out.thumbnail = true;
-    else if (argument === '--shader' && args[index + 1]) out.shader = args[++index];
-    else if (argument === '--output' && args[index + 1]) out.output = args[++index];
-    else if (argument === '--frames' && args[index + 1]) {
-      const frames = Number(args[++index]);
-      if (Number.isInteger(frames) && frames > 0) out.frames = frames;
-    }
+    const flag = flagHandlers[argument];
+    if (flag) { flag(out); continue; }
+    const takeValue = valueHandlers[argument];
+    const value = args[index + 1];
+    if (takeValue && value) { takeValue(out, value); index += 1; }
   }
   return out;
 }

@@ -7,7 +7,7 @@ import { AmbientAudio } from './ambient-audio';
 
 export interface ShaderDefinition { manifest: ShaderManifest; source: string; }
 
-function oglValue(definition: UniformManifest, value: unknown): unknown {
+export function oglValue(definition: UniformManifest, value: unknown): unknown {
   if (definition.type === 'color') {
     const match = String(value).match(/^#([0-9a-f]{6})$/i) ?? String(definition.default).match(/^#([0-9a-f]{6})$/i);
     const number = Number.parseInt(match?.[1] ?? 'ffffff', 16);
