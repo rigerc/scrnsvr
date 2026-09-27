@@ -144,6 +144,87 @@ describe('SettingsPanel', () => {
     expect(preview.mount).toHaveBeenCalledTimes(3);
   });
 
+  it('reveals boolean-dependent controls and retains their edits while hidden', () => {
+    const settings = panel(makePreview());
+    const row = settings.element.querySelector<HTMLElement>('[data-control="dependent"]')!;
+    const toggle = settings.element.querySelector<HTMLInputElement>('[data-name="flag"]')!;
+    expect(row.hidden).toBe(true);
+    toggle.checked = true; toggle.dispatchEvent(new Event('input'));
+    expect(row.hidden).toBe(false);
+    const input = row.querySelector<HTMLInputElement>('input[type="number"]')!;
+    input.value = '2.4'; input.dispatchEvent(new Event('change'));
+    toggle.checked = false; toggle.dispatchEvent(new Event('input'));
+    expect(row.hidden).toBe(true);
+    toggle.checked = true; toggle.dispatchEvent(new Event('input'));
+    expect(row.hidden).toBe(false);
+    expect(input.value).toBe('2.4');
+  });
+
+  it('validates exact hex entry and resets overrides even when equal to built-in defaults', () => {
+    config.shaders.plasma.color1 = '#112233';
+    const settings = panel(makePreview());
+    const row = settings.element.querySelector<HTMLElement>('[data-control="color1"]')!;
+    const reset = row.querySelector<HTMLButtonElement>('.uniform-reset')!;
+    const hex = row.querySelector<HTMLInputElement>('.uniform-hex')!;
+    expect(reset.disabled).toBe(false);
+    expect(row.querySelector('.uniform-source')?.textContent).toBe('Custom');
+    hex.value = '#bad';
+    hex.dispatchEvent(new Event('change'));
+    expect(hex.getAttribute('aria-invalid')).toBe('true');
+    expect(row.querySelector('.uniform-error')?.hasAttribute('hidden')).toBe(false);
+    expect(row.querySelector<HTMLInputElement>('[type="color"]')!.value).toBe('#112233');
+    hex.value = '#ABCDEF';
+    hex.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(row.querySelector<HTMLInputElement>('[type="color"]')!.value).toBe('#abcdef');
+    expect(hex.hasAttribute('aria-invalid')).toBe(false);
+    reset.click();
+    expect(reset.disabled).toBe(true);
+    expect(row.querySelector('.uniform-source')?.textContent).toBe('From scheme');
+    expect(hex.value).not.toBe('#112233');
+  });
+
+  it('preserves scheme inheritance through randomize, undo, save and subsequent scheme changes', async () => {
+    delete config.shaders.plasma.color1;
+    const settings = panel(makePreview());
+    const color = () => settings.element.querySelector<HTMLInputElement>('[data-name="color1"]')!.value;
+    const original = color();
+    settings.element.querySelector<HTMLButtonElement>('[data-action="random"]')!.click();
+    expect(color()).toBe(original);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(setConfig.mock.lastCall![0].shaders.plasma).not.toHaveProperty('color1');
+    expect(setConfig.mock.lastCall![0].shaders.plasma).not.toHaveProperty('palette');
+    settings.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]')!.click();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(setConfig.mock.lastCall![0].shaders.plasma).toEqual({ speed: 2 });
+    const scheme = settings.element.querySelector<HTMLSelectElement>('[data-shader-scheme]')!;
+    scheme.value = '';
+    scheme.dispatchEvent(new Event('input'));
+    expect(color()).not.toBe(original);
+  });
+
+  it('applies locks across random scopes and restores a color exploration in one step', () => {
+    const settings = panel(makePreview());
+    const scope = settings.element.querySelector<HTMLSelectElement>('[data-random-scope]')!;
+    const random = settings.element.querySelector<HTMLButtonElement>('[data-action="random"]')!;
+    settings.element.querySelector<HTMLButtonElement>('[data-control="speed"] .uniform-lock')!.click();
+    for (const value of ['Motion', 'Shape', 'Color', 'all']) {
+      scope.value = value;
+      random.click();
+      expect(settings.element.querySelector<HTMLInputElement>('[data-name="speed"]')!.value).toBe('2');
+    }
+    const original = settings.element.querySelector<HTMLInputElement>('[data-name="color1"]')!.value;
+    settings.element.querySelector<HTMLButtonElement>('[data-control="color1"] .uniform-lock')!.click();
+    scope.value = 'all'; random.click();
+    expect(settings.element.querySelector<HTMLInputElement>('[data-name="color1"]')!.value).toBe(original);
+    settings.element.querySelector<HTMLButtonElement>('[data-control="color1"] .uniform-lock')!.click();
+    scope.value = 'Color'; random.click();
+    const undo = settings.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]')!;
+    expect(undo.disabled).toBe(false);
+    undo.click();
+    expect(settings.element.querySelector<HTMLInputElement>('[data-name="color1"]')!.value).toBe(original);
+    expect(undo.disabled).toBe(true);
+  });
+
   it('saves, overwrites, renames and deletes looks', () => {
     const settings = panel(makePreview());
     const form = settings.element.querySelector<HTMLFormElement>('[data-look-save-form]')!;

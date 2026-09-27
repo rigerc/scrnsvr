@@ -1,4 +1,8 @@
 precision highp float;
+uniform float spread;
+uniform float edgeSoftness;
+uniform float paperFidelity;
+uniform int compositionSeed;
 
 uniform float uTime;
 uniform vec2 uResolution;
@@ -71,7 +75,7 @@ float snoise(in vec2 v) {
 
 // Match the collection's exposure and color controls; keep black at zero brightness.
 void finish(vec3 color) {
-    color = 1.0 - exp(-max(color, vec3(0.0)) * brightness);
+    color = mix(1.0 - exp(-max(color, vec3(0.0)) * brightness), clamp(color * brightness, 0.0, 1.0), paperFidelity);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -81,13 +85,14 @@ void finish(vec3 color) {
 void main() {
     vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * scale;
     float t = uTime * speed;
+    p += vec2(float(compositionSeed) * 0.731, float(compositionSeed) * 0.419);
     vec2 drift = vec2(t * 0.035, -t * 0.055);
     vec2 warp = vec2(snoise(p * 0.85 + drift), snoise(p * 0.85 - drift + 7.3));
     vec2 q = p + curl * warp;
     float cloud = snoise(q + drift);
     float detail = snoise(q * 3.0 - drift * 0.7);
     float fine = snoise(q * 7.0 + warp);
-    float pigment = smoothstep(-0.25, 0.55, cloud + feather * (detail * 0.22 + fine * 0.06) + density - 0.65);
+    float pigment = smoothstep(0.15 - 0.4 * edgeSoftness, 0.15 + 0.4 * edgeSoftness, cloud * spread + feather * (detail * 0.22 + fine * 0.06) + density - 0.65);
     float veins = 0.5 + 0.5 * sin(cloud * 14.0 + detail * 3.0);
     vec3 ink = mix(color1, color2, smoothstep(-0.6, 0.7, warp.y + detail * 0.3));
     vec3 color = mix(background, ink * (0.7 + 0.3 * veins), pigment * 0.94);

@@ -1,4 +1,5 @@
 precision highp float;
+uniform float highlightRolloff;
 
 uniform float direction;
 uniform float turbulence;
@@ -25,9 +26,12 @@ void main() {
   float flow = sin((p.x + turbulence * sin(p.y * 2.7 + t)) * 6.0 * scale - t);
   flow += cos((p.y + turbulence * cos(p.x * 2.1 - t * 0.7)) * 5.0 * scale + t * 0.6);
   float glow = 0.5 + 0.5 * sin(flow + length(p) * 5.0 - t);
-  vec3 base = palette == 1 ? vec3(glow) : mix(background, color, glow);
+  vec3 monoBackground = vec3(dot(background, vec3(0.2126, 0.7152, 0.0722)));
+  vec3 monoColor = vec3(dot(color, vec3(0.2126, 0.7152, 0.0722)));
+  vec3 base = palette == 1 ? mix(monoBackground, monoColor, glow) : mix(background, color, glow);
   if (palette == 2) base = mix(background, mix(color, color2, 0.5 + 0.5 * sin(flow * 0.7)), glow);
-  if (trail) base += glowStrength * color / max(glowWidth, abs(flow));
+  if (trail) base += glowStrength * (palette == 1 ? monoColor : color) / max(glowWidth, abs(flow));
+  base = mix(base, 1.0 - exp(-base), highlightRolloff);
   gl_FragColor = vec4(base * brightness, 1.0);
   float luminance = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor.rgb = mix(vec3(luminance), gl_FragColor.rgb, saturation);

@@ -2,6 +2,10 @@
   "mcpServers": {
     "code-graph": {
       "command": "code-graph-mcp"
+    },
+    "shadereye": {
+      "command": "shadereye-mcp",
+      "directTools": true
     }
   }
 }

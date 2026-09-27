@@ -7,6 +7,12 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float grassSway;
+uniform float fogDensity;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define time (uTime * speed)
 #define resolution (uResolution)
 
@@ -123,7 +129,7 @@ vec3 GetSky(in vec3 rd)
 // Merge grass into the sky background for correct fog colouring...
 vec3 ApplyFog( in vec3  rgb, in float dis, in vec3 dir)
 {
-	float fogAmount = clamp(dis*dis* 0.0000012, 0.0, 1.0);
+	float fogAmount = clamp(dis*dis* 0.0000012 * fogDensity, 0.0, 1.0);
 	return mix( rgb, GetSky(dir), fogAmount );
 }
 
@@ -135,7 +141,7 @@ vec3 DE(vec3 p)
 	//p.y += height;
 	float y = p.y - base-height;
 	y = y*y;
-	vec2 ret = Voronoi((p.xz*2.5+sin(y*4.0+p.zx*12.3)*.12+vec2(sin(time*2.3+1.5*p.z),sin(time*3.6+1.5*p.x))*y*.5));
+	vec2 ret = Voronoi((p.xz*2.5+sin(y*4.0+p.zx*12.3)*.12+vec2(sin(time*2.3+1.5*p.z),sin(time*3.6+1.5*p.x))*y*.5 * grassSway));
 	float f = ret.x * .6 + y * .58;
 	return vec3( y - f*1.4, clamp(f * 1.5, 0.0, 1.0), ret.y);
 }
@@ -389,6 +395,15 @@ void scrnsvrImportedMain(void)
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

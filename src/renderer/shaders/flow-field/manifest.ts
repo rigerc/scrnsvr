@@ -7,6 +7,8 @@ export const flowFieldManifest = manifest({
   description: "Slow currents of luminous color.",
   fragment: "shader.glsl",
   uniforms: [
+    {"name": "highlightRolloff", "type": "float", "default": 0, "min": 0, "max": 1, "step": 0.01, "label": "Highlight softness", "description": "Compress bright current edges to retain color; zero preserves the original glow.", "group": "Color", "advanced": true, "random": false},
+
     { name: "speed", type: "float", default: 0.4, min: 0, max: 3, step: 0.01,
       label: "Speed",
       description: "Overall animation speed; zero freezes all movement.",
@@ -69,7 +71,7 @@ export const flowFieldManifest = manifest({
       group: "Color",
       advanced: true,
       random: { min: 0.04, max: 0.12 },
-      visibleWhen: { name: "trail", value: 1 },
+      visibleWhen: { name: "trail", value: true },
     },
     { name: "glowWidth", type: "float", default: 0.08, min: 0.03, max: 0.25, step: 0.005,
       label: "Glow width",
@@ -77,7 +79,7 @@ export const flowFieldManifest = manifest({
       group: "Shape",
       advanced: true,
       random: { min: 0.036, max: 0.124 },
-      visibleWhen: { name: "trail", value: 1 },
+      visibleWhen: { name: "trail", value: true },
     },
     { name: "background", type: "color", default: "#040814",
       label: "Background",

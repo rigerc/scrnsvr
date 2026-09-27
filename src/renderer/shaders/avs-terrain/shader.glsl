@@ -7,6 +7,12 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float terrainHeight;
+uniform float terrainDensity;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 
@@ -52,36 +58,36 @@ float cnoise(vec2 p) {
 
 // --- Terrain height at different detail levels ---
 float terrainLow(vec2 p) {
-    p *= 0.0013;
+    p *= 0.0013 * terrainDensity;
     float s = 1.0, t = 0.0;
     for (int i = 0; i < 2; i++) {
         t += s * cnoise(p);
         s *= 0.5 + 0.1 * t;
         p = 0.97 * m2 * p + (t - 0.5) * 0.2;
     }
-    return t * 55.0;
+    return t * 55.0 * terrainHeight;
 }
 
 float terrainMed(vec2 p) {
-    p *= 0.0013;
+    p *= 0.0013 * terrainDensity;
     float s = 1.0, t = 0.0;
     for (int i = 0; i < 6; i++) {
         t += s * cnoise(p);
         s *= 0.5 + 0.1 * t;
         p = 0.97 * m2 * p + (t - 0.5) * 0.2;
     }
-    return t * 55.0;
+    return t * 55.0 * terrainHeight;
 }
 
 float terrainHigh(vec2 p) {
-    p *= 0.0013;
+    p *= 0.0013 * terrainDensity;
     float s = 1.0, t = 0.0;
     for (int i = 0; i < 7; i++) {
         t += s * cnoise(p);
         s *= 0.5 + 0.1 * t;
         p = 0.97 * m2 * p + (t - 0.5) * 0.2;
     }
-    return t * 55.0;
+    return t * 55.0 * terrainHeight;
 }
 
 // --- Desert soil texture ---
@@ -289,7 +295,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float tmin = 10.0, tmax = 4500.0;
 
     // Bound plane optimization
-    float maxh = 130.0;
+    float maxh = 130.0 * terrainHeight;
     float tp = (maxh - ro.y) / rd.y;
     if (tp > 0.0) {
         if (ro.y > maxh) tmin = max(tmin, tp);
@@ -361,6 +367,15 @@ void scrnsvrImportedMain() {
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

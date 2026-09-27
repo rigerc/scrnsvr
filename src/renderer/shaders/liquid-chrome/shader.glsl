@@ -1,4 +1,7 @@
 precision highp float;
+uniform float reflectionWidth;
+uniform float reflectionStrength;
+uniform vec3 highlightColor;
 
 uniform float uTime;
 uniform vec2 uResolution;
@@ -43,9 +46,9 @@ void main() {
     float axis = dot(reflected.xy, vec2(cos(angle), sin(angle)));
     float band = 0.5 + 0.5 * sin(axis * 7.0 + reflected.z * 2.0);
     float light = smoothstep(0.5 - roughness * 0.4, 0.55 + roughness * 0.4, band);
-    float strip = exp(-square((axis - 0.25) / (0.03 + roughness * 0.2)));
+    float strip = exp(-square((axis - 0.25) / ((0.03 + roughness * 0.2) * reflectionWidth)));
     vec3 tint = mix(color1, color2, 0.5 + 0.5 * reflected.y);
-    vec3 color = mix(background, tint, 0.12 + 0.85 * light) + strip * 0.55;
+    vec3 color = mix(background, tint, 0.12 + 0.85 * light) + highlightColor * strip * 0.55 * reflectionStrength;
     color *= 0.8 + 0.2 * normal.z;
     finish(color);
 }

@@ -56,7 +56,11 @@ function assertUniformContracts(manifest: Manifest) {
     if (def.visibleWhen) {
       const parent = manifest.uniforms.find(other => other.name === def.visibleWhen!.name)!;
       expect(parent).toBeDefined();
+      // A dependency value that does not match its parent's type can never be
+      // satisfied, which silently hides the control forever.
       if (parent.type === 'select') expect(parent.options).toContain(def.visibleWhen.value);
+      else if (parent.type === 'bool') expect(typeof def.visibleWhen.value).toBe('boolean');
+      else expect(typeof def.visibleWhen.value).toBe('number');
     }
   }
 }
@@ -64,14 +68,19 @@ function assertUniformContracts(manifest: Manifest) {
 function assertRandomization(manifest: Manifest) {
   for (const random of [0, 0.2, 0.5, 0.9, 1]) {
     const values = randomizeUniforms(manifest.uniforms, {}, () => random);
-    expect(bindUniforms(manifest.uniforms, values)).toEqual(values);
-    for (const def of manifest.uniforms) {
-      if (typeof values[def.name] !== 'number') continue;
-      expect(Number.isFinite(values[def.name])).toBe(true);
-      expect(snapUniformValue(def, values[def.name])).toBe(values[def.name]);
+    // Randomize stores eligible overrides only: inherited scheme colors stay
+    // absent so later scheme changes still flow through.
+    const stored = manifest.uniforms.filter(def => Object.hasOwn(values, def.name));
+    expect(Object.keys(values).every(name => manifest.uniforms.some(def => def.name === name))).toBe(true);
+    expect(bindUniforms(stored, values)).toEqual(values);
+    for (const def of stored) {
+      const value = values[def.name];
+      if (typeof value !== 'number') continue;
+      expect(Number.isFinite(value)).toBe(true);
+      expect(snapUniformValue(def, value)).toBe(value);
       if (def.random) {
-        expect(values[def.name]).toBeGreaterThanOrEqual(def.random.min);
-        expect(values[def.name]).toBeLessThanOrEqual(def.random.max);
+        expect(value).toBeGreaterThanOrEqual(def.random.min);
+        expect(value).toBeLessThanOrEqual(def.random.max);
       }
     }
   }

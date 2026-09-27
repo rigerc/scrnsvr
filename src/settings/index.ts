@@ -9,7 +9,7 @@ import { randomizeUniforms } from '../renderer/core/uniforms';
 import { openCustomShaderEditor } from './custom-shader-editor';
 import { settingsMarkup } from './layout';
 import { rotationEntryKey } from '../shared/rotation';
-import { SCHEME_NONE, clearShaderColorOverrides, effectiveShaderValues, paletteById, palettes, schemeIdForShader } from '../shared/palettes';
+import { SCHEME_NONE, clearShaderColorOverrides, effectiveShaderValues, paletteById, palettes } from '../shared/palettes';
 
 type Value = number | boolean | string;
 
@@ -58,6 +58,8 @@ export class SettingsPanel {
   private stopPreview?: () => void;
   private previewValues?: Record<string, Value>;
   private importingColors = false;
+  private readonly parameterLocks = new Map<string, Set<string>>();
+  private randomUndo?: { shader: string; values: Record<string, Value> };
   private refreshSchemeVisuals: () => void = () => {};
   private lastIntervalMinutes = 10;
   private pendingLookUpdate: string | undefined;
@@ -252,7 +254,8 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.element.querySelector('[data-action="edit-source"]')!.addEventListener('click', () => editSource(true));
     this.bindGlobals();
     this.element.querySelector('[data-action="random"]')!.addEventListener('click', () => this.randomize());
-    this.element.querySelector('[data-action="reset"]')!.addEventListener('click', () => { this.replaceValues({}); this.renderControls(); this.queueSave(); });
+    this.element.querySelector('[data-action="reset"]')!.addEventListener('click', () => { this.replaceValues({}); this.renderControls(); this.clearRandomUndo(); this.queueSave(); });
+    this.element.querySelector('[data-action="undo-random"]')!.addEventListener('click', () => this.undoRandomize());
     this.element.querySelector('[data-look-save-form]')!.addEventListener('submit', event => { event.preventDefault(); this.savePreset(); });
     this.element.querySelector('[data-preset]')!.addEventListener('input', () => this.cancelLookUpdate());
     this.element.querySelector('[data-action="update-look"]')!.addEventListener('click', () => this.savePreset(true));
@@ -262,6 +265,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.select(this.config.shader);
   }
   private select(id: string) {
+    this.clearRandomUndo();
     this.shader = this.manifests.find(m => m.id === id) ?? this.manifests[0];
     if (!this.shader) return;
     this.config.shader = this.shader.id;
@@ -327,17 +331,21 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     const override = this.config.colors.overrides[this.shader.id];
     const id = override !== undefined && override !== '' ? override : this.config.colors.scheme;
     const palette = id && id !== SCHEME_NONE ? paletteById.get(id) : undefined;
+    const custom = this.shader.uniforms.filter(def => def.type === 'color' && Object.hasOwn(this.config.shaders[this.shader.id] ?? {}, def.name)).length;
     hint.textContent = palette
       ? `Applying ${palette.name}${override ? ' (override)' : ''}.`
       : 'Using built-in shader colors.';
+    if (custom) hint.textContent += ` ${custom} custom ${custom === 1 ? 'color' : 'colors'}.`;
   }
   private applyGlobalScheme(id: string) {
+    this.clearRandomUndo();
     this.config.colors.scheme = id;
     for (const manifest of this.manifests) clearShaderColorOverrides(manifest, this.config.shaders[manifest.id]);
     this.refreshSchemeVisuals();
     this.queueSave();
   }
   private applyShaderScheme(id: string) {
+    this.clearRandomUndo();
     if (id) this.config.colors.overrides[this.shader.id] = id;
     else delete this.config.colors.overrides[this.shader.id];
     clearShaderColorOverrides(this.shader, this.config.shaders[this.shader.id]);
@@ -354,6 +362,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     try {
       const result = await window.scrnsvr.importNoctaliaColors();
       if (!result.ok) throw new Error(result.error);
+      this.clearRandomUndo();
       Object.assign(this.config.shaders[shader.id] ??= {}, noctaliaShaderValues(shader, result.palette));
       if (this.shader.id === shader.id) {
         this.renderControls();
@@ -486,16 +495,42 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
   }
   private renderControls() {
     const stored = this.config.shaders[this.shader.id] ??= {};
-    mountShaderControls(this.controls, this.shader.uniforms, stored, () => { this.refreshPreviewValues(); this.queueSave(); },
-      () => effectiveShaderValues(this.shader, stored, this.config.colors));
+    let locks = this.parameterLocks.get(this.shader.id);
+    if (!locks) { locks = new Set(); this.parameterLocks.set(this.shader.id, locks); }
+    mountShaderControls(this.controls, this.shader.uniforms, stored, () => {
+      this.clearRandomUndo(); this.updateSchemeHint(); this.refreshPreviewValues(); this.queueSave();
+    }, () => effectiveShaderValues(this.shader, stored, this.config.colors), {
+      locks,
+      inheritedValues: () => effectiveShaderValues(this.shader, {}, this.config.colors),
+    });
+    this.updateSchemeHint();
+  }
+  private clearRandomUndo() {
+    this.randomUndo = undefined;
+    const undo = this.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]');
+    if (undo) undo.disabled = true;
+  }
+  private undoRandomize() {
+    if (!this.randomUndo || this.randomUndo.shader !== this.shader.id) return;
+    this.replaceValues(this.randomUndo.values);
+    this.clearRandomUndo();
+    this.renderControls();
+    this.queueSave();
   }
   private randomize() {
     const stored = this.config.shaders[this.shader.id] ?? {};
-    const protectedNames = schemeIdForShader(this.shader.id, this.config.colors)
-      ? new Set(this.shader.uniforms.filter(u => u.type === 'color' || (u.type === 'select' && u.name === 'palette')).map(u => u.name))
-      : undefined;
-    this.replaceValues(randomizeUniforms(this.shader.uniforms, stored, Math.random, protectedNames));
+    const scope = this.element.querySelector<HTMLSelectElement>('[data-random-scope]')!.value;
+    const protectedNames = new Set(this.parameterLocks.get(this.shader.id));
+    for (const def of this.shader.uniforms) {
+      const group = def.type === 'color' || (def.type === 'select' && def.name === 'palette') ? 'Color' : def.group ?? 'Shape';
+      if ((scope === 'structure' && group === 'Color') || (scope !== 'structure' && scope !== 'all' && group !== scope)) protectedNames.add(def.name);
+    }
+    const next = randomizeUniforms(this.shader.uniforms, stored, Math.random, protectedNames,
+      effectiveShaderValues(this.shader, stored, this.config.colors));
+    this.randomUndo = { shader: this.shader.id, values: { ...stored } };
+    this.replaceValues(next);
     this.renderControls();
+    this.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]')!.disabled = false;
     this.queueSave();
   }
   private cancelLookUpdate() {
@@ -555,6 +590,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       apply.type = 'button'; apply.textContent = 'Apply';
       apply.setAttribute('aria-label', `Apply ${name} to current edits`);
       apply.onclick = () => {
+        this.clearRandomUndo();
         this.replaceValues({ ...looks[name] });
         this.renderControls();
         this.refreshPreview();

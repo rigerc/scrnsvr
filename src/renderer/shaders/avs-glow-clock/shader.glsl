@@ -7,10 +7,19 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float clockSize;
+uniform bool twelveHour;
+uniform bool showSeconds;
+uniform float glowWidth;
+uniform float glowPulse;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 uniform vec4 uDate;
-#define iDate (vec4(uDate.xyz, uDate.w + uTime * speed))
+#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -204,15 +213,15 @@ float numberLength(float n)
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 aspect = iResolution.xy / iResolution.y;
-    vec2 uv = (fragCoord.xy / iResolution.y - aspect/2.0) * 2.8;
+    vec2 uv = (fragCoord.xy / iResolution.y - aspect/2.0) * 2.8 / clockSize;
     uv.y -= 0.12;
 
     float secs = iDate.w;
     int hour = int(floor(secs / 3600.0));
-#if TWELVE_HOUR_CLOCK
-    if( hour > 12 ) hour -= 12;
+if (twelveHour) {
+if( hour > 12 ) hour -= 12;
     if( hour == 0 ) hour = 12;
-#endif
+}
     int minute = int(mod(floor(secs / 60.0), 60.0));
     int sec = int(mod(secs, 60.0));
 
@@ -230,21 +239,21 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     dist = min(dist, dfNumberInt(pos, minute, uv));
 
     pos.x += 0.23;
-    dist = min(dist, dfColon(pos, uv));
+    if (showSeconds) dist = min(dist, dfColon(pos, uv));
 
     // SS
     pos.x += 0.21;
-    dist = min(dist, dfNumberInt(pos, sec, uv));
+    if (showSeconds) dist = min(dist, dfNumberInt(pos, sec, uv));
 
     vec3 color = vec3(0);
 
     float shade = 0.0;
 
-    shade = 0.004 / (dist);
+    shade = 0.004 * glowWidth / (dist);
 
     color += vec3(1,0.2,0) * shade;
 #if GLOWPULSE
-    color += vec3(1,0.2,0) * shade * noise((uv + vec2(iTime*.5)) * 2.5 + .5);
+    color += vec3(1,0.2,0) * shade * noise((uv + vec2(iTime*.5)) * 2.5 + .5) * glowPulse;
 #endif
 
     #ifdef SHOW_GRID
@@ -264,6 +273,15 @@ void scrnsvrImportedMain() {
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

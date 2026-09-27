@@ -69,3 +69,14 @@ describe('bindUniforms', () => {
     expect(values.speed).not.toBe(0.4);
   });
 });
+
+it('preserves absent inherited colors and evaluates dependencies against effective values', () => {
+  const defs: UniformManifest[] = [
+    { name: 'color', type: 'color', default: '#112233' },
+    { name: 'palette', type: 'select', default: 'built-in', options: ['built-in', 'custom'] },
+    { name: 'detail', type: 'float', default: 0, min: 0, max: 1, visibleWhen: { name: 'palette', value: 'custom' } },
+    { name: 'hidden', type: 'float', default: 1, visibleWhen: { name: 'palette', value: 'built-in' } },
+  ];
+  const next = randomizeUniforms(defs, {}, () => 0.5, new Set(['color', 'palette']), { color: '#abcdef', palette: 'custom' });
+  expect(next).toEqual({ detail: 0.5 });
+});

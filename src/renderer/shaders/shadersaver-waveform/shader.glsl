@@ -7,6 +7,10 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 
@@ -47,6 +51,15 @@ void main() {
   vec4 importedColor = vec4(0.0);
   mainImage(importedColor, gl_FragCoord.xy);
   gl_FragColor = importedColor;
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

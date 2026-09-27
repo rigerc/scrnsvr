@@ -4,8 +4,14 @@ import { bindUniforms } from './uniforms';
 import { startLoop } from './loop';
 import { silentAudio } from '../../shared/audio';
 import { AmbientAudio } from './ambient-audio';
+import { AnimationClock } from './animation-clock';
 
-export interface ShaderDefinition { manifest: ShaderManifest; source: string; }
+export interface ShaderDefinition {
+  manifest: ShaderManifest;
+  source: string;
+  /** Built-ins consume integrated uTime with speed fixed to one; custom shaders retain elapsed uTime. */
+  animationTime?: 'integrated';
+}
 
 export function oglValue(definition: UniformManifest, value: unknown): unknown {
   if (definition.type === 'color') {
@@ -27,7 +33,8 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const mountedAt = new Date();
   let audio = silentAudio;
   const ambientAudio = new AmbientAudio();
-  let previousTime = 0;
+  const clock = new AnimationClock();
+  const integrated = shader.animationTime === 'integrated';
   const unsubscribeAudio = /\buAudio\b/.test(shader.source)
     ? window.scrnsvrAudio?.subscribe(frame => { audio = frame; }) : undefined;
   const uniforms: Record<string, { value: unknown }> = {
@@ -35,7 +42,8 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
     uAudio: { value: [0, 0, 0, 0] },
     uResolution: { value: [1, 1] },
     // Imported clock shaders use Shadertoy's year/month/day/seconds format.
-    // The shader adds scaled uTime so the Speed control can also freeze clocks.
+    // Clock faces follow artistic time from this mount date: pause holds the
+    // displayed time, and resume continues it rather than catching up to wall time.
     uDate: { value: [
       mountedAt.getFullYear(),
       mountedAt.getMonth() + 1,
@@ -57,14 +65,16 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const geometry = new Triangle(gl);
   const mesh = new Mesh(gl, { geometry, program });
   return {
-    draw(time: number) {
-      uniforms.uTime.value = time;
-      uniforms.uAudio.value = ambientAudio.update(audio, time - previousTime);
-      previousTime = time;
-      uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+    draw(delta = 0) {
       const latest = bindUniforms(shader.manifest.uniforms, values);
+      const activeSeconds = clock.advance(delta, Number(latest.speed ?? 1));
+      uniforms.uTime.value = integrated ? clock.phase : clock.elapsed;
+      uniforms.uAudio.value = ambientAudio.update(audio, activeSeconds);
+      const resolution = uniforms.uResolution.value as number[];
+      resolution[0] = gl.drawingBufferWidth;
+      resolution[1] = gl.drawingBufferHeight;
       for (const definition of shader.manifest.uniforms) {
-        uniforms[definition.name].value = oglValue(definition, latest[definition.name]);
+        uniforms[definition.name].value = oglValue(definition, integrated && definition.name === 'speed' ? 1 : latest[definition.name]);
       }
       renderer.render({ scene: mesh });
     },
@@ -101,21 +111,17 @@ export function mountShader(
     Object.assign(canvas.style, inlineSize);
   }
   const scene = createScene(renderer, shader, values);
-  let time = 0;
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
     renderer.setSize(width, height);
     Object.assign(canvas.style, inlineSize);
-    scene.draw(time);
+    scene.draw();
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
-  const stopLoop = startLoop(delta => {
-    time += delta / 1000;
-    scene.draw(time);
-  }, fps);
+  const stopLoop = startLoop(delta => scene.draw(delta), fps);
   return () => {
     stopLoop();
     observer.disconnect();
@@ -135,15 +141,14 @@ export function mountShaderThumbnail(
   if (!context) throw new Error('Unable to create thumbnail canvas');
   const renderer = thumbnailRenderer ??= new Renderer({ width: 180, height: 90, dpr: 1, alpha: false });
   const scene = createScene(renderer, shader, values);
-  let time = 0;
-  const draw = () => {
+  const draw = (delta = 0) => {
     if (renderer.width !== canvas.width || renderer.height !== canvas.height) {
       renderer.setSize(canvas.width, canvas.height);
     }
-    scene.draw(time);
+    scene.draw(delta);
     context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
   };
   draw();
-  const stop = startLoop(delta => { time += delta / 1000; draw(); }, 15);
+  const stop = startLoop(draw, 15);
   return () => { stop(); scene.dispose(); };
 }

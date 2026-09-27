@@ -1,4 +1,6 @@
 precision highp float;
+uniform float evolutionRate;
+uniform vec3 highlightColor;
 
 uniform float uTime;
 uniform vec2 uResolution;
@@ -82,7 +84,7 @@ void main() {
     vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     float t = uTime * speed;
     vec2 q = p * scale;
-    float n = snoise(q * 1.1 + vec2(t * 0.09, -t * 0.06));
+    float n = snoise(q * 1.1 + vec2(t * 0.09, -t * 0.06) * evolutionRate);
     float fold = q.y + 0.38 * sin(q.x * 2.6 + t * 0.22) + distortion * n * 0.65;
     float phase = fold * 8.0 + t * 0.3;
     vec3 spectral = 0.5 + 0.5 * cos(phase + vec3(0.0, 2.1, 4.2));
@@ -90,7 +92,7 @@ void main() {
     vec3 film = tint * (0.55 + iridescence * spectral);
     float pearl = pow(0.5 + 0.5 * cos(fold * 4.2 - n), 12.0);
     float fine = pow(0.5 + 0.5 * sin(phase + n * 2.0), 24.0);
-    vec3 color = mix(background, film, 0.83) + sheen * (pearl * 0.65 + fine * 0.12);
+    vec3 color = mix(background, film, 0.83) + highlightColor * sheen * (pearl * 0.65 + fine * 0.12);
     color *= 0.85 + 0.15 * cos(length(p) * 1.8);
     finish(color);
 }

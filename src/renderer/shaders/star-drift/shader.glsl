@@ -1,4 +1,5 @@
 precision highp float;
+uniform int compositionSeed;
 
 uniform float starSize;
 uniform float glowAmount;
@@ -33,7 +34,7 @@ void main() {
     float grid = (12.0 + layer * 7.0) * density;
     vec2 q = p * grid + driftRotation * vec2(t * (0.12 + layer * 0.05 * parallax), t * 0.035) + layer * 17.3;
     vec2 cell = floor(q);
-    vec2 seed = hash(cell);
+    vec2 seed = hash(cell + float(compositionSeed) * 13.17);
     vec2 offset = fract(q) - (0.25 + seed * 0.5);
     float distance = length(offset);
     float radius = starSize * mix(0.018, 0.045, seed.x) * (1.0 - layer * 0.18);

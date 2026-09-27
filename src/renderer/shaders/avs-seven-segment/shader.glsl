@@ -7,10 +7,18 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float clockSize;
+uniform bool twelveHour;
+uniform bool showSeconds;
+uniform bool digitMatrix;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 uniform vec4 uDate;
-#define iDate (vec4(uDate.xyz, uDate.w + uTime * speed))
+#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -23,7 +31,7 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 
 
 
-bool showMatrix = true;
+#define showMatrix digitMatrix
 bool showOff = false;
 
 float segment(vec2 uv, bool On)
@@ -88,13 +96,13 @@ float dots(vec2 uv)
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // Hardcoded defaults (no keyboard input available)
-    bool ampm = false;       // 24-hour mode
+    bool ampm = twelveHour;       // 24-hour mode
     bool isGreen = true;     // green color
 
     vec2 uv = (fragCoord.xy-0.5*iResolution.xy) /
                 min(iResolution.x,iResolution.y);
 
-    uv *= 15.0;
+    uv *= 15.0 / clockSize;
 
     uv.x *= -1.0;
     uv.x += uv.y/12.0;
@@ -111,10 +119,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 
     // SS (rightmost, drawn first since uv.x starts high)
-    seg += showNum(uv, sec, false);
+    if (showSeconds) seg += showNum(uv, sec, false);
 
     uv.x -= 1.75;
-    seg += dots(uv);
+    if (showSeconds) seg += dots(uv);
 
     // MM
     uv.x -= 1.75;
@@ -165,6 +173,15 @@ void scrnsvrImportedMain() {
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

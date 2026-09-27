@@ -62,8 +62,20 @@ export const settingsMarkup = `
       <section id="shader-settings" class="shader-settings" role="tabpanel" aria-labelledby="shader-tab">
         <div class="inspector-heading"><h2>Adjust visual</h2><button type="button" data-action="open-save-look">Save look</button></div>
         <div class="controls" aria-label="Shader controls"></div>
+        <div class="random-scope">
+          <label for="random-scope">Randomize</label>
+          <select id="random-scope" data-random-scope>
+            <option value="structure">Motion &amp; shape</option>
+            <option value="Motion">Motion</option>
+            <option value="Shape">Shape</option>
+            <option value="Color">Colors</option>
+            <option value="all">All parameters</option>
+          </select>
+          <p>Locks keep parameters fixed during randomization.</p>
+        </div>
         <div class="shader-actions">
           <button type="button" data-action="random">Randomize</button>
+          <button type="button" data-action="undo-random" disabled>Undo</button>
           <button type="button" data-action="reset">Reset shader</button>
         </div>
         <section class="color-import" aria-label="Colors">

@@ -37,15 +37,15 @@ const accentOrder: Array<keyof ColorRoles> = ['primary', 'secondary', 'tertiary'
  * schemes and the Noctalia desktop import so both stay consistent.
  */
 export function applyColorRoles(shader: ShaderManifest, roles: ColorRoles): Record<string, UniformValue> {
-  const accents = accentOrder.map(role => roles[role]);
   const values = Object.fromEntries(
     shader.uniforms
       .filter(uniform => uniform.type === 'color')
-      .map((uniform, index) => [uniform.name, roles[namedRoles[uniform.name] ?? accentOrder[index % accentOrder.length]!]]),
+      .map((uniform, index) => [uniform.name, roles[uniform.colorRole ?? namedRoles[uniform.name] ?? accentOrder[index % accentOrder.length]!]]),
   );
   // Flow Field's Aurora mode reads `color`; Plasma's Custom mode reads its three colors.
   if (shader.id === 'flow-field' && values.color) values.palette = 'aurora';
   if (shader.id === 'plasma' && values.color1) values.palette = 'custom';
+  if (shader.schemePalette && shader.uniforms.some(uniform => uniform.name === 'palette' && uniform.options?.includes(shader.schemePalette!))) values.palette = shader.schemePalette;
   return values;
 }
 

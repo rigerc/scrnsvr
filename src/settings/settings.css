@@ -540,3 +540,18 @@ body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .shader-select canvas, .rotate-toggle { transition: none; }
 }
+
+/* Exploration controls share the inspector's compact, quiet treatment. */
+.shader-control-heading label { flex: 1; }
+.uniform-lock { padding: 3px 4px; color: var(--muted); font-size: 11px; background: transparent; border: 1px solid transparent; }
+.uniform-lock[aria-pressed="true"] { color: var(--signal); border-color: var(--line-strong); }
+.uniform-lock:hover { color: var(--signal-hover); }
+.uniform-hex { width: 82px; min-width: 0; padding: 5px; font-size: 12px; }
+.uniform-source { color: var(--muted); font-size: 11px; }
+.shader-control p.uniform-error:not([hidden]) { display: block; color: var(--signal-hover); }
+.uniform-hex[aria-invalid="true"] { border-color: var(--signal); }
+.random-scope { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.random-scope label { display: block; margin-bottom: 6px; }
+.random-scope select { width: 100%; }
+.random-scope p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+.scrnsvr-settings .shader-actions { flex-wrap: wrap; margin-top: 10px; padding-top: 0; border-top: 0; }

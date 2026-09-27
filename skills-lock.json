@@ -6,12 +6,6 @@
       "sourceType": "github",
       "skillPath": ".agents/skills/impeccable/SKILL.md",
       "computedHash": "f7c4e03bef91154273d2dc3b62aff829cf4ab1b1f16e6b98c8c6a31be4405318"
-    },
-    "web-shaders": {
-      "source": "owenob1/web-shaders-agent-kit",
-      "sourceType": "github",
-      "skillPath": "skills/web-shaders/SKILL.md",
-      "computedHash": "bac178cfdc36a5f509a83343e75be8ced34e4352694be8de6d1715dd89fc0185"
     }
   }
 }

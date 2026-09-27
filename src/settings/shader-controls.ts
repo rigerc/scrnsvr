@@ -3,7 +3,13 @@ import { bindUniforms, snapUniformValue, uniformVisible } from '../renderer/core
 
 type ControlInput = HTMLInputElement | HTMLSelectElement;
 
+export interface ShaderControlOptions {
+  locks?: Set<string>;
+  inheritedValues?: () => Record<string, UniformValue>;
+}
+
 interface ControlContext {
+  options: ShaderControlOptions;
   values: Record<string, UniformValue>;
   resolveValues: () => Record<string, UniformValue>;
   refreshVisibility: () => void;
@@ -63,7 +69,22 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
   reset.className = 'uniform-reset';
   reset.textContent = 'Reset';
   reset.setAttribute('aria-label', `Reset ${name}`);
-  heading.append(label, reset);
+  const lock = document.createElement('button');
+  lock.type = 'button';
+  lock.className = 'uniform-lock';
+  const syncLock = () => {
+    const locked = context.options.locks?.has(def.name) ?? false;
+    lock.textContent = locked ? 'Locked' : 'Lock';
+    lock.setAttribute('aria-pressed', String(locked));
+    lock.setAttribute('aria-label', `Lock ${name} during randomization`);
+  };
+  lock.addEventListener('click', () => {
+    const locks = context.options.locks;
+    if (locks?.has(def.name)) locks.delete(def.name); else locks?.add(def.name);
+    syncLock();
+  });
+  syncLock();
+  heading.append(label, lock, reset);
   row.append(heading);
   const description = document.createElement('p');
   description.id = `${id}-hint`;
@@ -72,12 +93,37 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
   input.id = id;
   input.dataset.name = def.name;
   input.setAttribute('aria-describedby', description.id);
+  const source = document.createElement('span');
+  source.className = 'uniform-source';
+  const hex = def.type === 'color' ? document.createElement('input') : undefined;
+  const error = document.createElement('p');
+  error.id = `${id}-error`;
+  error.className = 'uniform-error';
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  if (hex) {
+    hex.type = 'text';
+    hex.className = 'uniform-hex';
+    hex.spellcheck = false;
+    hex.maxLength = 7;
+    hex.setAttribute('aria-label', `${name} hex color`);
+    hex.setAttribute('aria-describedby', `${description.id} ${error.id}`);
+  }
   const sync = () => {
     const value = bindUniforms([def], context.resolveValues())[def.name];
     input.value = String(value);
     if (input instanceof HTMLInputElement && def.type === 'bool') input.checked = Boolean(value);
     if (number) number.value = String(value);
-    reset.disabled = value === def.default;
+    const custom = Object.hasOwn(context.values, def.name);
+    reset.disabled = !custom;
+    const inherited = context.options.inheritedValues?.() ?? {};
+    source.textContent = custom ? 'Custom' : Object.hasOwn(inherited, def.name) ? 'From scheme' : 'Built-in';
+    reset.title = `Return to ${inherited[def.name] ?? def.default}`;
+    if (hex) {
+      hex.value = String(value);
+      hex.removeAttribute('aria-invalid');
+      error.hidden = true;
+    }
   };
   const commit = (value: unknown) => {
     context.values[def.name] = snapUniformValue(def, value);
@@ -92,6 +138,22 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
   number?.addEventListener('keydown', event => {
     if (event.key === 'Enter') { commit(number.value); event.preventDefault(); }
   });
+  const commitHex = () => {
+    if (!hex) return;
+    const value = hex.value.trim();
+    if (!/^#[\da-f]{6}$/i.test(value)) {
+      hex.setAttribute('aria-invalid', 'true');
+      error.textContent = 'Enter six hex digits, for example #aabbcc.';
+      error.hidden = false;
+      return;
+    }
+    commit(value.toLowerCase());
+  };
+  hex?.addEventListener('change', commitHex);
+  hex?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { commitHex(); event.preventDefault(); }
+    if (event.key === 'Escape') { sync(); event.preventDefault(); }
+  });
   reset.addEventListener('click', () => {
     delete context.values[def.name];
     sync();
@@ -102,7 +164,8 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
   inputs.className = 'shader-control-inputs';
   inputs.append(input);
   if (number) inputs.append(number);
-  row.append(inputs, description);
+  if (hex) inputs.append(hex, source);
+  row.append(inputs, description, error);
   sync();
   return { def, row };
 }
@@ -127,6 +190,7 @@ export function mountShaderControls(
   values: Record<string, UniformValue>,
   onChange: () => void,
   resolveValues: () => Record<string, UniformValue> = () => values,
+  options: ShaderControlOptions = {},
 ) {
   const wasOpen = root.querySelector('details')?.open ?? false;
   root.replaceChildren();
@@ -144,7 +208,8 @@ export function mountShaderControls(
     sections.forEach(section => { section.hidden = !section.querySelector('.shader-control:not([hidden])'); });
     advanced.hidden = !advanced.querySelector('fieldset:not([hidden])');
   };
-  const context: ControlContext = { values, resolveValues, refreshVisibility, onChange };
+  options.locks ??= new Set();
+  const context: ControlContext = { options, values, resolveValues, refreshVisibility, onChange };
   for (const isAdvanced of [false, true]) {
     for (const group of ['Motion', 'Shape', 'Color'] as const) {
       const defs = definitions.filter(def => Boolean(def.advanced) === isAdvanced && (def.group ?? 'Shape') === group);

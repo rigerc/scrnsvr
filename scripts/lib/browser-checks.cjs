@@ -52,7 +52,8 @@ function createGlHarness(canvas, contextType) {
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     gl.uniform1f(gl.getUniformLocation(program, 'uTime'), time);
     gl.uniform2f(gl.getUniformLocation(program, 'uResolution'), width, height);
-    gl.uniform4f(gl.getUniformLocation(program, 'uDate'), 2026, 9, 10, 45296);
+    // 13:00:00 so the 12-hour toggle changes the rendered hour.
+    gl.uniform4f(gl.getUniformLocation(program, 'uDate'), 2026, 9, 10, 46800);
     gl.uniform4fv(gl.getUniformLocation(program, 'uAudio'), overrides.audio ?? [0.25, 0.3, 0.2, 0.15]);
     for (const def of definition.manifest.uniforms) {
       const value = overrides[def.name] ?? def.default;

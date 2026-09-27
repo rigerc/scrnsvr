@@ -7,6 +7,13 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float waveHeight;
+uniform float waveDensity;
+uniform float waveChop;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 #define iTimeDelta (1.0 / 60.0)
@@ -91,9 +98,9 @@ float sea_octave(vec2 uv, float choppy) {
 }
 
 float map(vec3 p) {
-    float freq = SEA_FREQ;
-    float amp = SEA_HEIGHT;
-    float choppy = SEA_CHOPPY;
+    float freq = SEA_FREQ * waveDensity;
+    float amp = SEA_HEIGHT * waveHeight;
+    float choppy = SEA_CHOPPY * waveChop;
     vec2 uv = p.xz; uv.x *= 0.75;
     
     float d, h = 0.0;    
@@ -108,9 +115,9 @@ float map(vec3 p) {
 }
 
 float map_detailed(vec3 p) {
-    float freq = SEA_FREQ;
-    float amp = SEA_HEIGHT;
-    float choppy = SEA_CHOPPY;
+    float freq = SEA_FREQ * waveDensity;
+    float amp = SEA_HEIGHT * waveHeight;
+    float choppy = SEA_CHOPPY * waveChop;
     vec2 uv = p.xz; uv.x *= 0.75;
     
     float d, h = 0.0;    
@@ -134,7 +141,7 @@ vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
     vec3 color = mix(refracted, reflected, fresnel);
     
     float atten = max(1.0 - dot(dist, dist) * 0.001, 0.0);
-    color += SEA_WATER_COLOR * (p.y - SEA_HEIGHT) * 0.18 * atten;
+    color += SEA_WATER_COLOR * (p.y - SEA_HEIGHT * waveHeight) * 0.18 * atten;
     
     color += specular(n, l, eye, 600.0 * inversesqrt(dot(dist,dist)));
     
@@ -229,6 +236,15 @@ void scrnsvrImportedMain() {
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

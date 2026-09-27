@@ -1,0 +1,8 @@
+
+
+# BEGIN ai-config-sync mcp-servers
+[mcp_servers.code-graph]
+command = "code-graph-mcp"
+[mcp_servers.shadereye]
+command = "shadereye-mcp"
+# END ai-config-sync mcp-servers

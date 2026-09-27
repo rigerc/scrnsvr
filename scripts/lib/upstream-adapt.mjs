@@ -1,3 +1,5 @@
+import { applyEffectControls, controlDeclarations, importedControls, paletteApplication } from './upstream-controls.mjs';
+
 // Pure pipeline for scripts/import-upstream-shaders.mjs. The script keeps the
 // argv parsing and disk writes; everything that transforms shader source lives
 // here so it can be imported and tested without touching the filesystem.
@@ -25,7 +27,7 @@ const COMPATIBILITY_RULES = [
   { names: ['iMouse'], shaderSaverFallback: true, lines: ['#define iMouse (vec4(0.0))'] },
   { names: ['iTimeDelta'], shaderSaverFallback: false, lines: ['#define iTimeDelta (1.0 / 60.0)'] },
   { names: ['iFrame'], shaderSaverFallback: false, lines: ['#define iFrame int(floor(uTime * 60.0))'] },
-  { names: ['iDate'], shaderSaverFallback: false, lines: ['uniform vec4 uDate;', '#define iDate (vec4(uDate.xyz, uDate.w + uTime * speed))'] },
+  { names: ['iDate'], shaderSaverFallback: false, lines: ['uniform vec4 uDate;', '#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))'] },
 ];
 
 export function compatibilityDefines(source, item) {
@@ -312,6 +314,7 @@ export function emitModule(body, compatibility, item) {
 `uniform float contrast;\n` +
 `uniform float brightness;\n` +
 `uniform float saturation;\n` +
+`${controlDeclarations(item)}` +
 `${compatibility.join('\n')}\n\n` +
 `float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }\n` +
 `vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }\n` +
@@ -319,6 +322,7 @@ export function emitModule(body, compatibility, item) {
 `vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z), scrnsvrTanh(value.w)); }\n\n` +
 `${prepared.trim()}\n\n` +
 `void main() {\n${invoke}\n` +
+paletteApplication +
 `  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;\n` +
 `  float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));\n` +
 `  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);\n` +
@@ -327,7 +331,7 @@ export function emitModule(body, compatibility, item) {
 
 export function adapt(source, item) {
   const compatibility = compatibilityDefines(source, item);
-  const body = applyAdapterRules(stripPreamble(source), item);
+  const body = applyEffectControls(applyAdapterRules(stripPreamble(source), item), item);
   return emitModule(body, compatibility, item);
 }
 
@@ -340,11 +344,13 @@ export function manifestSource(item) {
 `  category: ${JSON.stringify(item.category)},\n` +
 `  description: ${JSON.stringify(`Imported from ${item.collection}; original shader notices are preserved in the source.`)},\n` +
 `  fragment: 'shader.glsl',\n` +
+`  schemePalette: 'custom',\n` +
 `  uniforms: [\n` +
 `    { name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01, label: 'Speed', description: 'Overall animation speed; zero freezes movement.', group: 'Motion', random: { min: 0.35, max: 1.4 } },\n` +
 `    { name: 'contrast', type: 'float', default: 1, min: 0.25, max: 2, step: 0.01, label: 'Contrast', description: 'Contrast applied to the imported composition.', group: 'Shape', random: { min: 0.7, max: 1.35 } },\n` +
 `    { name: 'brightness', type: 'float', default: 1, min: 0, max: 2, step: 0.01, label: 'Brightness', description: 'Overall light intensity.', group: 'Color', random: { min: 0.65, max: 1.25 } },\n` +
 `    { name: 'saturation', type: 'float', default: 1, min: 0, max: 2, step: 0.01, label: 'Saturation', description: 'Color intensity; zero is grayscale.', group: 'Color', random: { min: 0.55, max: 1.35 } },\n` +
+importedControls(item).map(def => `    ${JSON.stringify(def)},\n`).join('') +
 `  ],\n` +
 `});\n`;
 }

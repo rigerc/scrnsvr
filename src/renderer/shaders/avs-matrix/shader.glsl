@@ -7,6 +7,14 @@ uniform float speed;
 uniform float contrast;
 uniform float brightness;
 uniform float saturation;
+uniform float glyphFill;
+uniform float glyphStroke;
+uniform float glyphGlow;
+uniform float rainSpeed;
+uniform int palette;
+uniform vec3 shadowColor;
+uniform vec3 midtoneColor;
+uniform vec3 highlightColor;
 #define iTime (uTime * speed)
 #define iResolution (vec3(uResolution, 1.0))
 #define iMouse (vec4(0.0))
@@ -110,7 +118,7 @@ float rune(vec2 U, vec2 seed, float highlight)
 		if (pos.xy != pos.zw)  //filter out single points (when start and end are the same)
 		    d = min(d, rune_line(U, pos.xy, pos.zw + .001) ); // closest line
 	}
-	return smoothstep(0.1, 0., d) + highlight*smoothstep(0.4, 0., d);
+	return smoothstep(0.1 * glyphStroke, 0., d) + highlight*smoothstep(0.4 * glyphGlow, 0., d);
 }
 
 float random_char(vec2 outer, vec2 inner, float highlight) {
@@ -199,7 +207,7 @@ vec3 rain(vec3 ro3, vec3 rd3, float time) {
                         float c = floor(v * chars_count);  //symbol index relative to the start of the strip, with addition of char_z_shift it becomes an index relative to the whole cell
                         float q = fract(v * chars_count);
                         vec2 char_hash = hash2(vec2(c+char_z_shift, cell_hash2.x));
-                        if (char_hash.x >= 0.1 || c == 0.) {  //10% of missed symbols
+                        if (char_hash.x >= 1.0 - glyphFill || c == 0.) {  //10% of missed symbols
                             float time_factor = floor(c == 0. ? time*5.0 :  //first symbol is changed fast
                                     time*(1.0*cell_hash2.z +   //strips are changed sometime with different speed
                                             cell_hash2.w*cell_hash2.w*4.*pow(char_hash.y, 4.)));  //some symbols in some strips are changed relatively often
@@ -414,7 +422,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     ro += rd * 0.2;
     rd = normalize(rd);
 
-    vec3 col = rain(ro, rd, time);
+    vec3 col = rain(ro, rd, time * rainSpeed);
 
     fragColor = vec4(col, 1.);
 }
@@ -426,6 +434,15 @@ void scrnsvrImportedMain() {
 
 void main() {
   scrnsvrImportedMain();
+  if (palette == 1) {
+    // Soft-compress the source range so dark, middle and bright tones all
+    // contribute: a bright cloudscape must still respond to the shadow tone.
+    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
+    vec3 mapped = mix(shadowColor, midtoneColor, tone);
+    mapped = mix(mapped, highlightColor, tone * tone);
+    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+  }
   vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);

@@ -1,4 +1,6 @@
 precision highp float;
+uniform float wanderRate;
+uniform int compositionSeed;
 
 uniform float emberSize;
 uniform float sizeVariation;
@@ -19,7 +21,7 @@ uniform vec3 color1;
 uniform vec3 color2;
 varying vec2 vUv;
 
-float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float hash(float n) { return fract(sin((n + float(compositionSeed) * 13.17) * 127.1) * 43758.5453); }
 
 void main() {
   float aspect = uResolution.x / uResolution.y;
@@ -32,7 +34,7 @@ void main() {
     float seed = hash(id + 1.0);
     float life = fract(seed + t * mix(0.016, 0.04, hash(id + 7.0)));
     vec2 center = vec2(0.06 + hash(id + 19.0) * 0.88, life * 1.2 - 0.1);
-    center.x += wander * sin(t * 0.3 + id * 2.4 + life * 5.0);
+    center.x += wander * sin(t * 0.3 * wanderRate + id * 2.4 + life * 5.0);
     center = (riseRotation * ((center - 0.5) * vec2(aspect, 1.0))) / vec2(aspect, 1.0) + 0.5;
     vec2 offset = (vUv - center) * vec2(aspect, 1.0);
     float radius = emberSize * mix(0.0035, mix(0.002, 0.005, seed), sizeVariation);

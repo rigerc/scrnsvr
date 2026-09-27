@@ -1,3 +1,4 @@
+import { randomizeColorPalette } from '../../shared/color-palettes';
 import type { UniformManifest, UniformValue } from '../../shared/manifest';
 
 /** Clamp numeric controls, rounding integers and falling back to the default for junk input. */
@@ -61,7 +62,6 @@ const randomizers: Record<string, (def: UniformManifest, random: () => number) =
   int: randomNumber,
   bool: (_def, random) => random() >= 0.5,
   select: randomSelect,
-  color: (_def, random) => `#${Math.min(0xffffff, Math.floor(random() * 0x1000000)).toString(16).padStart(6, '0')}`,
 };
 
 /** Choose modes before dependent controls, regardless of manifest ordering. */
@@ -69,12 +69,17 @@ function byVisibleWhenLast(a: UniformManifest, b: UniformManifest): number {
   return Number(Boolean(a.visibleWhen)) - Number(Boolean(b.visibleWhen));
 }
 
-export function randomizeUniforms(defs: UniformManifest[], current: Record<string, unknown>, random = Math.random, protectedNames?: ReadonlySet<string>): Record<string, UniformValue> {
-  const values = bindUniforms(defs, current);
+export function randomizeUniforms(defs: UniformManifest[], current: Record<string, unknown>, random = Math.random, protectedNames?: ReadonlySet<string>, resolvedValues: Record<string, unknown> = current): Record<string, UniformValue> {
+  // Stored overrides and effective values are deliberately separate: skipped inherited
+  // controls must remain absent so future scheme changes can still flow through.
+  const values = { ...current } as Record<string, UniformValue>;
+  const resolved = bindUniforms(defs, resolvedValues);
   for (const def of [...defs].sort(byVisibleWhenLast)) {
     const randomizer = randomizers[def.type];
-    if (def.random === false || protectedNames?.has(def.name) || !uniformVisible(def, values) || !randomizer) continue;
+    if (def.random === false || protectedNames?.has(def.name) || !uniformVisible(def, resolved) || !randomizer) continue;
     values[def.name] = randomizer(def, random);
+    resolved[def.name] = values[def.name];
   }
+  Object.assign(values, randomizeColorPalette(defs, resolved, random, protectedNames));
   return values;
 }

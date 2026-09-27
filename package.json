@@ -25,7 +25,8 @@
     "dist": "npm run build && electron-builder --config electron-builder.yml",
     "check-shaders": "npm run build && node scripts/check-shaders.cjs",
     "check-custom-shaders": "npm run build && node scripts/check-custom-shaders.cjs",
-    "check-reactive-audio": "npm run build && node scripts/check-reactive-audio.cjs"
+    "check-reactive-audio": "npm run build && node scripts/check-reactive-audio.cjs",
+    "check-animation-runtime": "npm run build && node scripts/check-animation-runtime.cjs"
   },
   "dependencies": {
     "ogl": "^1.0.11",

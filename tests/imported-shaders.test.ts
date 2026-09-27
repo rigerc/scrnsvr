@@ -24,3 +24,27 @@ describe('imported shader collection', () => {
     }
   });
 });
+
+describe('imported expressive control contracts', () => {
+  it.each(imported)('%s exposes only wired, typed custom colors and controls', async id => {
+    const { importedControls } = await import('../scripts/lib/upstream-controls.mjs');
+    const source = readFileSync(`${root}/${id}/shader.glsl`, 'utf8');
+    const manifest = readFileSync(`${root}/${id}/manifest.ts`, 'utf8');
+    const controls = importedControls({ id });
+    for (const control of controls) {
+      const type = control.type === 'select' ? 'int' : control.type === 'color' ? 'vec3' : control.type;
+      expect(source).toContain(`uniform ${type} ${control.name};`);
+      expect(manifest).toContain(`"name":"${control.name}"`);
+      // A declaration alone is insufficient: every exposed control must be read.
+      expect(source.match(new RegExp(`\\b${control.name}\\b`, 'g'))!.length).toBeGreaterThan(1);
+      if (control.type === 'color') {
+        expect(control.visibleWhen).toEqual({ name: 'palette', value: 'custom' });
+        expect(control.colorRole).toBeTruthy();
+      }
+      if (control.type === 'float') {
+        expect(control.default).toBeGreaterThanOrEqual(control.min!);
+        expect(control.default).toBeLessThanOrEqual(control.max!);
+      }
+    }
+  });
+});

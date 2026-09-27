@@ -26,8 +26,8 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 44 GLSL shaders: 12 native effects plus 20 compatible screensaver shaders ported from AVS and all 12 ShaderSaver effects
-- 4–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
+- 53 GLSL shaders: 25 native effects plus 18 compatible screensaver shaders ported from AVS and 10 ShaderSaver effects
+- 8–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -80,7 +80,7 @@ Pick one of 30 well-known color schemes (Dracula, Nord, Gruvbox, Solarized, Mono
 
 Imported shader credits, pinned upstream revisions, license notes, exclusions, and porting details are recorded in [THIRD_PARTY_SHADERS.md](THIRD_PARTY_SHADERS.md).
 
-See the [shader parameter guide](docs/shader-parameters.md) for the available adjustments.
+See the [shader gallery](docs/shaders.md) for every built-in shader with its description, the [shader parameter guide](docs/shader-parameters.md) for the available adjustments, and the [shader authoring guide](docs/authoring-shaders.md) to add or modify built-in shaders. For fast look-development before touching the repo, see [Authoring shaders with the shadereye MCP](docs/authoring-shaders-with-shadereye.md).
 
 ## Config
 

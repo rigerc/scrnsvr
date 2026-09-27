@@ -21,7 +21,7 @@ describe('upstream shader adapter', () => {
   it('emits compatibility defines for declared upstream uniforms and ShaderSaver references', () => {
     const declared = compatibilityDefines('uniform float iTime;\nuniform vec2 iResolution;\nuniform vec4 iDate;', item);
     expect(declared).toContain('#define iTime (uTime * speed)');
-    expect(declared).toContain('#define iDate (vec4(uDate.xyz, uDate.w + uTime * speed))');
+    expect(declared).toContain('#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))');
     expect(declared).toContain('uniform vec4 uDate;');
     const shaderSaver = compatibilityDefines('float t = iTime;', { ...item, collection: 'ShaderSaver' });
     expect(shaderSaver).toContain('#define iTime (uTime * speed)');
@@ -64,5 +64,39 @@ describe('upstream shader adapter', () => {
     const manifest = manifestSource(item);
     expect(manifest).toContain("id: \"avs-sample\"");
     expect(manifest).toContain('export const avsSampleManifest = manifest({');
+  });
+});
+
+describe('expressive imported controls', () => {
+  it('keeps Original as the default and declares an opt-in tonal palette', () => {
+    const output = adapt('void main() { gl_FragColor = vec4(1.0); }', item);
+    expect(output).toContain('if (palette == 1)');
+    // Bright sources are compressed so the shadow tone still shapes the image.
+    expect(output).toContain('max(raw, 0.0) / (1.0 + max(raw, 0.0))');
+    expect(output).toContain('mix(mapped, highlightColor, tone * tone)');
+    const manifest = manifestSource(item);
+    expect(manifest).toContain("schemePalette: 'custom'");
+    expect(manifest).toContain('"default":"original"');
+    expect(manifest).toContain('"colorRole":"surface"');
+    expect(manifest).toContain('"visibleWhen":{"name":"palette","value":"custom"}');
+  });
+
+  it('re-imports structural controls into source expressions', () => {
+    const cases = [
+      ['avs-seven-segment', 'uv *= 15.0;', 'uv *= 15.0 / clockSize;'],
+      ['avs-glow-clock', 'shade = 0.004 / (dist);', '0.004 * glowWidth / (dist)'],
+      ['avs-green-clock', '#if SECONDS\nfloat seconds = 1.0;\n#endif', 'if (showSeconds)'],
+      ['avs-matrix', 'float f = char_hash.x >= 0.1;', 'char_hash.x >= 1.0 - glyphFill'],
+      ['shadersaver-water-ripples', 'float r = .4*sin(l*3.-iTime+.5);', '(.4 * waveHeight)*sin(l*(3. * waveDensity)-iTime+.5)'],
+      ['avs-ocean', 'float f = waveFreq;', 'float f = waveFreq * waveDensity;'],
+      ['avs-sea', 'float amp = SEA_HEIGHT;', 'float amp = SEA_HEIGHT * waveHeight;'],
+      ['avs-clouds', 'const float cloudcover = 0.2;', '#define cloudcover cloudCoverage'],
+      ['avs-terrain', 'return t * 55.0;', 'return t * 55.0 * terrainHeight;'],
+      ['avs-seascape', 'h *= 3.0;', 'h *= 3.0 * waveHeight;'],
+      ['avs-field', 'float fog = dis*dis* 0.0000012;', 'dis*dis* 0.0000012 * fogDensity'],
+    ];
+    for (const [id, body, expected] of cases) {
+      expect(adapt(body, { ...item, id })).toContain(expected);
+    }
   });
 });

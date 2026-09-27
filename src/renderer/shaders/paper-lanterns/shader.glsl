@@ -1,4 +1,6 @@
 precision highp float;
+uniform float swayRate;
+uniform int compositionSeed;
 
 uniform float uTime;
 uniform vec2 uResolution;
@@ -35,16 +37,16 @@ void main() {
     for (int i = 0; i < 20; i++) {
         if (i >= lanternCount) continue;
         float fi = float(i);
-        float seed = fract(sin(fi * 73.13 + 5.1) * 43758.5453);
+        float seed = fract(sin(fi * 73.13 + 5.1 + float(compositionSeed) * 13.17) * 43758.5453);
         float depth = 0.45 + 0.55 * seed;
         float travel = fract(seed + t * (0.018 + seed * 0.012));
         float y = travel * 1.5 - 0.25;
         float x = (fract(seed * 17.31) - 0.5) * (aspect + 0.2);
-        x += sway * 0.09 * sin(t * 0.37 + fi * 2.1);
+        x += sway * 0.09 * sin(t * 0.37 * swayRate + fi * 2.1);
         vec2 q = (p - vec2(x, y)) / (size * depth);
         // The halo has decayed below output precision outside this radius.
         if (dot(q, q) > 0.16) continue;
-        float angle = sway * 0.13 * sin(t * 0.3 + fi);
+        float angle = sway * 0.13 * sin(t * 0.3 * swayRate + fi);
         q = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * q;
         float width = 0.035 * (1.0 + 0.22 * cos(q.y * 30.0));
         float localAA = aa / (size * depth);

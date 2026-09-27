@@ -3,6 +3,7 @@ export type ShaderCategory = typeof shaderCategories[number];
 export type UniformType = 'float'|'int'|'bool'|'color'|'select';
 export type UniformValue = number | boolean | string;
 export type UniformGroup = 'Motion' | 'Shape' | 'Color';
+export type UniformColorRole = 'primary' | 'secondary' | 'tertiary' | 'surface' | 'onSurface';
 export interface UniformManifest {
   name: string;
   type: UniformType;
@@ -15,9 +16,10 @@ export interface UniformManifest {
   max?: number;
   step?: number;
   unit?: string;
+  colorRole?: UniformColorRole;
   options?: string[];
   visibleWhen?: { name: string; value: UniformValue };
   random?: { min: number; max: number } | false;
 }
-export interface ShaderManifest { id:string; title:string; category?:ShaderCategory; description?:string; uniforms:UniformManifest[]; fragment:string; }
+export interface ShaderManifest { id:string; title:string; category?:ShaderCategory; description?:string; uniforms:UniformManifest[]; fragment:string; schemePalette?: string; }
 export const manifest = (value: ShaderManifest): ShaderManifest => value;
