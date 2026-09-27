@@ -1,6 +1,7 @@
 // Ported from ShaderSaver/shader3.txt; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -11,8 +12,18 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -31,33 +42,16 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
     <512 Chars playlist: shadertoy.com/playlist/N3SyzR
 */
 
-void mainImage(out vec4 O, vec2 I) {
-  vec2 r = iResolution.xy;
-  vec2 p = (I + I - r) / r.y * mat2(3,4,4,-3) / 1e2;
-  vec4 S = vec4(0.0), C = vec4(1,2,3,0), W = vec4(0.0);
-  float t = iTime, T = 0.1 * t + p.y;
-  for (int particle = 0; particle < 50; ++particle) {
-    float i = float(particle + 1);
-    W = sin(i) * C;
-    float noise = (0.5 + 0.5 * sin(dot(p / exp(W.x) + vec2(i,t) / 8.0, vec2(12.9898, 78.233)))) * 40.0;
-    S += (cos(W) + 1.0) * exp(sin(i + i * T))
-      / length(max(p, p / vec2(2.0, noise))) / 1e4;
-    p += 0.02 * cos(i * (C.xz + 8.0 + i) + T + T);
-  }
-  C -= 1.0;
-  O = scrnsvrTanh(p.x * C + S * S);
-}
-
 //Original [334]
 /*
 void mainImage( out vec4 O, vec2 I)
 {
     //Resolution for scaling
-    vec2 r = iResolution.xy,
+    vec2 r = uResolution,
     //Center, rotate and scale
     p = (I+I-r) / r.y * mat2(4,-3,3,4);
     //Time, trailing time and iterator variables
-    float t=iTime, T=t+.1*p.x, i;
+    float t=uTime * speed, T=t+.1*p.x, i;
 
     //Iterate through 50 particles
     for(
@@ -98,20 +92,35 @@ void mainImage( out vec4 O, vec2 I)
     O = scrnsvrTanh(.01*p.y*vec4(0,1,2,3)+O*O/1e4);
 }*/
 
-void main() {
-  vec4 importedColor = vec4(0.0);
-  mainImage(importedColor, gl_FragCoord.xy);
-  gl_FragColor = importedColor;
+void upstreamImage(out vec4 O, vec2 I) {
+  vec2 r = uResolution;
+  vec2 p = (I + I - r) / r.y * mat2(3,4,4,-3) / 1e2;
+  vec4 S = vec4(0.0), C = vec4(1,2,3,0), W = vec4(0.0);
+  float t = uTime * speed, T = 0.1 * t + p.y;
+  for (int particle = 0; particle < 50; ++particle) {
+    float i = float(particle + 1);
+    W = sin(i) * C;
+    float noise = (0.5 + 0.5 * sin(dot(p / exp(W.x) + vec2(i,t) / 8.0, vec2(12.9898, 78.233)))) * 40.0;
+    S += (cos(W) + 1.0) * exp(sin(i + i * T))
+      / length(max(p, p / vec2(2.0, noise))) / 1e4;
+    p += 0.02 * cos(i * (C.xz + 8.0 + i) + T + T);
+  }
+  C -= 1.0;
+  O = scrnsvrTanh(p.x * C + S * S);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

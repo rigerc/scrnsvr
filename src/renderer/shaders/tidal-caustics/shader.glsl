@@ -1,12 +1,6 @@
 precision highp float;
 
-uniform int layers;
-uniform float distortion;
-uniform float complexity;
-uniform float direction;
-uniform float depthShading;
-uniform float saturation;
-
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -15,10 +9,31 @@ uniform float focus;
 uniform float brightness;
 uniform vec3 color1;
 uniform vec3 color2;
-varying vec2 vUv;
+uniform float saturation;
+uniform int layers;
+uniform float distortion;
+uniform float complexity;
+uniform float direction;
+uniform float depthShading;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.25;
+const float scale = 1.0;
+const float focus = 0.5;
+const float brightness = 1.0;
+const vec3 color1 = vec3(0.023529, 0.223529, 0.301961);
+const vec3 color2 = vec3(0.443137, 0.898039, 0.815686);
+const float saturation = 1.0;
+const int layers = 3;
+const float distortion = 0.7;
+const float complexity = 0.5;
+const float direction = 0.0;
+const float depthShading = 1.0;
+#endif
 
-void main() {
-  vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * scale * 6.0;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 p = ((fragCoord / uResolution) - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * scale * 6.0;
   float rotation = radians(direction);
   p = mat2(cos(rotation), sin(rotation), -sin(rotation), cos(rotation)) * p;
   float t = uTime * speed;
@@ -37,7 +52,7 @@ void main() {
   float depth = 0.75 + 0.25 * depthShading * sin(p.x * 0.35 + p.y * 0.4 + t * 0.15);
   vec3 color = color1 * depth + color2 * light * 0.85;
   float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-  gl_FragColor = vec4(clamp((1.0 - exp(-color * brightness)) + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0), 1.0);
-  float luminance = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor.rgb = mix(vec3(luminance), gl_FragColor.rgb, saturation);
+  fragColor = vec4(clamp((1.0 - exp(-color * brightness)) + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0), 1.0);
+  float luminance = dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  fragColor.rgb = mix(vec3(luminance), fragColor.rgb, saturation);
 }

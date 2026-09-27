@@ -1,4 +1,5 @@
-import { applyEffectControls, controlDeclarations, importedControls, paletteApplication } from './upstream-controls.mjs';
+import { canonicalSource, detectUpstreamCompatNames, extractFunction, IMPORTED_POST, normalizeCompatTokens } from './canonical-shader.mjs';
+import { applyEffectControls, importedControls } from './upstream-controls.mjs';
 
 // Pure pipeline for scripts/import-upstream-shaders.mjs. The script keeps the
 // argv parsing and disk writes; everything that transforms shader source lives
@@ -16,30 +17,6 @@ export function replaceFirstMainImage(source, replacement) {
     if (source[index] === '}' && --depth === 0) return source.slice(0, start) + replacement + source.slice(index + 1);
   }
   throw new Error('Unclosed mainImage function');
-}
-
-/** Compatibility `#define`s for the upstream uniform names a source declares or references. */
-const COMPATIBILITY_RULES = [
-  { names: ['iTime'], shaderSaverFallback: true, lines: ['#define iTime (uTime * speed)'] },
-  { names: ['time'], shaderSaverFallback: false, lines: ['#define time (uTime * speed)'] },
-  { names: ['iResolution'], shaderSaverFallback: true, lines: ['#define iResolution (vec3(uResolution, 1.0))'] },
-  { names: ['resolution'], shaderSaverFallback: false, lines: ['#define resolution (uResolution)'] },
-  { names: ['iMouse'], shaderSaverFallback: true, lines: ['#define iMouse (vec4(0.0))'] },
-  { names: ['iTimeDelta'], shaderSaverFallback: false, lines: ['#define iTimeDelta (1.0 / 60.0)'] },
-  { names: ['iFrame'], shaderSaverFallback: false, lines: ['#define iFrame int(floor(uTime * 60.0))'] },
-  { names: ['iDate'], shaderSaverFallback: false, lines: ['uniform vec4 uDate;', '#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))'] },
-];
-
-export function compatibilityDefines(source, item) {
-  const declared = (name) => new RegExp(`uniform\\s+[^;]+\\s+${name}\\s*;`).test(source);
-  const uses = (name) => new RegExp(`\\b${name}\\b`).test(source);
-  const defines = [];
-  for (const rule of COMPATIBILITY_RULES) {
-    const isDeclared = rule.names.some((name) => declared(name));
-    const shaderSaverUses = rule.shaderSaverFallback && item.collection === 'ShaderSaver' && rule.names.some((name) => uses(name));
-    if (isDeclared || shaderSaverUses) defines.push(...rule.lines);
-  }
-  return defines;
 }
 
 /** Drop GLSL ES precision preambles and upstream uniform declarations, then route tanh. */
@@ -299,58 +276,83 @@ function applyAdapterRules(body, item) {
   return next;
 }
 
-/** Wrap the adapted body in the module scaffold that exposes it as a scrnsvr shader. */
-export function emitModule(body, compatibility, item) {
-  const hasMain = /\bvoid\s+main\s*\(/.test(body);
-  const prepared = hasMain ? body.replace(/\bvoid\s+main\s*\(/, 'void scrnsvrImportedMain(') : body;
-  const invoke = hasMain
-    ? '  scrnsvrImportedMain();'
-    : '  vec4 importedColor = vec4(0.0);\n  mainImage(importedColor, gl_FragCoord.xy);\n  gl_FragColor = importedColor;';
-  return `// Ported from ${item.collection}/${item.file}; original notices are preserved below.\n` +
-`precision highp float;\n\n` +
-`uniform float uTime;\n` +
-`uniform vec2 uResolution;\n` +
-`uniform float speed;\n` +
-`uniform float contrast;\n` +
-`uniform float brightness;\n` +
-`uniform float saturation;\n` +
-`${controlDeclarations(item)}` +
-`${compatibility.join('\n')}\n\n` +
-`float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }\n` +
-`vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }\n` +
-`vec3 scrnsvrTanh(vec3 value) { return vec3(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z)); }\n` +
-`vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z), scrnsvrTanh(value.w)); }\n\n` +
-`${prepared.trim()}\n\n` +
-`void main() {\n${invoke}\n` +
-paletteApplication +
-`  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;\n` +
-`  float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));\n` +
-`  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);\n` +
-`}\n`;
+const TANH_HELPERS = [
+  'float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }',
+  'vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }',
+  'vec3 scrnsvrTanh(vec3 value) { return vec3(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z)); }',
+  'vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z), scrnsvrTanh(value.w)); }',
+].join('\n');
+
+const standardFloat = (name, label, description, group, min, max, random) => ({ name, type: 'float', default: 1, min, max, step: 0.01, label, description, group, random });
+
+const STANDARD_CONTROLS = [
+  standardFloat('speed', 'Speed', 'Overall animation speed; zero freezes movement.', 'Motion', 0, 3, { min: 0.35, max: 1.4 }),
+  standardFloat('contrast', 'Contrast', 'Contrast applied to the imported composition.', 'Shape', 0.25, 2, { min: 0.7, max: 1.35 }),
+  standardFloat('brightness', 'Brightness', 'Overall light intensity.', 'Color', 0, 2, { min: 0.65, max: 1.25 }),
+  standardFloat('saturation', 'Saturation', 'Color intensity; zero is grayscale.', 'Color', 0, 2, { min: 0.55, max: 1.35 }),
+];
+
+/** The manifest object the adapter generates; shared by emitModule and manifestSource. */
+function importedManifest(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    description: `Imported from ${item.collection}; original shader notices are preserved in the source.`,
+    fragment: 'shader.glsl',
+    schemePalette: 'custom',
+    uniforms: [...STANDARD_CONTROLS, ...importedControls(item)],
+  };
+}
+
+/** Convert an upstream `main()` into the `upstreamImage(out vec4, in vec2)` helper. */
+function convertUpstreamMain(text, callName) {
+  let out = text
+    .replace(/\bvoid\s+main\s*\(\s*(?:void\s*)?\)/, 'void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord)')
+    .replace(/\bgl_FragCoord\.xy\b/g, 'scrnsvrCoord')
+    .replace(/\bgl_FragColor\b/g, 'scrnsvrResult');
+  if (callName) out = out.replace(/\bmainImage\b/g, callName);
+  return out;
+}
+
+/**
+ * Emit the canonical mainImage module for a raw upstream body: the effect
+ * becomes `upstreamImage`, the palette + standard post pipeline becomes the
+ * body of the single `mainImage`, and the `#ifdef SCRNSVR` block is generated
+ * from the manifest so the file also renders directly in Shadereye.
+ */
+export function emitModule(body, item, defined = detectUpstreamCompatNames(body, item.collection)) {
+  const manifest = importedManifest(item);
+  const imageText = extractFunction(body, 'mainImage');
+  const mainText = extractFunction(body, 'main');
+  if (!imageText && !mainText) throw new Error('Upstream shader has no mainImage or main');
+
+  let effect = '';
+  let wrapper = '';
+  if (imageText) {
+    effect = imageText.replace(/\bmainImage\b/g, mainText ? 'effectImage' : 'upstreamImage');
+    if (mainText) wrapper = convertUpstreamMain(mainText, 'effectImage');
+  } else {
+    wrapper = convertUpstreamMain(mainText, null);
+  }
+
+  let rest = body;
+  for (const text of [imageText, mainText]) if (text) rest = rest.replace(text, '');
+  const mainImage = `void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n  upstreamImage(fragColor, fragCoord);\n${IMPORTED_POST.replace(/\bgl_FragColor\b/g, 'fragColor')}}\n`;
+  const assembled = [TANH_HELPERS, rest, effect, wrapper, mainImage].filter(Boolean).join('\n\n');
+  const normalized = normalizeCompatTokens(assembled, defined);
+  const engine = { audio: /\buAudio\b/.test(normalized), date: /\buDate\b/.test(normalized) };
+  const header = `// Ported from ${item.collection}/${item.file}; original notices are preserved below.\n`;
+  return canonicalSource(header, normalized, manifest.uniforms, engine);
 }
 
 export function adapt(source, item) {
-  const compatibility = compatibilityDefines(source, item);
+  const defined = detectUpstreamCompatNames(source, item.collection);
   const body = applyEffectControls(applyAdapterRules(stripPreamble(source), item), item);
-  return emitModule(body, compatibility, item);
+  return emitModule(body, item, defined);
 }
 
 export function manifestSource(item) {
   const symbol = symbolFor(item.id);
-  return `import { manifest } from '../../../shared/manifest';\n\n` +
-`export const ${symbol} = manifest({\n` +
-`  id: ${JSON.stringify(item.id)},\n` +
-`  title: ${JSON.stringify(item.title)},\n` +
-`  category: ${JSON.stringify(item.category)},\n` +
-`  description: ${JSON.stringify(`Imported from ${item.collection}; original shader notices are preserved in the source.`)},\n` +
-`  fragment: 'shader.glsl',\n` +
-`  schemePalette: 'custom',\n` +
-`  uniforms: [\n` +
-`    { name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01, label: 'Speed', description: 'Overall animation speed; zero freezes movement.', group: 'Motion', random: { min: 0.35, max: 1.4 } },\n` +
-`    { name: 'contrast', type: 'float', default: 1, min: 0.25, max: 2, step: 0.01, label: 'Contrast', description: 'Contrast applied to the imported composition.', group: 'Shape', random: { min: 0.7, max: 1.35 } },\n` +
-`    { name: 'brightness', type: 'float', default: 1, min: 0, max: 2, step: 0.01, label: 'Brightness', description: 'Overall light intensity.', group: 'Color', random: { min: 0.65, max: 1.25 } },\n` +
-`    { name: 'saturation', type: 'float', default: 1, min: 0, max: 2, step: 0.01, label: 'Saturation', description: 'Color intensity; zero is grayscale.', group: 'Color', random: { min: 0.55, max: 1.35 } },\n` +
-importedControls(item).map(def => `    ${JSON.stringify(def)},\n`).join('') +
-`  ],\n` +
-`});\n`;
+  return `import { manifest } from '../../../shared/manifest';\n\nexport const ${symbol} = manifest(${JSON.stringify(importedManifest(item), null, 2)});\n`;
 }

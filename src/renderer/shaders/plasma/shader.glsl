@@ -1,5 +1,14 @@
 precision highp float;
 
+#ifdef SCRNSVR
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float speed;
+uniform float scale;
+uniform float contrast;
+uniform int palette;
+uniform float brightness;
+uniform float saturation;
 uniform float direction;
 uniform float distortion;
 uniform float radialStrength;
@@ -7,15 +16,23 @@ uniform float paletteOffset;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 color3;
-uniform float brightness;
-uniform float saturation;
-
-uniform float uTime;
-uniform vec2 uResolution;
-uniform float speed;
-uniform float scale;
-uniform float contrast;
-uniform int palette;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.65;
+const float scale = 3.5;
+const float contrast = 1.15;
+const int palette = 0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float direction = 0.0;
+const float distortion = 1.0;
+const float radialStrength = 1.0;
+const float paletteOffset = 0.0;
+const vec3 color1 = vec3(0.439216, 0.317647, 0.937255);
+const vec3 color2 = vec3(1.000000, 0.545098, 0.701961);
+const vec3 color3 = vec3(0.270588, 0.874510, 0.811765);
+#endif
 
 vec3 colors(float value) {
   value += paletteOffset;
@@ -32,7 +49,7 @@ vec3 colors(float value) {
   return 0.5 + 0.5 * cos(6.28318 * (value + vec3(0.0, 0.33, 0.67)));
 }
 
-void main() {
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = (2.0 * gl_FragCoord.xy - uResolution.xy) / min(uResolution.x, uResolution.y);
   float rotation = radians(direction);
   uv = mat2(cos(rotation), sin(rotation), -sin(rotation), cos(rotation)) * uv;
@@ -42,8 +59,8 @@ void main() {
   wave += distortion * sin((uv.x + uv.y + t * 0.11) * scale * 0.73);
   wave += radialStrength * sin(length(uv) * scale * 2.0 - t);
   float value = 0.5 + 0.5 * sin(wave * contrast);
-  gl_FragColor = vec4(colors(value), 1.0);
-  gl_FragColor.rgb *= brightness;
-  float luminance = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor.rgb = mix(vec3(luminance), gl_FragColor.rgb, saturation);
+  fragColor = vec4(colors(value), 1.0);
+  fragColor.rgb *= brightness;
+  float luminance = dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  fragColor.rgb = mix(vec3(luminance), fragColor.rgb, saturation);
 }

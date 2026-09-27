@@ -1,6 +1,7 @@
 // Ported from ShaderSaver/shader.txt; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -11,8 +12,18 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -29,19 +40,20 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
     dean_the_coder: -12
     iq: -4
 */
-void mainImage(out vec4 O, vec2 F) {
+
+void upstreamImage(out vec4 O, vec2 F) {
   float i = 0.2;
-  vec2 r = iResolution.xy;
+  vec2 r = uResolution;
   vec2 p = (F + F - r) / r.y / 0.7;
   vec2 d = vec2(-1.0, 1.0);
   vec2 b = p - i * d;
   vec2 c = p * mat2(1.0, 1.0, d / (0.1 + i / dot(b, b)));
   float a = dot(c, c);
-  vec2 v = c * mat2(cos(0.5 * log(a) + iTime * i + vec4(0, 33, 11, 0))) / i;
+  vec2 v = c * mat2(cos(0.5 * log(a) + uTime * speed * i + vec4(0, 33, 11, 0))) / i;
   vec2 w = vec2(0.0);
   for (int wave = 0; wave < 9; ++wave) {
     i += 1.0;
-    v += 0.7 * sin(v.yx * i + iTime) / i + 0.5;
+    v += 0.7 * sin(v.yx * i + uTime * speed) / i + 0.5;
     w += 1.0 + sin(v);
   }
   i = length(sin(v / 0.3) * 0.4 + c * (3.0 + d));
@@ -49,20 +61,18 @@ void mainImage(out vec4 O, vec2 F) {
     / (2.0 + i*i/4.0 - i) / (0.5 + 1.0/a) / (0.03 + abs(length(p) - 0.7)));
 }
 
-void main() {
-  vec4 importedColor = vec4(0.0);
-  mainImage(importedColor, gl_FragCoord.xy);
-  gl_FragColor = importedColor;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

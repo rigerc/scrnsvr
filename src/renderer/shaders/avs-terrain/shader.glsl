@@ -1,6 +1,7 @@
 // Ported from AVS/terrain.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -13,8 +14,20 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float terrainHeight = 1.0;
+const float terrainDensity = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -24,7 +37,6 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 // Terrain — mountains and valleys with procedural soil
 // Based on techniques by Inigo Quilez
 // Rewritten for continuous flyover, no scene switches
-
 
 const mat2 m2 = mat2(1.6,-1.2,1.2,1.6);
 
@@ -216,7 +228,7 @@ vec3 dome(vec3 rd, vec3 sun) {
 
     // Clouds (only above horizon)
     if (rd.y > 0.01) {
-        float time = iTime * 0.03;
+        float time = uTime * speed * 0.03;
         vec2 uv = rd.xz / (rd.y + 0.1) * 0.8;
 
         float q = cloudFBM(uv * 0.55);
@@ -274,12 +286,12 @@ mat3 setCamera(vec3 ro, vec3 ta, float cr) {
     return mat3(cu, cv, cw);
 }
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    vec2 xy = -1.0 + 2.0 * fragCoord.xy / iResolution.xy;
-    vec2 sp = xy * vec2(iResolution.x / iResolution.y, 1.0);
+void effectImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 xy = -1.0 + 2.0 * fragCoord.xy / uResolution;
+    vec2 sp = xy * vec2(uResolution.x / uResolution.y, 1.0);
 
     // Continuous time — no scene switching
-    float time = 16.5 + iTime * 0.05;
+    float time = 16.5 + uTime * speed * 0.05;
 
     float cr = 0.18 * sin(-0.1 * time);
     vec3 ro = camPath(time);
@@ -353,30 +365,30 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     fragColor = vec4(col, 1.0);
 }
 
-void scrnsvrImportedMain() {
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     // Scanline skip: every other row black, saves 50% GPU
-    vec2 fc = gl_FragCoord.xy;
+    vec2 fc = scrnsvrCoord;
     if (mod(floor(fc.y), 2.0) < 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        scrnsvrResult = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     vec4 fragColor;
-    mainImage(fragColor, fc);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, fc);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

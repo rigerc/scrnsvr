@@ -1,10 +1,10 @@
 precision highp float;
-uniform float evolutionRate;
-uniform vec3 highlightColor;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
-varying vec2 vUv;
+uniform float evolutionRate;
+uniform vec3 highlightColor;
 uniform float speed;
 uniform float scale;
 uniform float iridescence;
@@ -15,6 +15,22 @@ uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float evolutionRate = 1.0;
+const vec3 highlightColor = vec3(1.000000, 1.000000, 1.000000);
+const float speed = 0.3;
+const float scale = 1.6;
+const float iridescence = 0.75;
+const float distortion = 0.65;
+const float sheen = 0.7;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const vec3 color1 = vec3(0.937255, 0.658824, 0.800000);
+const vec3 color2 = vec3(0.560784, 0.811765, 0.905882);
+const vec3 background = vec3(0.070588, 0.094118, 0.149020);
+#endif
 
 // 2D simplex noise from LYGIA, Stefan Gustavson and Ian McEwan.
 // Copyright 2021-2023. MIT license; see THIRD_PARTY_SHADERS.md.
@@ -70,18 +86,17 @@ float snoise(in vec2 v) {
     return 130.0 * dot(m, g);
 }
 
-
 // Match the collection's exposure and color controls; keep black at zero brightness.
-void finish(vec3 color) {
+vec4 finish(vec3 color) {
     color = 1.0 - exp(-max(color, vec3(0.0)) * brightness);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    gl_FragColor = vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
+    return vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
 }
 
-void main() {
-    vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 p = ((fragCoord / uResolution) - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     float t = uTime * speed;
     vec2 q = p * scale;
     float n = snoise(q * 1.1 + vec2(t * 0.09, -t * 0.06) * evolutionRate);
@@ -94,5 +109,5 @@ void main() {
     float fine = pow(0.5 + 0.5 * sin(phase + n * 2.0), 24.0);
     vec3 color = mix(background, film, 0.83) + highlightColor * sheen * (pearl * 0.65 + fine * 0.12);
     color *= 0.85 + 0.15 * cos(length(p) * 1.8);
-    finish(color);
+    fragColor = finish(color);
 }

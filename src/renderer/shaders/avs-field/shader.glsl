@@ -1,6 +1,7 @@
 // Ported from AVS/field.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -13,8 +14,20 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define time (uTime * speed)
-#define resolution (uResolution)
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float grassSway = 1.0;
+const float fogDensity = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -68,11 +81,10 @@ vec2 Voronoi( in vec2 x )
 		{
 			res = d;
 			id  = Hash(p+b);
-		}			
+		}
     }
 	return vec2(max(.4-sqrt(res), 0.0),id);
 }
-
 
 //--------------------------------------------------------------------------
 vec2 Terrain( in vec2 p)
@@ -141,7 +153,7 @@ vec3 DE(vec3 p)
 	//p.y += height;
 	float y = p.y - base-height;
 	y = y*y;
-	vec2 ret = Voronoi((p.xz*2.5+sin(y*4.0+p.zx*12.3)*.12+vec2(sin(time*2.3+1.5*p.z),sin(time*3.6+1.5*p.x))*y*.5 * grassSway));
+	vec2 ret = Voronoi((p.xz*2.5+sin(y*4.0+p.zx*12.3)*.12+vec2(sin(uTime * speed*2.3+1.5*p.z),sin(uTime * speed*3.6+1.5*p.x))*y*.5 * grassSway));
 	float f = ret.x * .6 + y * .58;
 	return vec3( y - f*1.4, clamp(f * 1.5, 0.0, 1.0), ret.y);
 }
@@ -150,7 +162,7 @@ vec3 DE(vec3 p)
 // eiffie's code for calculating the aperture size for a given distance...
 float CircleOfConfusion(float t)
 {
-	return max(t * .04, (2.0 / resolution.y) * (1.0+t));
+	return max(t * .04, (2.0 / uResolution.y) * (1.0+t));
 }
 
 //--------------------------------------------------------------------------
@@ -167,14 +179,14 @@ vec3 GrassBlades(in vec3 rO, in vec3 rD, in vec3 mat, in float dist)
 	// Only calculate cCoC once is enough here...
 	float rCoC = CircleOfConfusion(dist*.3);
 	float alpha = 0.0;
-	
+
 	vec4 col = vec4(mat*0.15, 0.0);
 
 	for (int i = 0; i < 15; i++)
 	{
 		if (col.w > .99) break;
 		vec3 p = rO + rD * d;
-		
+
 		vec3 ret = DE(p);
 		ret.x += .5 * rCoC;
 
@@ -252,7 +264,7 @@ bool Scene(in vec3 rO, in vec3 rD, out float resT, out float type )
 		if (p.y < 105.0 && !hit)
 		{
 			h = Map(p); // ...Get this position's height mapping.
-	
+
 			// Are we inside, and close enough to fudge a hit?...
 			if( h.x < 0.05)
 			{
@@ -278,39 +290,42 @@ bool Scene(in vec3 rO, in vec3 rD, out float resT, out float type )
 //--------------------------------------------------------------------------
 vec3 CameraPath( float t )
 {
-	//t = time + t;
+	//t = uTime * speed + t;
     vec2 p = vec2(200.0 * sin(3.54*t), 200.0 * cos(2.0*t) );
 	return vec3(p.x+55.0,  12.0+sin(t*.3)*6.5, -94.0+p.y);
-} 
+}
 
 //--------------------------------------------------------------------------
 vec3 PostEffects(vec3 rgb, vec2 xy)
 {
 	// Gamma first...
 	rgb = pow(rgb, vec3(0.45));
-	
+
 	// Then...
 	#define CONTRAST 1.1
 	#define SATURATION 1.3
 	#define BRIGHTNESS 1.3
 	rgb = mix(vec3(.5), mix(vec3(dot(vec3(.2125, .7154, .0721), rgb*BRIGHTNESS)), rgb*BRIGHTNESS, SATURATION), CONTRAST);
 	// Vignette...
-	rgb *= .4+0.5*pow(40.0*xy.x*xy.y*(1.0-xy.x)*(1.0-xy.y), 0.2 );	
+	rgb *= .4+0.5*pow(40.0*xy.x*xy.y*(1.0-xy.x)*(1.0-xy.y), 0.2 );
 	return rgb;
 }
 
 //--------------------------------------------------------------------------
-void scrnsvrImportedMain(void)
+
+//--------------------------------------------------------------------------
+
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord)
 {
-	float gTime = (time*5.0+2352.0)*.006;
-    vec2 xy = gl_FragCoord.xy / resolution.xy;
-	vec2 uv = (-1.0 + 2.0 * xy) * vec2(resolution.x/resolution.y,1.0);
+	float gTime = (uTime * speed*5.0+2352.0)*.006;
+    vec2 xy = scrnsvrCoord / uResolution;
+	vec2 uv = (-1.0 + 2.0 * xy) * vec2(uResolution.x/uResolution.y,1.0);
 	vec3 camTar;
-	
+
 	if (xy.y < .13 || xy.y >= .87)
 	{
 		// Top and bottom cine-crop - what a waste! :)
-		gl_FragColor=vec4(vec4(0.0));
+		scrnsvrResult=vec4(vec4(0.0));
 		return;
 	}
 
@@ -322,7 +337,7 @@ void scrnsvrImportedMain(void)
 	camTar	 = CameraPath(gTime + .009);
 	cameraPos.y += Terrain(CameraPath(gTime + .009).xz).x;
 	camTar.y = cameraPos.y;
-	
+
 	float roll = .4*sin(gTime+.5);
 	vec3 cw = normalize(camTar-cameraPos);
 	vec3 cp = vec3(sin(roll), cos(roll),0.0);
@@ -359,7 +374,7 @@ void scrnsvrImportedMain(void)
 		// Get the colour using all available data...
 		col = TerrainColour(pos, dir, nor, distance, type);
 	}
-	
+
 	// bri is the brightness of sun at the centre of the camera direction.
 	// Yeah, the lens flares is not exactly subtle, but it was good fun making it.
 	float bri = dot(cw, sunLight)*.75;
@@ -382,29 +397,27 @@ void scrnsvrImportedMain(void)
 		col += bri * vec3(1.0, 1.0, 0.2) * pow(glare2, 2.0)*2.5;
 		col += bri * sunColour * pow(glare3, 2.0)*3.0;
 	}
-	col = PostEffects(col, xy);	
-	
-	#ifdef STEREO	
-	col *= vec3( isCyan, 1.0-isCyan, 1.0-isCyan );	
+	col = PostEffects(col, xy);
+
+	#ifdef STEREO
+	col *= vec3( isCyan, 1.0-isCyan, 1.0-isCyan );
 	#endif
-	
-	gl_FragColor=vec4(col,1.0);
+
+	scrnsvrResult=vec4(col,1.0);
 }
 
-//--------------------------------------------------------------------------
-
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

@@ -1,8 +1,8 @@
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
-varying vec2 vUv;
 uniform float speed;
 uniform int stemCount;
 uniform float curvature;
@@ -13,25 +13,39 @@ uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.3;
+const int stemCount = 12;
+const float curvature = 0.65;
+const float pulseRate = 0.8;
+const float growth = 0.7;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const vec3 color1 = vec3(0.368627, 0.905882, 0.666667);
+const vec3 color2 = vec3(0.352941, 0.607843, 0.862745);
+const vec3 background = vec3(0.027451, 0.070588, 0.105882);
+#endif
 
 // Square explicitly: pow() is undefined for negative bases in GLSL.
 float square(float x) { return x * x; }
 
 // Match the collection's exposure and color controls; keep black at zero brightness.
-void finish(vec3 color) {
+vec4 finish(vec3 color) {
     color = 1.0 - exp(-max(color, vec3(0.0)) * brightness);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    gl_FragColor = vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
+    return vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
 }
 
-void main() {
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float aspect = uResolution.x / uResolution.y;
-    vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y);
+    vec2 p = vec2(((fragCoord / uResolution).x - 0.5) * aspect, (fragCoord / uResolution).y);
     float t = uTime * speed;
     float aa = 1.5 / uResolution.y;
-    vec3 color = background * (0.6 + 0.4 * vUv.y);
+    vec3 color = background * (0.6 + 0.4 * (fragCoord / uResolution).y);
     for (int i = 0; i < 20; i++) {
         if (i >= stemCount) continue;
         float fi = float(i);
@@ -66,5 +80,5 @@ void main() {
         vec2 tip = p - vec2(tipX, height);
         color += tint * exp(-dot(tip, tip) / 0.00012) * 0.9;
     }
-    finish(color);
+    fragColor = finish(color);
 }

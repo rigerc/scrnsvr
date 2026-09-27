@@ -1,6 +1,7 @@
 // Ported from AVS/matrix.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -15,11 +16,22 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
-#define iMouse (vec4(0.0))
-#define iTimeDelta (1.0 / 60.0)
-#define iFrame int(floor(uTime * 60.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float glyphFill = 0.9;
+const float glyphStroke = 1.0;
+const float glyphGlow = 1.0;
+const float rainSpeed = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.207843, 0.811765, 0.501961);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -49,9 +61,7 @@ const int BLOCK_GAP = 2;    //in cells
 const float WALK_SPEED = 0.4 * XYCELL_SIZE;
 const float BLOCKS_BEFORE_TURN = 3.;
 
-
 const float PI = 3.14159265359;
-
 
 //        ----  random  ----
 
@@ -86,7 +96,6 @@ vec4 hash4(vec3 v)
                       dot(v, vec3(271.9, 269.5, 311.7)));
     return fract(sin(p)*43758.5453123);
 }
-
 
 //        ----  symbols  ----
 //  Slightly modified version of "runes" by FabriceNeyret2 -  https://www.shadertoy.com/view/4ltyDM
@@ -125,7 +134,6 @@ float random_char(vec2 outer, vec2 inner, float highlight) {
     vec2 seed = vec2(dot(outer, vec2(269.5, 183.3)), dot(outer, vec2(113.5, 271.9)));
     return rune(inner, seed, highlight);
 }
-
 
 //        ----  digital rain  ----
 
@@ -234,7 +242,6 @@ vec3 rain(vec3 ro3, vec3 rd3, float time) {
     return result.xyz * result.a;
 }
 
-
 //        ----  main, camera  ----
 
 vec2 rotate(vec2 v, float a) {
@@ -266,7 +273,7 @@ float smoothstep1(float x) {
     return smoothstep(0., 1., x);
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void effectImage( out vec4 fragColor, in vec2 fragCoord )
 {
     if (STRIP_CHAR_WIDTH > XYCELL_SIZE || STRIP_CHAR_HEIGHT * STRIP_CHARS_MAX > ZCELL_SIZE) {
         // error
@@ -274,9 +281,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         return;
     }
 
-	vec2 uv = (fragCoord.xy * 2. - iResolution.xy) / iResolution.y;
+	vec2 uv = (fragCoord.xy * 2. - uResolution) / uResolution.y;
 
-    float time = iTime * SPEED;
+    float time = uTime * speed * SPEED;
 
     const float turn_rad = 0.25 / BLOCKS_BEFORE_TURN;   //0 .. 0.5
     const float turn_abs_time = (PI/2.*turn_rad) * 1.5;  //multiplier different than 1 means a slow down on turns
@@ -385,8 +392,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         angle += fifth_turn_drift_angle * (1.5*min(1., (1.-t1)/turn_time) - 0.5*smoothstep1(1. - min(1.,t1/(1.-turn_time))));
     }
 
-    if (iMouse.x > 10. || iMouse.y > 10.) {
-        vec2 mouse = iMouse.xy / iResolution.xy * 2. - 1.;
+    if (vec4(0.0).x > 10. || vec4(0.0).y > 10.) {
+        vec2 mouse = vec4(0.0).xy / uResolution * 2. - 1.;
         up_down = -0.7 * mouse.y;
         angle += mouse.x;
         rotate_on_turns = 1.;
@@ -426,24 +433,25 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     fragColor = vec4(col, 1.);
 }
-void scrnsvrImportedMain() {
+
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     vec4 fragColor = vec4(0.0);
-    mainImage(fragColor, gl_FragCoord.xy);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, scrnsvrCoord);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

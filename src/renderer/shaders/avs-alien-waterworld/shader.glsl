@@ -1,6 +1,7 @@
 // Ported from AVS/alienwater.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -11,9 +12,18 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
-#define iMouse (vec4(0.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -22,8 +32,6 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 
 // License CC0: Alien Waterworld
 
-
-
 #define PI  3.141592654
 #define TAU (2.0*PI)
 
@@ -31,7 +39,7 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 #define MAX_ITER        55
 #define MAX_DISTANCE    31.0
 #define PERIOD          45.0
-#define TIME            mod(iTime, PERIOD)
+#define TIME            mod(uTime * speed, PERIOD)
 
 const vec3  skyCol1       = vec3(0.35, 0.45, 0.6);
 const vec3  skyCol2       = skyCol1*skyCol1*skyCol1*3.0;
@@ -94,7 +102,6 @@ vec2 raySphere(vec3 ro, vec3 rd, vec4 sphere)
 float hash(in vec2 co) {
   return fract(sin(dot(co.xy ,vec2(12.9898,58.233))) * 13758.5453);
 }
-
 
 float noise2(vec2 x) {
   vec2 i = floor(x);
@@ -281,7 +288,6 @@ vec3 skyColor(vec3 ro, vec3 rd) {
   vec3 sunCol = 0.5*sunCol1*pow(sunDot, 20.0) + 8.0*sunCol2*pow(sunDot, 2000.0);
   vec3 smallSunCol = 0.5*smallSunCol1*pow(smallSunDot, 200.0) + 8.0*smallSunCol2*pow(smallSunDot, 20000.0);
 
-
   vec2 si = raySphere(ro, rd, planet);
   float pi = rayPlane(ro, rd, rings);
 
@@ -289,7 +295,6 @@ vec3 skyColor(vec3 ro, vec3 rd) {
 
   vec3 skyCol = mix(skyCol1, skyCol2, sqrt(dustTransparency));
   skyCol *= (1.0-dustTransparency);
-
 
   vec3 planetSurface = ro + si.x*rd;
   vec3 planetNormal = normalize(planetSurface - planet.xyz);
@@ -392,7 +397,6 @@ vec3 getColor(vec3 ro, vec3 rd) {
 
     col = seaCol;
 
-
     const float level = 0.00;
     const float level2 = 0.3;
     vec3 scol = sunCol1*(smoothstep(level, level2, hih) - smoothstep(level, level2, loh2));
@@ -439,10 +443,10 @@ vec3 getSample1(vec2 p, float time) {
 
 }
 
-void mainImage(out vec4 fragColor, vec2 fragCoord) {
-  vec2 q = fragCoord.xy/iResolution.xy;
+void effectImage(out vec4 fragColor, vec2 fragCoord) {
+  vec2 q = fragCoord.xy/uResolution;
   vec2 p = -1.0 + 2.0*q;
-  p.x *= iResolution.x/iResolution.y;
+  p.x *= uResolution.x/uResolution.y;
 
   vec3 col = getSample1(p, TIME);
 
@@ -454,30 +458,30 @@ void mainImage(out vec4 fragColor, vec2 fragCoord) {
   fragColor = vec4(col, 1.0);
 }
 
-void scrnsvrImportedMain() {
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
   // Scanline skip: every other column black, saves 50% GPU
-  vec2 fc = gl_FragCoord.xy;
+  vec2 fc = scrnsvrCoord;
   if (mod(floor(fc.x), 2.0) < 1.0) {
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    scrnsvrResult = vec4(0.0, 0.0, 0.0, 1.0);
     return;
   }
   vec4 c;
-  mainImage(c, fc);
-  gl_FragColor = c;
+  effectImage(c, fc);
+  scrnsvrResult = c;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

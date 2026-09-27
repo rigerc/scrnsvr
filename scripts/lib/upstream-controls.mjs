@@ -64,10 +64,6 @@ export function importedControls(item) {
   ];
 }
 
-export function controlDeclarations(item) {
-  return importedControls(item).map(def => `uniform ${def.type === 'color' ? 'vec3' : def.type === 'select' ? 'int' : def.type} ${def.name};`).join('\n') + '\n';
-}
-
 // Apply to the repaired upstream body only, never to an already wrapped module.
 export function applyEffectControls(body, item) {
   if (clockIds.includes(item.id)) {

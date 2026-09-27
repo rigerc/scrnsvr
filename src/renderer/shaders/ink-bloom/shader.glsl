@@ -1,12 +1,12 @@
 precision highp float;
+
+#ifdef SCRNSVR
+uniform float uTime;
+uniform vec2 uResolution;
 uniform float spread;
 uniform float edgeSoftness;
 uniform float paperFidelity;
 uniform int compositionSeed;
-
-uniform float uTime;
-uniform vec2 uResolution;
-varying vec2 vUv;
 uniform float speed;
 uniform float scale;
 uniform float curl;
@@ -17,6 +17,24 @@ uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float spread = 1.0;
+const float edgeSoftness = 1.0;
+const float paperFidelity = 0.0;
+const int compositionSeed = 0;
+const float speed = 0.3;
+const float scale = 2.0;
+const float curl = 0.85;
+const float density = 0.65;
+const float feather = 0.6;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const vec3 color1 = vec3(0.098039, 0.145098, 0.274510);
+const vec3 color2 = vec3(0.603922, 0.321569, 0.435294);
+const vec3 background = vec3(0.913725, 0.882353, 0.815686);
+#endif
 
 // 2D simplex noise from LYGIA, Stefan Gustavson and Ian McEwan.
 // Copyright 2021-2023. MIT license; see THIRD_PARTY_SHADERS.md.
@@ -72,18 +90,17 @@ float snoise(in vec2 v) {
     return 130.0 * dot(m, g);
 }
 
-
 // Match the collection's exposure and color controls; keep black at zero brightness.
-void finish(vec3 color) {
+vec4 finish(vec3 color) {
     color = mix(1.0 - exp(-max(color, vec3(0.0)) * brightness), clamp(color * brightness, 0.0, 1.0), paperFidelity);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    gl_FragColor = vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
+    return vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
 }
 
-void main() {
-    vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * scale;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 p = ((fragCoord / uResolution) - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * scale;
     float t = uTime * speed;
     p += vec2(float(compositionSeed) * 0.731, float(compositionSeed) * 0.419);
     vec2 drift = vec2(t * 0.035, -t * 0.055);
@@ -96,5 +113,5 @@ void main() {
     float veins = 0.5 + 0.5 * sin(cloud * 14.0 + detail * 3.0);
     vec3 ink = mix(color1, color2, smoothstep(-0.6, 0.7, warp.y + detail * 0.3));
     vec3 color = mix(background, ink * (0.7 + 0.3 * veins), pigment * 0.94);
-    finish(color);
+    fragColor = finish(color);
 }

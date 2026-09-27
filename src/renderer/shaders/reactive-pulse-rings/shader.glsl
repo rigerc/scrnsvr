@@ -1,25 +1,43 @@
 precision highp float;
+
+#ifdef SCRNSVR
+uniform float uTime;
+uniform vec2 uResolution;
+uniform vec4 uAudio;
+uniform float speed;
+uniform float sensitivity;
 uniform float audioLight;
 uniform float audioShape;
 uniform float shapeDetail;
-uniform float uTime;
-uniform float speed;
-uniform float sensitivity;
 uniform float scale;
 uniform float brightness;
-uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
-uniform vec2 uResolution;
-uniform vec4 uAudio;
+uniform float saturation;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const vec4 uAudio = vec4(0.0);
+const float speed = 0.4;
+const float sensitivity = 1.0;
+const float audioLight = 1.0;
+const float audioShape = 1.0;
+const float shapeDetail = 1.0;
+const float scale = 1.0;
+const float brightness = 1.0;
+const vec3 color1 = vec3(0.905882, 0.788235, 0.627451);
+const vec3 color2 = vec3(0.439216, 0.533333, 0.623529);
+const vec3 background = vec3(0.062745, 0.078431, 0.109804);
+const float saturation = 1.0;
+#endif
 
 float pool(vec2 p, vec2 center, vec2 stretch) {
   vec2 q = (p - center) / stretch;
   return exp(-dot(q, q) * 2.0);
 }
 
-void main() {
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   // Use the short edge so the composition remains visible in portrait layouts.
   vec2 p = (2.0 * gl_FragCoord.xy - uResolution.xy) / min(uResolution.x, uResolution.y) * scale;
   float t = uTime * speed * 0.12;
@@ -40,5 +58,5 @@ void main() {
   float grain = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
   color += grain / 255.0;
   color = mix(vec3(dot(color, vec3(0.299, 0.587, 0.114))), color, saturation);
-  gl_FragColor = vec4(clamp(color * brightness, 0.0, 1.0), 1.0);
+  fragColor = vec4(clamp(color * brightness, 0.0, 1.0), 1.0);
 }

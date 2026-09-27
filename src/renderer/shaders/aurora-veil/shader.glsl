@@ -1,24 +1,41 @@
 precision highp float;
 
-uniform int curtains;
-uniform float verticalPosition;
-uniform float amplitude;
-uniform float foldDetail;
-uniform vec3 background;
-uniform vec3 backgroundTop;
-uniform float saturation;
-
+#ifdef SCRNSVR
 uniform float uTime;
+uniform vec2 uResolution;
 uniform float speed;
 uniform float waves;
 uniform float spread;
 uniform float brightness;
 uniform vec3 color1;
 uniform vec3 color2;
-varying vec2 vUv;
+uniform float saturation;
+uniform int curtains;
+uniform float verticalPosition;
+uniform float amplitude;
+uniform float foldDetail;
+uniform vec3 background;
+uniform vec3 backgroundTop;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.3;
+const float waves = 1.5;
+const float spread = 0.45;
+const float brightness = 1.0;
+const vec3 color1 = vec3(0.219608, 0.909804, 0.729412);
+const vec3 color2 = vec3(0.572549, 0.439216, 1.000000);
+const float saturation = 1.0;
+const int curtains = 3;
+const float verticalPosition = 0.0;
+const float amplitude = 1.0;
+const float foldDetail = 1.0;
+const vec3 background = vec3(0.007843, 0.015686, 0.050980);
+const vec3 backgroundTop = vec3(0.035294, 0.054902, 0.129412);
+#endif
 
-void main() {
-  vec2 p = vUv;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 p = (fragCoord / uResolution);
   float t = uTime * speed;
   vec3 color = mix(background, backgroundTop, p.y);
   for (int i = 0; i < 5; i++) {
@@ -37,7 +54,7 @@ void main() {
     color += tint * curtain * folds * 0.5 * brightness;
   }
   float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-  gl_FragColor = vec4(clamp(color + (dither - 0.5) / 255.0, 0.0, 1.0), 1.0);
-  float luminance = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor.rgb = mix(vec3(luminance), gl_FragColor.rgb, saturation);
+  fragColor = vec4(clamp(color + (dither - 0.5) / 255.0, 0.0, 1.0), 1.0);
+  float luminance = dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  fragColor.rgb = mix(vec3(luminance), fragColor.rgb, saturation);
 }

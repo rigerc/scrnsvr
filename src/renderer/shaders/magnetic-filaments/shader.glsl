@@ -1,8 +1,8 @@
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
-varying vec2 vUv;
 uniform float speed;
 uniform int poleCount;
 uniform float poleSpacing;
@@ -13,18 +13,32 @@ uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.3;
+const int poleCount = 4;
+const float poleSpacing = 0.32;
+const float lineDensity = 16.0;
+const float curvature = 0.65;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const vec3 color1 = vec3(0.407843, 0.827451, 0.839216);
+const vec3 color2 = vec3(0.725490, 0.572549, 0.956863);
+const vec3 background = vec3(0.035294, 0.058824, 0.125490);
+#endif
 
 // Match the collection's exposure and color controls; keep black at zero brightness.
-void finish(vec3 color) {
+vec4 finish(vec3 color) {
     color = 1.0 - exp(-max(color, vec3(0.0)) * brightness);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    gl_FragColor = vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
+    return vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
 }
 
-void main() {
-    vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 p = ((fragCoord / uResolution) - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     float t = uTime * speed;
     float field = 0.0;
     vec2 gradient = vec2(0.0);
@@ -53,5 +67,5 @@ void main() {
     float pulse = 0.65 + 0.35 * sin(field * 3.0 - t * 0.8);
     vec3 tint = mix(color1, color2, 0.5 + 0.5 * sin(field * 2.0 + t * 0.15));
     vec3 color = background + tint * line * pulse + mix(color1, color2, 0.5) * cores * 0.9;
-    finish(color);
+    fragColor = finish(color);
 }

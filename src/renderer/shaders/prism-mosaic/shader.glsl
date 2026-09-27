@@ -1,8 +1,8 @@
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
-varying vec2 vUv;
 uniform float speed;
 uniform float cellScale;
 uniform float edgeGlow;
@@ -13,18 +13,32 @@ uniform float saturation;
 uniform vec3 color1;
 uniform vec3 color2;
 uniform vec3 background;
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 0.3;
+const float cellScale = 5.0;
+const float edgeGlow = 0.65;
+const float distortion = 0.6;
+const float bevel = 0.12;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const vec3 color1 = vec3(0.447059, 0.831373, 0.823529);
+const vec3 color2 = vec3(0.741176, 0.505882, 0.835294);
+const vec3 background = vec3(0.062745, 0.105882, 0.180392);
+#endif
 
 // Match the collection's exposure and color controls; keep black at zero brightness.
-void finish(vec3 color) {
+vec4 finish(vec3 color) {
     color = 1.0 - exp(-max(color, vec3(0.0)) * brightness);
     float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     color = clamp(color + (dither - 0.5) / 255.0 * min(brightness, 1.0), 0.0, 1.0);
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    gl_FragColor = vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
+    return vec4(clamp(mix(vec3(luminance), color, saturation), 0.0, 1.0), 1.0);
 }
 
-void main() {
-    vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * cellScale;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 p = ((fragCoord / uResolution) - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * cellScale;
     float t = uTime * speed;
     vec2 cell = floor(p);
     vec2 q = fract(p);
@@ -58,5 +72,5 @@ void main() {
     vec3 tint = mix(color1, color2, palette);
     float facet = 0.65 + 0.22 * sin(nearest.x * 3.0 + nearest.y * 2.0 + t * 0.3);
     vec3 color = mix(background, tint * facet, 0.72) + tint * rim * edgeGlow * 0.55 + glint * edgeGlow * 0.23;
-    finish(color);
+    fragColor = finish(color);
 }

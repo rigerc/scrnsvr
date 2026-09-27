@@ -1,5 +1,6 @@
 import { Color, Mesh, Program, Renderer, Triangle } from 'ogl';
 import type { ShaderManifest, UniformManifest } from '../../shared/manifest';
+import { compiledFragmentSource } from '../../shared/shader-source';
 import { bindUniforms } from './uniforms';
 import { startLoop } from './loop';
 import { silentAudio } from '../../shared/audio';
@@ -56,7 +57,7 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   }
   const program = new Program(gl, {
     vertex: 'attribute vec2 uv; attribute vec2 position; varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,0.,1.);}',
-    fragment: shader.source,
+    fragment: compiledFragmentSource(shader.source),
     uniforms,
     depthTest: false,
     depthWrite: false,

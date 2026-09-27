@@ -13,6 +13,13 @@ function compileStage(gl, type, source, label, assert) {
   return shader;
 }
 
+/** Compile canonical mainImage shaders exactly as the app's runtime does.
+ * Must match src/shared/shader-source.ts builtinFragmentSource; a parity test enforces it. */
+function wrapBuiltinSource(source) {
+  if (!/\bvoid\s+mainImage\s*\(/.test(source) || /\bvoid\s+main\s*\(/.test(source)) return source;
+  return '#define SCRNSVR 1\n' + source.trimEnd() + '\nvoid main() {\n  vec4 color = vec4(0.0);\n  mainImage(color, gl_FragCoord.xy);\n  gl_FragColor = vec4(color.rgb, 1.0);\n}\n';
+}
+
 function applyUniform(gl, location, definition, value) {
   if (definition.type === 'color') {
     const n = parseInt(value.slice(1), 16);
@@ -35,7 +42,7 @@ function createGlHarness(canvas, contextType) {
   const createProgram = definition => {
     const program = gl.createProgram();
     gl.attachShader(program, vertex);
-    const fragment = compileStage(gl, gl.FRAGMENT_SHADER, definition.source, definition.manifest.id, assert);
+    const fragment = compileStage(gl, gl.FRAGMENT_SHADER, wrapBuiltinSource(definition.source), definition.manifest.id, assert);
     gl.attachShader(program, fragment);
     gl.linkProgram(program);
     gl.deleteShader(fragment);
@@ -316,7 +323,7 @@ async function uiChecks(registry) {
 }
 
 const browserFunctions = {
-  compileStage, applyUniform, createGlHarness,
+  compileStage, wrapBuiltinSource, applyUniform, createGlHarness,
   assertAnimation, assertReactiveAudio, assertGrayscale, assertWaveformSpeckles,
   assertUniformEffects, assertBaseline, measureRender, renderChecks, uiChecks,
 };
@@ -326,4 +333,4 @@ function browserPrelude() {
   return Object.entries(browserFunctions).map(([name, fn]) => `const ${name} = ${fn.toString()};`).join('\n');
 }
 
-module.exports = { browserPrelude, renderChecks };
+module.exports = { browserPrelude, renderChecks, wrapBuiltinSource };

@@ -1,6 +1,7 @@
 // Ported from AVS/seascape.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -13,8 +14,20 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float waveHeight = 1.0;
+const float waveDensity = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -22,7 +35,6 @@ vec3 scrnsvrTanh(vec3 value) { return vec3(scrnsvrTanh(value.x), scrnsvrTanh(val
 vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(value.y), scrnsvrTanh(value.z), scrnsvrTanh(value.w)); }
 
 // Standalone GLSL for use with shader.cpp host
-
 
 // Procedural value-noise replacement for iChannel0 lookups.
 float hash2( vec2 p ) {
@@ -55,7 +67,6 @@ float sdTorus( vec3 p, vec2 t )
   return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
 
-
 float smin( float a, float b, float k )
 {
     float h = clamp( 0.5 + 0.5*(b-a)/k, 0.0, 1.0 );
@@ -84,7 +95,6 @@ float map( in vec3 pos )
     r1.y = pos.y-0.1 - 0.7*h;
     float d2 = sdTorus( r1.xzy, vec2(1.0,0.05) );
 
-
     return smin( d1, d2, 1.0 );
 }
 
@@ -109,7 +119,6 @@ float mapH( in vec3 pos )
     vec3 r1 = mod(2.3+pos+5.0,10.0)-5.0;
     r1.y = pos.y-0.1 - 0.7*h;
     float d2 = sdTorus( r1.xzy, vec2(1.0,0.05) );
-
 
     return smin( d1, d2, 1.0 );
 }
@@ -140,13 +149,12 @@ float softShadows( in vec3 ro, in vec3 rd )
     return res;
 }
 
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void effectImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    vec2 p = fragCoord.xy / iResolution.xy;
-    vec2 q = (-iResolution.xy + 2.0* fragCoord.xy) / iResolution.y;
+    vec2 p = fragCoord.xy / uResolution;
+    vec2 q = (-uResolution + 2.0* fragCoord.xy) / uResolution.y;
 
-    float ani = iTime*0.5;
+    float ani = uTime * speed*0.5;
 
     // ray
     vec3 ro = vec3( 0.0, 2.5, -ani*0.5 );
@@ -210,30 +218,30 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     fragColor = vec4( col, 1.0 );
 }
 
-void scrnsvrImportedMain() {
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     // Vertical scanline skip: every other column black, saves 50% GPU
-    vec2 fc = gl_FragCoord.xy;
+    vec2 fc = scrnsvrCoord;
     if (mod(floor(fc.x), 2.0) < 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        scrnsvrResult = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     vec4 fragColor;
-    mainImage(fragColor, fc);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, fc);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

@@ -1,6 +1,7 @@
 // Ported from AVS/stardust.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -11,8 +12,18 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -23,7 +34,6 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 // Created by Dmitry Andreev - and'2014
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // Standalone GLSL for use with shader.cpp host
-
 
 #define SPEED           (1.7)
 #define WARMUP_TIME     (2.0)
@@ -44,7 +54,7 @@ float isectPlane(vec3 n, float d, vec3 org, vec3 dir)
 
 float drawLogo(in vec2 fragCoord)
 {
-    float res = max(iResolution.x, iResolution.y);
+    float res = max(uResolution.x, uResolution.y);
     vec2  pos = vec2(floor((fragCoord.xy / res) * 128.0));
 
     float val = 0.0;
@@ -68,7 +78,7 @@ vec3 drawEffect(vec2 coord, float time)
 
     float mtime = SOUND_OFFSET + time * 2.0 / SPEED;
     mtime = mod(mtime, 64.0);  // loop the 64-second timeline
-    vec2 uv = coord.xy / iResolution.xy;
+    vec2 uv = coord.xy / uResolution;
 
     vec3 org = vec3(0.0);
     vec3 dir = vec3(uv.xy * 2.0 - 1.0, 1.0);
@@ -204,9 +214,9 @@ vec3 drawEffect(vec2 coord, float time)
     return clr;
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void effectImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    float time = max(0.0, iTime - WARMUP_TIME);
+    float time = max(0.0, uTime * speed - WARMUP_TIME);
     vec3  clr = vec3(0.0);
 
     clr = drawEffect(fragCoord.xy, time);
@@ -214,24 +224,24 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     fragColor = vec4(clr, 0.0);
 }
 
-void scrnsvrImportedMain() {
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     vec4 fragColor;
-    mainImage(fragColor, gl_FragCoord.xy);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, scrnsvrCoord);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

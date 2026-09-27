@@ -1,6 +1,7 @@
 // Ported from AVS/sea.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float speed;
@@ -14,10 +15,21 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
-#define iTimeDelta (1.0 / 60.0)
-#define iFrame int(floor(uTime * 60.0))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float waveHeight = 1.0;
+const float waveDensity = 1.0;
+const float waveChop = 1.0;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.203922, 0.490196, 0.603922);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -33,7 +45,7 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 const int NUM_STEPS = 32;
 const float PI	 	= 3.141592;
 const float EPSILON	= 1e-3;
-#define EPSILON_NRM (0.1 / iResolution.x)
+#define EPSILON_NRM (0.1 / uResolution.x)
 //#define AA
 
 // sea
@@ -45,7 +57,7 @@ const float SEA_SPEED = 0.8;
 const float SEA_FREQ = 0.16;
 const vec3 SEA_BASE = vec3(0.0,0.09,0.18);
 const vec3 SEA_WATER_COLOR = vec3(0.8,0.9,0.6)*0.6;
-#define SEA_TIME (1.0 + iTime * SEA_SPEED)
+#define SEA_TIME (1.0 + uTime * speed * SEA_SPEED)
 const mat2 octave_m = mat2(1.6,1.2,-1.2,1.6);
 
 // math
@@ -60,16 +72,16 @@ mat3 fromEuler(vec3 ang) {
 	return m;
 }
 float hash( vec2 p ) {
-	float h = dot(p,vec2(127.1,311.7));	
+	float h = dot(p,vec2(127.1,311.7));
     return fract(sin(h)*43758.5453123);
 }
 float noise( in vec2 p ) {
     vec2 i = floor( p );
-    vec2 f = fract( p );	
+    vec2 f = fract( p );
 	vec2 u = f*f*(3.0-2.0*f);
-    return -1.0+2.0*mix( mix( hash( i + vec2(0.0,0.0) ), 
+    return -1.0+2.0*mix( mix( hash( i + vec2(0.0,0.0) ),
                      hash( i + vec2(1.0,0.0) ), u.x),
-                mix( hash( i + vec2(0.0,1.0) ), 
+                mix( hash( i + vec2(0.0,1.0) ),
                      hash( i + vec2(1.0,1.0) ), u.x), u.y);
 }
 
@@ -77,7 +89,7 @@ float noise( in vec2 p ) {
 float diffuse(vec3 n,vec3 l,float p) {
     return pow(dot(n,l) * 0.4 + 0.6,p);
 }
-float specular(vec3 n,vec3 l,vec3 e,float s) {    
+float specular(vec3 n,vec3 l,vec3 e,float s) {
     float nrm = (s + 8.0) / (PI * 8.0);
     return pow(max(dot(reflect(e,n),l),0.0),s) * nrm;
 }
@@ -90,9 +102,9 @@ vec3 getSkyColor(vec3 e) {
 
 // sea
 float sea_octave(vec2 uv, float choppy) {
-    uv += noise(uv);        
+    uv += noise(uv);
     vec2 wv = 1.0-abs(sin(uv));
-    vec2 swv = abs(cos(uv));    
+    vec2 swv = abs(cos(uv));
     wv = mix(wv,swv,wv);
     return pow(1.0-pow(wv.x * wv.y,0.65),choppy);
 }
@@ -102,12 +114,12 @@ float map(vec3 p) {
     float amp = SEA_HEIGHT * waveHeight;
     float choppy = SEA_CHOPPY * waveChop;
     vec2 uv = p.xz; uv.x *= 0.75;
-    
-    float d, h = 0.0;    
-    for(int i = 0; i < ITER_GEOMETRY; i++) {        
+
+    float d, h = 0.0;
+    for(int i = 0; i < ITER_GEOMETRY; i++) {
     	d = sea_octave((uv+SEA_TIME)*freq,choppy);
     	d += sea_octave((uv-SEA_TIME)*freq,choppy);
-        h += d * amp;        
+        h += d * amp;
     	uv *= octave_m; freq *= 1.9; amp *= 0.22;
         choppy = mix(choppy,1.0,0.2);
     }
@@ -119,88 +131,88 @@ float map_detailed(vec3 p) {
     float amp = SEA_HEIGHT * waveHeight;
     float choppy = SEA_CHOPPY * waveChop;
     vec2 uv = p.xz; uv.x *= 0.75;
-    
-    float d, h = 0.0;    
-    for(int i = 0; i < ITER_FRAGMENT; i++) {        
+
+    float d, h = 0.0;
+    for(int i = 0; i < ITER_FRAGMENT; i++) {
     	d = sea_octave((uv+SEA_TIME)*freq,choppy);
     	d += sea_octave((uv-SEA_TIME)*freq,choppy);
-        h += d * amp;        
+        h += d * amp;
     	uv *= octave_m; freq *= 1.9; amp *= 0.22;
         choppy = mix(choppy,1.0,0.2);
     }
     return p.y - h;
 }
 
-vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {  
+vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
     float fresnel = clamp(1.0 - dot(n, -eye), 0.0, 1.0);
     fresnel = min(fresnel * fresnel * fresnel, 0.5);
-    
-    vec3 reflected = getSkyColor(reflect(eye, n));    
-    vec3 refracted = SEA_BASE + diffuse(n, l, 80.0) * SEA_WATER_COLOR * 0.12; 
-    
+
+    vec3 reflected = getSkyColor(reflect(eye, n));
+    vec3 refracted = SEA_BASE + diffuse(n, l, 80.0) * SEA_WATER_COLOR * 0.12;
+
     vec3 color = mix(refracted, reflected, fresnel);
-    
+
     float atten = max(1.0 - dot(dist, dist) * 0.001, 0.0);
     color += SEA_WATER_COLOR * (p.y - SEA_HEIGHT * waveHeight) * 0.18 * atten;
-    
+
     color += specular(n, l, eye, 600.0 * inversesqrt(dot(dist,dist)));
-    
+
     return color;
 }
 
 // tracing
 vec3 getNormal(vec3 p, float eps) {
     vec3 n;
-    n.y = map_detailed(p);    
+    n.y = map_detailed(p);
     n.x = map_detailed(vec3(p.x+eps,p.y,p.z)) - n.y;
     n.z = map_detailed(vec3(p.x,p.y,p.z+eps)) - n.y;
     n.y = eps;
     return normalize(n);
 }
 
-float heightMapTracing(vec3 ori, vec3 dir, out vec3 p) {  
+float heightMapTracing(vec3 ori, vec3 dir, out vec3 p) {
     float tm = 0.0;
-    float tx = 1000.0;    
+    float tx = 1000.0;
     float hx = map(ori + dir * tx);
     if(hx > 0.0) {
         p = ori + dir * tx;
-        return tx;   
+        return tx;
     }
-    float hm = map(ori);    
+    float hm = map(ori);
     for(int i = 0; i < NUM_STEPS; i++) {
         float tmid = mix(tm, tx, hm / (hm - hx));
         p = ori + dir * tmid;
-        float hmid = map(p);        
+        float hmid = map(p);
         if(hmid < 0.0) {
             tx = tmid;
             hx = hmid;
         } else {
             tm = tmid;
             hm = hmid;
-        }        
+        }
         if(abs(hmid) < EPSILON) break;
     }
     return mix(tm, tx, hm / (hm - hx));
 }
 
-vec3 getPixel(in vec2 coord, float time) {    
-    vec2 uv = coord / iResolution.xy;
+vec3 getPixel(in vec2 coord, float time) {
+    vec2 uv = coord / uResolution;
     uv = uv * 2.0 - 1.0;
-    uv.x *= iResolution.x / iResolution.y;    
-        
+    uv.x *= uResolution.x / uResolution.y;
+
     // ray
-    vec3 ang = vec3(sin(time*0.5)*0.03,sin(time*0.3)*0.04+0.1,time*0.05);    
+    vec3 ang = vec3(sin(time*0.5)*0.03,sin(time*0.3)*0.04+0.1,time*0.05);
     vec3 ori = vec3(time*0.1,3.5,0.0);
     vec3 dir = normalize(vec3(uv.xy,-2.0));
     dir = normalize(dir) * fromEuler(ang);
-    
+
     // tracing
     vec3 p;
     heightMapTracing(ori,dir,p);
     vec3 dist = p - ori;
     vec3 n = getNormal(p, dot(dist,dist) * EPSILON_NRM);
-    vec3 light = normalize(vec3(0.0,1.0,0.8)); 
-             
+    vec3 light = normalize(vec3(0.0,1.0,0.8));
+
     // color
     return mix(
         getSkyColor(dir),
@@ -209,9 +221,10 @@ vec3 getPixel(in vec2 coord, float time) {
 }
 
 // main
-void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
-    float time = iTime * 0.3;
-	
+
+void effectImage( out vec4 fragColor, in vec2 fragCoord ) {
+    float time = uTime * speed * 0.3;
+
 #ifdef AA
     vec3 color = vec3(0.0);
     for(int i = -1; i <= 1; i++) {
@@ -224,28 +237,29 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 #else
     vec3 color = getPixel(fragCoord, time);
 #endif
-    
+
     // post
 	fragColor = vec4(pow(color,vec3(0.65)), 1.0);
 }
-void scrnsvrImportedMain() {
+
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     vec4 fragColor = vec4(0.0);
-    mainImage(fragColor, gl_FragCoord.xy);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, scrnsvrCoord);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }

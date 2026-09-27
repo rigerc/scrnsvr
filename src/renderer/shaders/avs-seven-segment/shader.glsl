@@ -1,8 +1,10 @@
 // Ported from AVS/7seg.glsl; original notices are preserved below.
 precision highp float;
 
+#ifdef SCRNSVR
 uniform float uTime;
 uniform vec2 uResolution;
+uniform vec4 uDate;
 uniform float speed;
 uniform float contrast;
 uniform float brightness;
@@ -15,10 +17,23 @@ uniform int palette;
 uniform vec3 shadowColor;
 uniform vec3 midtoneColor;
 uniform vec3 highlightColor;
-#define iTime (uTime * speed)
-#define iResolution (vec3(uResolution, 1.0))
-uniform vec4 uDate;
-#define iDate (vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)))
+#else
+#define uTime iTime
+#define uResolution iResolution.xy
+const vec4 uDate = vec4(2026.0, 9.0, 10.0, 46800.0);
+const float speed = 1.0;
+const float contrast = 1.0;
+const float brightness = 1.0;
+const float saturation = 1.0;
+const float clockSize = 1.0;
+const bool twelveHour = false;
+const bool showSeconds = true;
+const bool digitMatrix = true;
+const int palette = 0;
+const vec3 shadowColor = vec3(0.019608, 0.043137, 0.086275);
+const vec3 midtoneColor = vec3(0.207843, 0.811765, 0.501961);
+const vec3 highlightColor = vec3(0.890196, 0.968627, 1.000000);
+#endif
 
 float scrnsvrTanh(float value) { float e = exp(clamp(2.0 * value, -40.0, 40.0)); return (e - 1.0) / (e + 1.0); }
 vec2 scrnsvrTanh(vec2 value) { return vec2(scrnsvrTanh(value.x), scrnsvrTanh(value.y)); }
@@ -28,8 +43,6 @@ vec4 scrnsvrTanh(vec4 value) { return vec4(scrnsvrTanh(value.x), scrnsvrTanh(val
 // Seven-segment LED clock
 // Based on cmarangu's shader: https://www.shadertoy.com/view/3dtSRj
 // Converted to standalone GLSL for use with temiz.cpp host
-
-
 
 #define showMatrix digitMatrix
 bool showOff = false;
@@ -93,14 +106,14 @@ float dots(vec2 uv)
     return seg;
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void effectImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // Hardcoded defaults (no keyboard input available)
     bool ampm = twelveHour;       // 24-hour mode
     bool isGreen = true;     // green color
 
-    vec2 uv = (fragCoord.xy-0.5*iResolution.xy) /
-                min(iResolution.x,iResolution.y);
+    vec2 uv = (fragCoord.xy-0.5*uResolution) /
+                min(uResolution.x,uResolution.y);
 
     uv *= 15.0 / clockSize;
 
@@ -109,7 +122,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     uv.x += 3.5;
     float seg = 0.0;
 
-    float timeSecs = iDate.w;
+    float timeSecs = vec4(uDate.xyz, mod(uDate.w + uTime * speed, 86400.0)).w;
     int sec = int(mod(timeSecs, 60.0));
     int minute = int(mod(floor(timeSecs / 60.0), 60.0));
     int hour = int(floor(timeSecs / 3600.0));
@@ -165,24 +178,24 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 }
 
-void scrnsvrImportedMain() {
+void upstreamImage(out vec4 scrnsvrResult, in vec2 scrnsvrCoord) {
     vec4 fragColor;
-    mainImage(fragColor, gl_FragCoord.xy);
-    gl_FragColor = fragColor;
+    effectImage(fragColor, scrnsvrCoord);
+    scrnsvrResult = fragColor;
 }
 
-void main() {
-  scrnsvrImportedMain();
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  upstreamImage(fragColor, fragCoord);
   if (palette == 1) {
     // Soft-compress the source range so dark, middle and bright tones all
     // contribute: a bright cloudscape must still respond to the shadow tone.
-    float raw = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+    float raw = max(fragColor.r, max(fragColor.g, fragColor.b));
     float tone = max(raw, 0.0) / (1.0 + max(raw, 0.0));
     vec3 mapped = mix(shadowColor, midtoneColor, tone);
     mapped = mix(mapped, highlightColor, tone * tone);
-    gl_FragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
+    fragColor.rgb = mapped + highlightColor * max(raw - 1.0, 0.0);
   }
-  vec3 color = (gl_FragColor.rgb - 0.5) * contrast + 0.5;
+  vec3 color = (fragColor.rgb - 0.5) * contrast + 0.5;
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  gl_FragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
+  fragColor = vec4(mix(vec3(luminance), color, saturation) * brightness, 1.0);
 }
