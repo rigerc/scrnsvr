@@ -3,8 +3,7 @@
     "src/renderer/index.html",
     "src/settings/index.html",
     "scripts/capture-frames.cjs",
-    "scripts/render-thumbnails.mjs",
-    "scripts/import-upstream-shaders.mjs"
+    "scripts/render-thumbnails.mjs"
   ],
   "ignorePatterns": ["docs/refs/**"],
   "health": {

@@ -45,7 +45,7 @@ app.whenReady().then(async () => {
         return result;
       };
       const difference = (a, b) => a.reduce((sum, value, i) => sum + Math.abs(value - b[i]), 0);
-      for (const id of ['flow-field', 'avs-matrix', 'avs-seven-segment']) {
+      for (const id of ['flow-field', 'plasma']) {
         const values = { speed: 1 };
         const stop = window.testShaders.mountShader(canvas, window.testShaders.shaderRegistry[id], values, 60);
         const gl = nativeContext(contextType);
@@ -65,22 +65,40 @@ app.whenReady().then(async () => {
         values.speed = 2;
         advance(100);
         assert(Math.abs(time() - 2.2) < 0.001, id + ': speed edit reset phase');
-        assert(difference(moving, pixels(gl)) > 0 || id === 'avs-seven-segment', id + ': resume remained frozen');
+        assert(difference(moving, pixels(gl)) > 0, id + ': resume remained frozen');
         advance(60000);
         assert(Math.abs(time() - 2.2) < 0.001, id + ': suspension jumped phase');
-        if (id === 'avs-seven-segment') {
-          const dateLocation = gl.getUniformLocation(program, 'uDate');
-          const date = [...gl.getUniform(program, dateLocation)];
-          assert(date[3] === 86399, 'Clock baseline should be 23:59:59');
-          // At phase 2.2, 23:59:59 must match a 00:00:00 baseline advanced 1.2s.
-          const midnight = pixels(gl);
-          gl.uniform4f(dateLocation, date[0], date[1], date[2] + 1, 0);
-          gl.uniform1f(gl.getUniformLocation(program, 'uTime'), 1.2);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          assert(difference(midnight, pixels(gl)) === 0, 'Clock failed to wrap at midnight');
-        }
         stop();
         reports.push({ contextType, id, phase: 2.2 });
+      }
+      // A synthetic canonical-clock fixture preserves the midnight-wrap contract
+      // that the removed avs-seven-segment shader used to cover: the day rolls
+      // over while the phase keeps running, so 23:59:59 + 2.2s must render
+      // identically to 00:00:00 + 1.2s.
+      const canonicalClock = {
+        manifest: { id: 'canonical-clock', title: 'Canonical clock contract', fragment: 'clock.glsl', uniforms: [{ name: 'speed', type: 'float', default: 1 }] },
+        animationTime: 'integrated',
+        source: 'precision highp float;\nuniform float uTime;\nuniform vec4 uDate;\nvoid main(){\n  float secs = mod(uDate.w + uTime, 86400.0);\n  float tick = float(int(secs));\n  gl_FragColor = vec4(fract(tick * 0.001), fract(tick * 0.01), fract(tick * 0.1), 1.0);\n}',
+      };
+      {
+        const values = { speed: 1 };
+        const stop = window.testShaders.mountShader(canvas, canonicalClock, values, 60);
+        const gl = nativeContext(contextType);
+        const program = gl.getParameter(gl.CURRENT_PROGRAM);
+        advance(1000);
+        advance(1000);
+        advance(200);
+        assert(Math.abs(gl.getUniform(program, gl.getUniformLocation(program, 'uTime')) - 2.2) < 0.001, 'Clock fixture expected phase 2.2');
+        const dateLocation = gl.getUniformLocation(program, 'uDate');
+        const date = [...gl.getUniform(program, dateLocation)];
+        assert(date[3] === 86399, 'Clock baseline should be 23:59:59');
+        const midnight = pixels(gl);
+        gl.uniform4f(dateLocation, date[0], date[1], date[2] + 1, 0);
+        gl.uniform1f(gl.getUniformLocation(program, 'uTime'), 1.2);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        assert(difference(midnight, pixels(gl)) === 0, 'Clock failed to wrap at midnight');
+        stop();
+        reports.push({ contextType, id: 'canonical-clock', phase: 2.2 });
       }
       const custom = {
         manifest: { id: 'custom-clock', title: 'Custom contract', fragment: 'custom.glsl', uniforms: [{ name: 'speed', type: 'float', default: 1 }] },

@@ -106,22 +106,6 @@ function assertGrayscale(harness, id, definition, program) {
   for (let i = 0; i < gray.length; i += 4) assert(gray[i] === gray[i + 1] && gray[i] === gray[i + 2], id + ': saturation zero is not grayscale');
 }
 
-/** A zero march distance used to produce thousands of isolated black pixels inside white highlights. */
-function assertWaveformSpeckles(harness, id, program, definition) {
-  const { assert, render } = harness;
-  const width = 640, height = 360;
-  const pixels = render(id, program, definition, 12, {}, width, height);
-  const white = index => pixels[index] > 220 && pixels[index + 1] > 220 && pixels[index + 2] > 220;
-  let speckles = 0;
-  for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
-    const index = (y * width + x) * 4;
-    if (pixels[index] < 32 && pixels[index + 1] < 32 && pixels[index + 2] < 32
-      && white(index - 4) && white(index + 4)
-      && white(index - width * 4) && white(index + width * 4)) speckles++;
-  }
-  assert(speckles === 0, id + ': ' + speckles + ' black speckles in white highlights');
-}
-
 /** Every declared control must change the rendered result, and bounds must render. */
 function assertUniformEffects(harness, id, definition, program) {
   const { assert, render, difference } = harness;
@@ -172,7 +156,6 @@ function renderChecks(registry, baseline, contextType) {
     assertAnimation(harness, id, definition, program);
     if (definition.manifest.category === 'Reactive') assertReactiveAudio(harness, id, definition, program);
     assertGrayscale(harness, id, definition, program);
-    if (id === 'shadersaver-waveform') assertWaveformSpeckles(harness, id, program, definition);
     assertUniformEffects(harness, id, definition, program);
     const defaultDifference = assertBaseline(harness, id, baseline, definition, program);
     const renderMs = measureRender(harness, id, definition, program);
@@ -324,7 +307,7 @@ async function uiChecks(registry) {
 
 const browserFunctions = {
   compileStage, wrapBuiltinSource, applyUniform, createGlHarness,
-  assertAnimation, assertReactiveAudio, assertGrayscale, assertWaveformSpeckles,
+  assertAnimation, assertReactiveAudio, assertGrayscale,
   assertUniformEffects, assertBaseline, measureRender, renderChecks, uiChecks,
 };
 

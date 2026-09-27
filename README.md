@@ -26,8 +26,8 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 53 GLSL shaders: 25 native effects plus 18 compatible screensaver shaders ported from AVS and 10 ShaderSaver effects
-- 8–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
+- 25 GLSL shaders, from quiet ambient gradients to reactive audio effects
+- 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -78,9 +78,7 @@ Every shader supports speed, brightness, and saturation. Speed at zero freezes a
 
 Pick one of 30 well-known color schemes (Dracula, Nord, Gruvbox, Solarized, Monokai, One Dark, Tokyo Night, Night Owl, Palenight, Zenburn, Ayu, Rosé Pine, Kanagawa, GitHub, Material, Everforest, and Iceberg) under **Global settings → Color scheme**. The scheme supplies background, text, and accent colors to every shader that exposes color controls, using the same role mapping as the Noctalia import. Each shader can override the global choice or opt out with **Built-in colors** in its Colors section; adjusting an individual color afterwards keeps that change until you pick another scheme. Randomize leaves scheme colors alone. Scheme data is generated from the Ghostty/iTerm2 color-scheme YAMLs in `reference/` by `scripts/generate-palettes.mjs`.
 
-Imported shader credits, pinned upstream revisions, license notes, exclusions, and porting details are recorded in [THIRD_PARTY_SHADERS.md](THIRD_PARTY_SHADERS.md).
-
-See the [shader gallery](docs/shaders.md) for every built-in shader with its description, the [shader parameter guide](docs/shader-parameters.md) for the available adjustments, and the [shader authoring guide](docs/authoring-shaders.md) to add or modify built-in shaders. For fast look-development before touching the repo, see [Authoring shaders with the shadereye MCP](docs/authoring-shaders-with-shadereye.md).
+Every built-in shader lives in `src/renderer/shaders/<id>/` as a `manifest.ts` (id, name, category, description, controls) plus a `shader.glsl` that exports `mainImage`. Run `node scripts/generate-shader-registry.mjs` after adding one to refresh the registry in `src/renderer/shaders/generated.ts`.
 
 ## Config
 
@@ -123,6 +121,5 @@ systemctl --user enable --now scrnsvr.service
 - `src/shared/` — Zod config, clock/Noctalia helpers, IPC keys, shader manifest schema
 - `scripts/build.mjs` — esbuild bundles for main/preload/renderer/settings + static copies
 - `scripts/generate-shader-registry.mjs` — generates `src/renderer/shaders/generated.ts`
-- `scripts/import-upstream-shaders.mjs` — reproduces the AVS and ShaderSaver WebGL ports from local upstream clones
-- `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and imported shader contracts
+- `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and the shader manifest and canonical-ABI contracts
 - `packaging/` — systemd unit + deb post-install script

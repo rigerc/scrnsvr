@@ -107,15 +107,15 @@ const reactiveDefinition = {
   },
   source: 'void main(){}',
 };
-const waveformDefinition = {
-  manifest: { id: 'shadersaver-waveform', title: 'Waveform', category: 'Abstract', uniforms: [{ name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01 }] },
+const plasmaDefinition = {
+  manifest: { id: 'plasma', title: 'Chromatic Plasma', category: 'Abstract', uniforms: [{ name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01 }] },
   source: 'void main(){}',
 };
 
 const registry = {
   'test-plain': plainDefinition,
   'test-reactive': reactiveDefinition,
-  'shadersaver-waveform': waveformDefinition,
+  plasma: plasmaDefinition,
 };
 
 describe('browser shader checks', () => {
@@ -123,7 +123,7 @@ describe('browser shader checks', () => {
     const result = renderChecks(registry, { 'test-plain': plainDefinition }, 'webgl');
     expect(result.contextType).toBe('webgl');
     expect(result.checks).toBeGreaterThan(0);
-    expect(result.reports.map((report: { id: string }) => report.id)).toEqual(['test-plain', 'test-reactive', 'shadersaver-waveform']);
+    expect(result.reports.map((report: { id: string }) => report.id)).toEqual(['test-plain', 'test-reactive', 'plasma']);
     expect(result.reports.find((report: { id: string }) => report.id === 'test-plain').defaultDifference).toBe(0);
   });
 
