@@ -309,6 +309,39 @@ describe('SettingsPanel', () => {
     expect(preview.mountThumbnail).toHaveBeenCalledTimes(4);
   });
 
+  it('changes only the old and new selection in a large gallery and reuses scheme options', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const manifests = [plasma, ...Array.from({ length: 400 }, (_, i) => ({ ...ribbons, id: `shader-${i}` }))];
+    new SettingsPanel({ root, manifests, initial: structuredClone(config), preview: makePreview() });
+    const firstOption = root.querySelector('[data-shader-scheme] option');
+    const observer = new MutationObserver(() => {});
+    observer.observe(root.querySelector('.shader-categories')!, { subtree: true, attributes: true });
+    root.querySelector<HTMLButtonElement>('.shader-select[data-id="shader-399"]')!.click();
+    expect(observer.takeRecords()).toHaveLength(4);
+    expect(root.querySelectorAll('.shader-select[aria-pressed="true"]')).toHaveLength(1);
+    expect(root.querySelector('.shader-card.active')?.getAttribute('data-id')).toBe('shader-399');
+    expect(root.querySelector('[data-shader-scheme] option')).toBe(firstOption);
+    observer.disconnect();
+  });
+
+  it('updates colors without recompiling the preview and resolves offscreen thumbnail colors on entry', () => {
+    const preview = makePreview();
+    const settings = panel(preview);
+    const observer = FakeIntersectionObserver.instances[0];
+    observer.trigger(true);
+    const values = mountThumbnail.mock.calls[0][2];
+    observer.trigger(false);
+    const scheme = settings.element.querySelector<HTMLSelectElement>('[data-shader-scheme]')!;
+    scheme.value = 'none';
+    scheme.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(preview.mount).toHaveBeenCalledTimes(1);
+    observer.trigger(true);
+    expect(mountThumbnail.mock.calls[2][2]).toBe(values);
+    expect(values).not.toHaveProperty('color1');
+    expect(values.speed).toBe(2);
+  });
+
   it('loads a saved look from the shuffle list', () => {
     const preview = makePreview();
     const settings = panel(preview);

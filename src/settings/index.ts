@@ -64,6 +64,8 @@ export class SettingsPanel {
   private lastIntervalMinutes = 10;
   private pendingLookUpdate: string | undefined;
   private activateTab?: (tab: HTMLButtonElement, showPreview?: boolean) => void;
+  private readonly shaderButtons = new Map<string, HTMLButtonElement>();
+  private selectedShaderButton?: HTMLButtonElement;
 
   constructor(options: SettingsOptions) {
     this.manifests = options.manifests;
@@ -144,12 +146,18 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
         const state = thumbnailStates.get(entry.target);
         if (!state) continue;
         if (entry.isIntersecting && !state.stop) {
+          updateThumbnailValues(state);
           state.stop = this.preview
             ? (this.preview.mountThumbnail ?? this.preview.mount)(state.canvas, state.manifest, state.values)
             : this.animateFallback(state.canvas);
         } else if (!entry.isIntersecting) releaseThumbnail(state);
       }
     }, { root: this.element.querySelector('.shader-bank'), rootMargin: '100px 0px' });
+    const updateThumbnailValues = (state: { manifest: ShaderManifest; values: Record<string, Value> }) => {
+      const refreshed = effectiveShaderValues(state.manifest, this.config.shaders[state.manifest.id], this.config.colors);
+      for (const key of Object.keys(state.values)) delete state.values[key];
+      Object.assign(state.values, refreshed);
+    };
     window.addEventListener('pagehide', () => {
       thumbnailObserver.disconnect();
       thumbnailStates.forEach(releaseThumbnail);
@@ -164,6 +172,8 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       select.className = 'shader-select';
       select.dataset.id = manifest.id;
       select.setAttribute('aria-label', 'Preview ' + manifest.title);
+      select.setAttribute('aria-pressed', 'false');
+      this.shaderButtons.set(manifest.id, select);
       const canvas = document.createElement('canvas');
       canvas.width = 240;
       canvas.height = 300;
@@ -175,10 +185,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
 
       card.append(select);
       grid.append(card);
-      const stored = this.config.shaders[manifest.id] ??= {};
-      thumbnailStates.set(select, {
-        canvas, manifest, values: effectiveShaderValues(manifest, stored, this.config.colors),
-      });
+      thumbnailStates.set(select, { canvas, manifest, values: {} });
       thumbnailObserver.observe(select);
     };
 
@@ -229,12 +236,10 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     }
     this.refreshSchemeVisuals = () => {
       for (const state of thumbnailStates.values()) {
-        const refreshed = effectiveShaderValues(state.manifest, this.config.shaders[state.manifest.id], this.config.colors);
-        for (const key of Object.keys(state.values)) delete state.values[key];
-        Object.assign(state.values, refreshed);
+        if (state.stop) updateThumbnailValues(state);
       }
       this.renderControls();
-      this.refreshPreview();
+      this.refreshPreviewValues();
       this.updateSchemeHint();
     };
     this.bindRotation();
@@ -262,6 +267,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.element.querySelector('[data-action="cancel-update"]')!.addEventListener('click', () => this.cancelLookUpdate());
     this.element.querySelector('[data-action="import-noctalia"]')!.addEventListener('click', () => void this.importNoctaliaColors());
     this.element.querySelector('[data-shader-scheme]')!.addEventListener('input', event => this.applyShaderScheme((event.target as HTMLSelectElement).value));
+    fillSchemeOptions(this.element.querySelector<HTMLSelectElement>('[data-shader-scheme]')!, { inherit: true });
     this.select(this.config.shader);
   }
   private select(id: string) {
@@ -280,11 +286,11 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.element.querySelector('[data-import-status]')!.textContent = this.shader.uniforms.some(u => u.type === 'color')
       ? 'Apply your desktop palette to this shader.'
       : 'This shader uses a built-in palette. Choose a shader with color controls to import colors.';
-    this.element.querySelectorAll<HTMLButtonElement>('.shader-select').forEach(button => {
-      const selected = button.dataset.id === this.shader.id;
-      button.closest('.shader-card')?.classList.toggle('active', selected);
-      button.setAttribute('aria-pressed', String(selected));
-    });
+    this.selectedShaderButton?.closest('.shader-card')?.classList.remove('active');
+    this.selectedShaderButton?.setAttribute('aria-pressed', 'false');
+    this.selectedShaderButton = this.shaderButtons.get(this.shader.id);
+    this.selectedShaderButton?.closest('.shader-card')?.classList.add('active');
+    this.selectedShaderButton?.setAttribute('aria-pressed', 'true');
     this.renderPresets();
     this.refreshPreview();
   }
@@ -317,7 +323,6 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     button.textContent = this.importingColors ? 'Importing…' : 'Import Noctalia colors';
     const scheme = this.element.querySelector('[data-shader-scheme]') as HTMLSelectElement;
     scheme.disabled = !hasColors;
-    fillSchemeOptions(scheme, { inherit: true });
     scheme.value = this.config.colors.overrides[this.shader.id] ?? '';
     this.updateSchemeHint();
   }

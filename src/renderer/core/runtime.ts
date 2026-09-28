@@ -6,6 +6,7 @@ import { startLoop } from './loop';
 import { silentAudio } from '../../shared/audio';
 import { AmbientAudio } from './ambient-audio';
 import { AnimationClock } from './animation-clock';
+import { ThumbnailScheduler } from './thumbnail-scheduler';
 
 export interface ShaderDefinition {
   manifest: ShaderManifest;
@@ -36,8 +37,12 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const ambientAudio = new AmbientAudio();
   const clock = new AnimationClock();
   const integrated = shader.animationTime === 'integrated';
-  const unsubscribeAudio = /\buAudio\b/.test(shader.source)
-    ? window.scrnsvrAudio?.subscribe(frame => { audio = frame; }) : undefined;
+  const usesAudio = /\buAudio\b/.test(shader.source);
+  let unsubscribeAudio: (() => void) | undefined;
+  const resume = () => {
+    if (usesAudio && !unsubscribeAudio) unsubscribeAudio = window.scrnsvrAudio?.subscribe(frame => { audio = frame; });
+  };
+  const suspend = () => { unsubscribeAudio?.(); unsubscribeAudio = undefined; };
   const uniforms: Record<string, { value: unknown }> = {
     uTime: { value: 0 },
     uAudio: { value: [0, 0, 0, 0] },
@@ -65,7 +70,10 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   });
   const geometry = new Triangle(gl);
   const mesh = new Mesh(gl, { geometry, program });
+  resume();
   return {
+    resume,
+    suspend,
     draw(delta = 0) {
       const latest = bindUniforms(shader.manifest.uniforms, values);
       const activeSeconds = clock.advance(delta, Number(latest.speed ?? 1));
@@ -80,7 +88,7 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
       renderer.render({ scene: mesh });
     },
     dispose() {
-      unsubscribeAudio?.();
+      suspend();
       geometry.remove();
       // OGL retains uploaded uniform values in its renderer cache.
       for (const location of program.uniformLocations.values()) renderer.state.uniformLocations.delete(location);
@@ -133,23 +141,33 @@ export function mountShader(
 // Copy each visible thumbnail synchronously into a 2D canvas. The whole gallery
 // uses just one GPU context, regardless of window size or shader count.
 let thumbnailRenderer: Renderer | undefined;
+const thumbnailScheduler = new ThumbnailScheduler();
+const thumbnailKeys = new WeakMap<HTMLCanvasElement, { shader: ShaderDefinition; values: Record<string, unknown> }>();
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => thumbnailScheduler.dispose());
 export function mountShaderThumbnail(
   canvas: HTMLCanvasElement,
   shader: ShaderDefinition,
   values: Record<string, unknown>,
 ): () => void {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Unable to create thumbnail canvas');
-  const renderer = thumbnailRenderer ??= new Renderer({ width: 180, height: 90, dpr: 1, alpha: false });
-  const scene = createScene(renderer, shader, values);
-  const draw = (delta = 0) => {
-    if (renderer.width !== canvas.width || renderer.height !== canvas.height) {
-      renderer.setSize(canvas.width, canvas.height);
-    }
-    scene.draw(delta);
-    context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
-  };
-  draw();
-  const stop = startLoop(draw, 15);
-  return () => { stop(); scene.dispose(); };
+  let key = thumbnailKeys.get(canvas);
+  if (!key || key.shader !== shader || key.values !== values) {
+    key = { shader, values };
+    thumbnailKeys.set(canvas, key);
+  }
+  return thumbnailScheduler.mount(key, () => {
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Unable to create thumbnail canvas');
+    const renderer = thumbnailRenderer ??= new Renderer({ width: 240, height: 300, dpr: 1, alpha: false });
+    const scene = createScene(renderer, shader, values);
+    return {
+      ...scene,
+      draw(delta: number) {
+        if (renderer.width !== canvas.width || renderer.height !== canvas.height) {
+          renderer.setSize(canvas.width, canvas.height);
+        }
+        scene.draw(delta);
+        context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
+      },
+    };
+  });
 }
