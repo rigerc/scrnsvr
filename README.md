@@ -26,7 +26,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 25 GLSL shaders, from quiet ambient gradients to reactive audio effects
+- 40 GLSL shaders, from quiet ambient gradients to reactive audio effects
 - 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms

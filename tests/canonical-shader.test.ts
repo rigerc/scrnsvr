@@ -33,7 +33,7 @@ function manifestFor(id: string): ShaderManifest {
 
 describe('canonical shader ABI', () => {
   it('covers every built-in folder', () => {
-    expect(ids.length).toBe(25);
+    expect(ids.length).toBe(40);
   });
 
   it.each(ids)('%s is a mainImage source with manifest-matched Shadereye fallbacks', id => {

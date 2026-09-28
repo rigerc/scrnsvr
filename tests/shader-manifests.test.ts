@@ -27,10 +27,27 @@ import { pulseRingsManifest } from '../src/renderer/shaders/reactive-pulse-rings
 import { audioRibbonsManifest } from '../src/renderer/shaders/reactive-audio-ribbons/manifest';
 import { bassBloomManifest } from '../src/renderer/shaders/reactive-bass-bloom/manifest';
 
+import { chromaticOverlapManifest } from '../src/renderer/shaders/chromatic-overlap/manifest';
+import { quietArchesManifest } from '../src/renderer/shaders/quiet-arches/manifest';
+import { tidalCutoutsManifest } from '../src/renderer/shaders/tidal-cutouts/manifest';
+import { eclipseStudyManifest } from '../src/renderer/shaders/eclipse-study/manifest';
+import { colorMobileManifest } from '../src/renderer/shaders/color-mobile/manifest';
+import { softApertureManifest } from '../src/renderer/shaders/soft-aperture/manifest';
+import { gradientLoomManifest } from '../src/renderer/shaders/gradient-loom/manifest';
+import { petalHoursManifest } from '../src/renderer/shaders/petal-hours/manifest';
+import { pebbleAtlasManifest } from '../src/renderer/shaders/pebble-atlas/manifest';
+import { floatingWindowsManifest } from '../src/renderer/shaders/floating-windows/manifest';
+import { paperFansManifest } from '../src/renderer/shaders/paper-fans/manifest';
+import { islandHoursManifest } from '../src/renderer/shaders/island-hours/manifest';
+import { tangramTideManifest } from '../src/renderer/shaders/tangram-tide/manifest';
+import { colorEstuaryManifest } from '../src/renderer/shaders/color-estuary/manifest';
+import { quietPleatsManifest } from '../src/renderer/shaders/quiet-pleats/manifest';
+
 const manifests = [auroraVeilManifest, contourDunesManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest,
   opalFilmManifest, kineticTilesManifest, inkBloomManifest, phosphorGardenManifest, rainGlassManifest,
   guillocheManifest, liquidChromeManifest, prismMosaicManifest, paperLanternsManifest, magneticFilamentsManifest,
-  pulseRingsManifest, audioRibbonsManifest, bassBloomManifest];
+  pulseRingsManifest, audioRibbonsManifest, bassBloomManifest,
+  chromaticOverlapManifest, quietArchesManifest, tidalCutoutsManifest, eclipseStudyManifest, colorMobileManifest, softApertureManifest, gradientLoomManifest, petalHoursManifest, pebbleAtlasManifest, floatingWindowsManifest, paperFansManifest, islandHoursManifest, tangramTideManifest, colorEstuaryManifest, quietPleatsManifest];
 
 type Manifest = (typeof manifests)[number];
 

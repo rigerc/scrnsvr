@@ -32,7 +32,7 @@ const REMOVED_PIPELINE_TOKENS = [
 describe('upstream shader removal', () => {
   it('ships no AVS or ShaderSaver effect', () => {
     expect(shaderIds.filter(id => /^(avs|shadersaver)-/.test(id))).toEqual([]);
-    expect(shaderIds).toHaveLength(25);
+    expect(shaderIds).toHaveLength(40);
   });
 
   it('keeps no ported-source provenance header', () => {
