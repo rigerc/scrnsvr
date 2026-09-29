@@ -21,6 +21,7 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "quality": "npm run typecheck && npm run coverage && fallow",
+    "qlty": "qlty check --all",
     "render-thumbnails": "npm run build && electron dist/main/index.js --thumbnail --output assets/thumbnails --frames 3",
     "dist": "npm run build && electron-builder --config electron-builder.yml",
     "check-shaders": "npm run build && node scripts/check-shaders.cjs",
