@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const guillocheManifest = manifest({
   id: "guilloche",
   title: "Guilloché",
-  category: "Abstract",
+  category: "Geometric",
   description: "Fine interwoven curves slowly evolve like intricate ornamental engravings.",
   fragment: "shader.glsl",
   uniforms: [

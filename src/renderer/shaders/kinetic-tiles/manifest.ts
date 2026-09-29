@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const kineticTilesManifest = manifest({
   id: "kinetic-tiles",
   title: "Kinetic Tiles",
-  category: "Digital",
+  category: "Geometric",
   description: "Rounded tiles turn and slide in coordinated waves across a quiet grid.",
   fragment: "shader.glsl",
   uniforms: [

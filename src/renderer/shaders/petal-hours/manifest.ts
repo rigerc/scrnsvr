@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const petalHoursManifest = manifest({
   id: "petal-hours",
   title: "Petal Hours",
-  category: "Ambient",
+  category: "Geometric",
   description: "Broad gradient petals slowly lean and lengthen around a quiet off-center opening.",
   fragment: "shader.glsl",
   uniforms: [

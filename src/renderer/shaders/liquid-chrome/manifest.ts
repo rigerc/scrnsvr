@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const liquidChromeManifest = manifest({
   id: "liquid-chrome",
   title: "Liquid Chrome",
-  category: "Abstract",
+  category: "Ambient",
   description: "Broad studio lights ripple across a slowly undulating metallic surface.",
   fragment: "shader.glsl",
   uniforms: [

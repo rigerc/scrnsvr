@@ -84,7 +84,7 @@ HTMLCanvasElement.prototype.getContext = function getContext(this: HTMLCanvasEle
 
 const plainDefinition = {
   manifest: {
-    id: 'test-plain', title: 'Plain', category: 'Abstract',
+    id: 'test-plain', title: 'Plain', category: 'Ambient',
     uniforms: [
       { name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01 },
       { name: 'saturation', type: 'float', default: 1, min: 0, max: 2, step: 0.01 },
@@ -108,7 +108,7 @@ const reactiveDefinition = {
   source: 'void main(){}',
 };
 const plasmaDefinition = {
-  manifest: { id: 'plasma', title: 'Chromatic Plasma', category: 'Abstract', uniforms: [{ name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01 }] },
+  manifest: { id: 'plasma', title: 'Chromatic Plasma', category: 'Ambient', uniforms: [{ name: 'speed', type: 'float', default: 1, min: 0, max: 3, step: 0.01 }] },
   source: 'void main(){}',
 };
 

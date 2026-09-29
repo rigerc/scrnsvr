@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const quietPleatsManifest = manifest({
   id: "quiet-pleats",
   title: "Quiet Pleats",
-  category: "Ambient",
+  category: "Geometric",
   description: "Wide bands of lavender, slate, and cream compress and expand like gently folded paper.",
   fragment: "shader.glsl",
   uniforms: [

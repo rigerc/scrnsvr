@@ -16,6 +16,8 @@ Click a screenshot to watch the 5-second animated preview (H.264 MP4, ~640px).
 | **Chromatic Plasma** · [video](assets/videos/plasma.mp4) | **Contour Dunes** · [video](assets/videos/contour-dunes.mp4) | **Ember Drift** · [video](assets/videos/ember-drift.mp4) |
 | [![Silk Ribbons](assets/screenshots/silk-ribbons.png)](assets/videos/silk-ribbons.mp4) | [![Star Drift](assets/screenshots/star-drift.png)](assets/videos/star-drift.mp4) | [![Tidal Caustics](assets/screenshots/tidal-caustics.png)](assets/videos/tidal-caustics.mp4) |
 | **Silk Ribbons** · [video](assets/videos/silk-ribbons.mp4) | **Star Drift** · [video](assets/videos/star-drift.mp4) | **Tidal Caustics** · [video](assets/videos/tidal-caustics.mp4) |
+| [![Dune Silk](assets/screenshots/dune-silk.png)](assets/videos/dune-silk.mp4) | | |
+| **Dune Silk** · [video](assets/videos/dune-silk.mp4) | | |
 
 Media is captured headlessly at 1280×720 (stills) / 640px 12 fps (video) via `scripts/capture-frames.cjs` + ffmpeg:
 
@@ -26,7 +28,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 ## Features
 
-- 40 GLSL shaders, from quiet ambient gradients to reactive audio effects
+- 41 GLSL shaders, from quiet ambient gradients to reactive audio effects
 - 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms

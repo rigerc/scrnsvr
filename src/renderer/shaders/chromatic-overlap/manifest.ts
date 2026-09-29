@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const chromaticOverlapManifest = manifest({
   id: "chromatic-overlap",
   title: "Chromatic Overlap",
-  category: "Ambient",
+  category: "Geometric",
   description: "Translucent circles and capsules drift together, mixing apricot, lavender, and teal.",
   fragment: "shader.glsl",
   uniforms: [

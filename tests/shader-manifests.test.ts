@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { bindUniforms, randomizeUniforms, snapUniformValue } from '../src/renderer/core/uniforms';
 import { auroraVeilManifest } from '../src/renderer/shaders/aurora-veil/manifest';
 import { contourDunesManifest } from '../src/renderer/shaders/contour-dunes/manifest';
+import { duneSilkManifest } from '../src/renderer/shaders/dune-silk/manifest';
 import { emberDriftManifest } from '../src/renderer/shaders/ember-drift/manifest';
 import { flowFieldManifest } from '../src/renderer/shaders/flow-field/manifest';
 import { gradientBlobsManifest } from '../src/renderer/shaders/gradient-blobs/manifest';
@@ -26,7 +27,6 @@ import { magneticFilamentsManifest } from '../src/renderer/shaders/magnetic-fila
 import { pulseRingsManifest } from '../src/renderer/shaders/reactive-pulse-rings/manifest';
 import { audioRibbonsManifest } from '../src/renderer/shaders/reactive-audio-ribbons/manifest';
 import { bassBloomManifest } from '../src/renderer/shaders/reactive-bass-bloom/manifest';
-
 import { chromaticOverlapManifest } from '../src/renderer/shaders/chromatic-overlap/manifest';
 import { quietArchesManifest } from '../src/renderer/shaders/quiet-arches/manifest';
 import { tidalCutoutsManifest } from '../src/renderer/shaders/tidal-cutouts/manifest';
@@ -43,11 +43,14 @@ import { tangramTideManifest } from '../src/renderer/shaders/tangram-tide/manife
 import { colorEstuaryManifest } from '../src/renderer/shaders/color-estuary/manifest';
 import { quietPleatsManifest } from '../src/renderer/shaders/quiet-pleats/manifest';
 
-const manifests = [auroraVeilManifest, contourDunesManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest,
+const manifests = [auroraVeilManifest, contourDunesManifest, duneSilkManifest, emberDriftManifest, flowFieldManifest, gradientBlobsManifest, gradientDriftManifest, interferenceManifest, meshGradientManifest, plasmaManifest, silkRibbonsManifest, starDriftManifest, tidalCausticsManifest,
   opalFilmManifest, kineticTilesManifest, inkBloomManifest, phosphorGardenManifest, rainGlassManifest,
   guillocheManifest, liquidChromeManifest, prismMosaicManifest, paperLanternsManifest, magneticFilamentsManifest,
   pulseRingsManifest, audioRibbonsManifest, bassBloomManifest,
-  chromaticOverlapManifest, quietArchesManifest, tidalCutoutsManifest, eclipseStudyManifest, colorMobileManifest, softApertureManifest, gradientLoomManifest, petalHoursManifest, pebbleAtlasManifest, floatingWindowsManifest, paperFansManifest, islandHoursManifest, tangramTideManifest, colorEstuaryManifest, quietPleatsManifest];
+  chromaticOverlapManifest, quietArchesManifest, tidalCutoutsManifest, eclipseStudyManifest,
+  colorMobileManifest, softApertureManifest, gradientLoomManifest,
+  petalHoursManifest, pebbleAtlasManifest, floatingWindowsManifest, paperFansManifest,
+  islandHoursManifest, tangramTideManifest, colorEstuaryManifest, quietPleatsManifest];
 
 type Manifest = (typeof manifests)[number];
 
@@ -79,6 +82,11 @@ function assertUniformContracts(manifest: Manifest) {
       else if (parent.type === 'bool') expect(typeof def.visibleWhen.value).toBe('boolean');
       else expect(typeof def.visibleWhen.value).toBe('number');
     }
+  }
+  // The inspector's "Colors" randomize scope is a no-op for a shader whose
+  // every color control opts out, which reads as a broken control.
+  if (manifest.uniforms.some(def => def.type === 'color')) {
+    expect(manifest.uniforms.some(def => def.type === 'color' && def.random !== false)).toBe(true);
   }
 }
 

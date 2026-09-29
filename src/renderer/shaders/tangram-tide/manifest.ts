@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const tangramTideManifest = manifest({
   id: "tangram-tide",
   title: "Tangram Tide",
-  category: "Ambient",
+  category: "Geometric",
   description: "Triangles, trapezoids, and parallelograms glide and gently turn through open space.",
   fragment: "shader.glsl",
   uniforms: [

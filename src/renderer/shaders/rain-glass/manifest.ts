@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const rainGlassManifest = manifest({
   id: "rain-glass",
   title: "Rain Glass",
-  category: "Water",
+  category: "Ambient",
   description: "Slow droplets trail down glass over blurred pools of nighttime color.",
   fragment: "shader.glsl",
   uniforms: [

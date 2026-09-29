@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const pebbleAtlasManifest = manifest({
   id: "pebble-atlas",
   title: "Pebble Atlas",
-  category: "Ambient",
+  category: "Geometric",
   description: "Large mineral-colored cells redistribute space between narrow, softly edged channels.",
   fragment: "shader.glsl",
   uniforms: [

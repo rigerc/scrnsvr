@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const prismMosaicManifest = manifest({
   id: "prism-mosaic",
   title: "Prism Mosaic",
-  category: "Abstract",
+  category: "Geometric",
   description: "Drifting glass facets catch colored light along their beveled edges.",
   fragment: "shader.glsl",
   uniforms: [

@@ -9,76 +9,78 @@ import { colorMobileManifest } from './color-mobile/manifest';
 import shader3 from './color-mobile/shader.glsl';
 import { contourDunesManifest } from './contour-dunes/manifest';
 import shader4 from './contour-dunes/shader.glsl';
+import { duneSilkManifest } from './dune-silk/manifest';
+import shader5 from './dune-silk/shader.glsl';
 import { eclipseStudyManifest } from './eclipse-study/manifest';
-import shader5 from './eclipse-study/shader.glsl';
+import shader6 from './eclipse-study/shader.glsl';
 import { emberDriftManifest } from './ember-drift/manifest';
-import shader6 from './ember-drift/shader.glsl';
+import shader7 from './ember-drift/shader.glsl';
 import { floatingWindowsManifest } from './floating-windows/manifest';
-import shader7 from './floating-windows/shader.glsl';
+import shader8 from './floating-windows/shader.glsl';
 import { flowFieldManifest } from './flow-field/manifest';
-import shader8 from './flow-field/shader.glsl';
+import shader9 from './flow-field/shader.glsl';
 import { gradientBlobsManifest } from './gradient-blobs/manifest';
-import shader9 from './gradient-blobs/shader.glsl';
+import shader10 from './gradient-blobs/shader.glsl';
 import { gradientDriftManifest } from './gradient-drift/manifest';
-import shader10 from './gradient-drift/shader.glsl';
+import shader11 from './gradient-drift/shader.glsl';
 import { gradientLoomManifest } from './gradient-loom/manifest';
-import shader11 from './gradient-loom/shader.glsl';
+import shader12 from './gradient-loom/shader.glsl';
 import { guillocheManifest } from './guilloche/manifest';
-import shader12 from './guilloche/shader.glsl';
+import shader13 from './guilloche/shader.glsl';
 import { inkBloomManifest } from './ink-bloom/manifest';
-import shader13 from './ink-bloom/shader.glsl';
+import shader14 from './ink-bloom/shader.glsl';
 import { interferenceManifest } from './interference/manifest';
-import shader14 from './interference/shader.glsl';
+import shader15 from './interference/shader.glsl';
 import { islandHoursManifest } from './island-hours/manifest';
-import shader15 from './island-hours/shader.glsl';
+import shader16 from './island-hours/shader.glsl';
 import { kineticTilesManifest } from './kinetic-tiles/manifest';
-import shader16 from './kinetic-tiles/shader.glsl';
+import shader17 from './kinetic-tiles/shader.glsl';
 import { liquidChromeManifest } from './liquid-chrome/manifest';
-import shader17 from './liquid-chrome/shader.glsl';
+import shader18 from './liquid-chrome/shader.glsl';
 import { magneticFilamentsManifest } from './magnetic-filaments/manifest';
-import shader18 from './magnetic-filaments/shader.glsl';
+import shader19 from './magnetic-filaments/shader.glsl';
 import { meshGradientManifest } from './mesh-gradient/manifest';
-import shader19 from './mesh-gradient/shader.glsl';
+import shader20 from './mesh-gradient/shader.glsl';
 import { opalFilmManifest } from './opal-film/manifest';
-import shader20 from './opal-film/shader.glsl';
+import shader21 from './opal-film/shader.glsl';
 import { paperFansManifest } from './paper-fans/manifest';
-import shader21 from './paper-fans/shader.glsl';
+import shader22 from './paper-fans/shader.glsl';
 import { paperLanternsManifest } from './paper-lanterns/manifest';
-import shader22 from './paper-lanterns/shader.glsl';
+import shader23 from './paper-lanterns/shader.glsl';
 import { pebbleAtlasManifest } from './pebble-atlas/manifest';
-import shader23 from './pebble-atlas/shader.glsl';
+import shader24 from './pebble-atlas/shader.glsl';
 import { petalHoursManifest } from './petal-hours/manifest';
-import shader24 from './petal-hours/shader.glsl';
+import shader25 from './petal-hours/shader.glsl';
 import { phosphorGardenManifest } from './phosphor-garden/manifest';
-import shader25 from './phosphor-garden/shader.glsl';
+import shader26 from './phosphor-garden/shader.glsl';
 import { plasmaManifest } from './plasma/manifest';
-import shader26 from './plasma/shader.glsl';
+import shader27 from './plasma/shader.glsl';
 import { prismMosaicManifest } from './prism-mosaic/manifest';
-import shader27 from './prism-mosaic/shader.glsl';
+import shader28 from './prism-mosaic/shader.glsl';
 import { quietArchesManifest } from './quiet-arches/manifest';
-import shader28 from './quiet-arches/shader.glsl';
+import shader29 from './quiet-arches/shader.glsl';
 import { quietPleatsManifest } from './quiet-pleats/manifest';
-import shader29 from './quiet-pleats/shader.glsl';
+import shader30 from './quiet-pleats/shader.glsl';
 import { rainGlassManifest } from './rain-glass/manifest';
-import shader30 from './rain-glass/shader.glsl';
+import shader31 from './rain-glass/shader.glsl';
 import { audioRibbonsManifest } from './reactive-audio-ribbons/manifest';
-import shader31 from './reactive-audio-ribbons/shader.glsl';
+import shader32 from './reactive-audio-ribbons/shader.glsl';
 import { bassBloomManifest } from './reactive-bass-bloom/manifest';
-import shader32 from './reactive-bass-bloom/shader.glsl';
+import shader33 from './reactive-bass-bloom/shader.glsl';
 import { pulseRingsManifest } from './reactive-pulse-rings/manifest';
-import shader33 from './reactive-pulse-rings/shader.glsl';
+import shader34 from './reactive-pulse-rings/shader.glsl';
 import { silkRibbonsManifest } from './silk-ribbons/manifest';
-import shader34 from './silk-ribbons/shader.glsl';
+import shader35 from './silk-ribbons/shader.glsl';
 import { softApertureManifest } from './soft-aperture/manifest';
-import shader35 from './soft-aperture/shader.glsl';
+import shader36 from './soft-aperture/shader.glsl';
 import { starDriftManifest } from './star-drift/manifest';
-import shader36 from './star-drift/shader.glsl';
+import shader37 from './star-drift/shader.glsl';
 import { tangramTideManifest } from './tangram-tide/manifest';
-import shader37 from './tangram-tide/shader.glsl';
+import shader38 from './tangram-tide/shader.glsl';
 import { tidalCausticsManifest } from './tidal-caustics/manifest';
-import shader38 from './tidal-caustics/shader.glsl';
+import shader39 from './tidal-caustics/shader.glsl';
 import { tidalCutoutsManifest } from './tidal-cutouts/manifest';
-import shader39 from './tidal-cutouts/shader.glsl';
+import shader40 from './tidal-cutouts/shader.glsl';
 
 export const shaderRegistry: Record<string, import('../core/runtime').ShaderDefinition> = {
   [auroraVeilManifest.id]: { manifest: auroraVeilManifest, source: shader0, animationTime: 'integrated' },
@@ -86,40 +88,41 @@ export const shaderRegistry: Record<string, import('../core/runtime').ShaderDefi
   [colorEstuaryManifest.id]: { manifest: colorEstuaryManifest, source: shader2, animationTime: 'integrated' },
   [colorMobileManifest.id]: { manifest: colorMobileManifest, source: shader3, animationTime: 'integrated' },
   [contourDunesManifest.id]: { manifest: contourDunesManifest, source: shader4, animationTime: 'integrated' },
-  [eclipseStudyManifest.id]: { manifest: eclipseStudyManifest, source: shader5, animationTime: 'integrated' },
-  [emberDriftManifest.id]: { manifest: emberDriftManifest, source: shader6, animationTime: 'integrated' },
-  [floatingWindowsManifest.id]: { manifest: floatingWindowsManifest, source: shader7, animationTime: 'integrated' },
-  [flowFieldManifest.id]: { manifest: flowFieldManifest, source: shader8, animationTime: 'integrated' },
-  [gradientBlobsManifest.id]: { manifest: gradientBlobsManifest, source: shader9, animationTime: 'integrated' },
-  [gradientDriftManifest.id]: { manifest: gradientDriftManifest, source: shader10, animationTime: 'integrated' },
-  [gradientLoomManifest.id]: { manifest: gradientLoomManifest, source: shader11, animationTime: 'integrated' },
-  [guillocheManifest.id]: { manifest: guillocheManifest, source: shader12, animationTime: 'integrated' },
-  [inkBloomManifest.id]: { manifest: inkBloomManifest, source: shader13, animationTime: 'integrated' },
-  [interferenceManifest.id]: { manifest: interferenceManifest, source: shader14, animationTime: 'integrated' },
-  [islandHoursManifest.id]: { manifest: islandHoursManifest, source: shader15, animationTime: 'integrated' },
-  [kineticTilesManifest.id]: { manifest: kineticTilesManifest, source: shader16, animationTime: 'integrated' },
-  [liquidChromeManifest.id]: { manifest: liquidChromeManifest, source: shader17, animationTime: 'integrated' },
-  [magneticFilamentsManifest.id]: { manifest: magneticFilamentsManifest, source: shader18, animationTime: 'integrated' },
-  [meshGradientManifest.id]: { manifest: meshGradientManifest, source: shader19, animationTime: 'integrated' },
-  [opalFilmManifest.id]: { manifest: opalFilmManifest, source: shader20, animationTime: 'integrated' },
-  [paperFansManifest.id]: { manifest: paperFansManifest, source: shader21, animationTime: 'integrated' },
-  [paperLanternsManifest.id]: { manifest: paperLanternsManifest, source: shader22, animationTime: 'integrated' },
-  [pebbleAtlasManifest.id]: { manifest: pebbleAtlasManifest, source: shader23, animationTime: 'integrated' },
-  [petalHoursManifest.id]: { manifest: petalHoursManifest, source: shader24, animationTime: 'integrated' },
-  [phosphorGardenManifest.id]: { manifest: phosphorGardenManifest, source: shader25, animationTime: 'integrated' },
-  [plasmaManifest.id]: { manifest: plasmaManifest, source: shader26, animationTime: 'integrated' },
-  [prismMosaicManifest.id]: { manifest: prismMosaicManifest, source: shader27, animationTime: 'integrated' },
-  [quietArchesManifest.id]: { manifest: quietArchesManifest, source: shader28, animationTime: 'integrated' },
-  [quietPleatsManifest.id]: { manifest: quietPleatsManifest, source: shader29, animationTime: 'integrated' },
-  [rainGlassManifest.id]: { manifest: rainGlassManifest, source: shader30, animationTime: 'integrated' },
-  [audioRibbonsManifest.id]: { manifest: audioRibbonsManifest, source: shader31, animationTime: 'integrated' },
-  [bassBloomManifest.id]: { manifest: bassBloomManifest, source: shader32, animationTime: 'integrated' },
-  [pulseRingsManifest.id]: { manifest: pulseRingsManifest, source: shader33, animationTime: 'integrated' },
-  [silkRibbonsManifest.id]: { manifest: silkRibbonsManifest, source: shader34, animationTime: 'integrated' },
-  [softApertureManifest.id]: { manifest: softApertureManifest, source: shader35, animationTime: 'integrated' },
-  [starDriftManifest.id]: { manifest: starDriftManifest, source: shader36, animationTime: 'integrated' },
-  [tangramTideManifest.id]: { manifest: tangramTideManifest, source: shader37, animationTime: 'integrated' },
-  [tidalCausticsManifest.id]: { manifest: tidalCausticsManifest, source: shader38, animationTime: 'integrated' },
-  [tidalCutoutsManifest.id]: { manifest: tidalCutoutsManifest, source: shader39, animationTime: 'integrated' },
+  [duneSilkManifest.id]: { manifest: duneSilkManifest, source: shader5, animationTime: 'integrated' },
+  [eclipseStudyManifest.id]: { manifest: eclipseStudyManifest, source: shader6, animationTime: 'integrated' },
+  [emberDriftManifest.id]: { manifest: emberDriftManifest, source: shader7, animationTime: 'integrated' },
+  [floatingWindowsManifest.id]: { manifest: floatingWindowsManifest, source: shader8, animationTime: 'integrated' },
+  [flowFieldManifest.id]: { manifest: flowFieldManifest, source: shader9, animationTime: 'integrated' },
+  [gradientBlobsManifest.id]: { manifest: gradientBlobsManifest, source: shader10, animationTime: 'integrated' },
+  [gradientDriftManifest.id]: { manifest: gradientDriftManifest, source: shader11, animationTime: 'integrated' },
+  [gradientLoomManifest.id]: { manifest: gradientLoomManifest, source: shader12, animationTime: 'integrated' },
+  [guillocheManifest.id]: { manifest: guillocheManifest, source: shader13, animationTime: 'integrated' },
+  [inkBloomManifest.id]: { manifest: inkBloomManifest, source: shader14, animationTime: 'integrated' },
+  [interferenceManifest.id]: { manifest: interferenceManifest, source: shader15, animationTime: 'integrated' },
+  [islandHoursManifest.id]: { manifest: islandHoursManifest, source: shader16, animationTime: 'integrated' },
+  [kineticTilesManifest.id]: { manifest: kineticTilesManifest, source: shader17, animationTime: 'integrated' },
+  [liquidChromeManifest.id]: { manifest: liquidChromeManifest, source: shader18, animationTime: 'integrated' },
+  [magneticFilamentsManifest.id]: { manifest: magneticFilamentsManifest, source: shader19, animationTime: 'integrated' },
+  [meshGradientManifest.id]: { manifest: meshGradientManifest, source: shader20, animationTime: 'integrated' },
+  [opalFilmManifest.id]: { manifest: opalFilmManifest, source: shader21, animationTime: 'integrated' },
+  [paperFansManifest.id]: { manifest: paperFansManifest, source: shader22, animationTime: 'integrated' },
+  [paperLanternsManifest.id]: { manifest: paperLanternsManifest, source: shader23, animationTime: 'integrated' },
+  [pebbleAtlasManifest.id]: { manifest: pebbleAtlasManifest, source: shader24, animationTime: 'integrated' },
+  [petalHoursManifest.id]: { manifest: petalHoursManifest, source: shader25, animationTime: 'integrated' },
+  [phosphorGardenManifest.id]: { manifest: phosphorGardenManifest, source: shader26, animationTime: 'integrated' },
+  [plasmaManifest.id]: { manifest: plasmaManifest, source: shader27, animationTime: 'integrated' },
+  [prismMosaicManifest.id]: { manifest: prismMosaicManifest, source: shader28, animationTime: 'integrated' },
+  [quietArchesManifest.id]: { manifest: quietArchesManifest, source: shader29, animationTime: 'integrated' },
+  [quietPleatsManifest.id]: { manifest: quietPleatsManifest, source: shader30, animationTime: 'integrated' },
+  [rainGlassManifest.id]: { manifest: rainGlassManifest, source: shader31, animationTime: 'integrated' },
+  [audioRibbonsManifest.id]: { manifest: audioRibbonsManifest, source: shader32, animationTime: 'integrated' },
+  [bassBloomManifest.id]: { manifest: bassBloomManifest, source: shader33, animationTime: 'integrated' },
+  [pulseRingsManifest.id]: { manifest: pulseRingsManifest, source: shader34, animationTime: 'integrated' },
+  [silkRibbonsManifest.id]: { manifest: silkRibbonsManifest, source: shader35, animationTime: 'integrated' },
+  [softApertureManifest.id]: { manifest: softApertureManifest, source: shader36, animationTime: 'integrated' },
+  [starDriftManifest.id]: { manifest: starDriftManifest, source: shader37, animationTime: 'integrated' },
+  [tangramTideManifest.id]: { manifest: tangramTideManifest, source: shader38, animationTime: 'integrated' },
+  [tidalCausticsManifest.id]: { manifest: tidalCausticsManifest, source: shader39, animationTime: 'integrated' },
+  [tidalCutoutsManifest.id]: { manifest: tidalCutoutsManifest, source: shader40, animationTime: 'integrated' },
 };
 export const shaderIds = Object.keys(shaderRegistry);

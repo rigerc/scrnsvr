@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const quietArchesManifest = manifest({
   id: "quiet-arches",
   title: "Quiet Arches",
-  category: "Ambient",
+  category: "Geometric",
   description: "Nested arches in clay, rose, and plum slowly widen and slide across one another.",
   fragment: "shader.glsl",
   uniforms: [

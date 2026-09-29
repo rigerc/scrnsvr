@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const gradientLoomManifest = manifest({
   id: "gradient-loom",
   title: "Gradient Loom",
-  category: "Ambient",
+  category: "Geometric",
   description: "Wide translucent strips slide across one another, weaving softly blended patches of color.",
   fragment: "shader.glsl",
   uniforms: [

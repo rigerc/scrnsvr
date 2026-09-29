@@ -1,4 +1,6 @@
-export const shaderCategories = ['Abstract', 'Ambient', 'Custom', 'Digital', 'Landscapes', 'Reactive', 'Space', 'Water'] as const;
+// Ambient: light, fluid surfaces, and landscapes. Geometric: shapes and patterns.
+// Keep audio-responsive shaders and user-created shaders easy to find separately.
+export const shaderCategories = ['Ambient', 'Geometric', 'Reactive', 'Custom'] as const;
 export type ShaderCategory = typeof shaderCategories[number];
 export type UniformType = 'float'|'int'|'bool'|'color'|'select';
 export type UniformValue = number | boolean | string;

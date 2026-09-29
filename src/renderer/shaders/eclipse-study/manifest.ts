@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const eclipseStudyManifest = manifest({
   id: "eclipse-study",
   title: "Eclipse Study",
-  category: "Ambient",
+  category: "Geometric",
   description: "Two enormous gradient discs pass across dusk, revealing a changing peach crescent.",
   fragment: "shader.glsl",
   uniforms: [

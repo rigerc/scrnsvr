@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const colorMobileManifest = manifest({
   id: "color-mobile",
   title: "Color Mobile",
-  category: "Ambient",
+  category: "Geometric",
   description: "Semicircles, rounded bars, and discs rock gently in an open field of color.",
   fragment: "shader.glsl",
   uniforms: [

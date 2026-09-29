@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const paperFansManifest = manifest({
   id: "paper-fans",
   title: "Paper Fans",
-  category: "Ambient",
+  category: "Geometric",
   description: "Broad fans of terracotta, peach, and aubergine slowly open and overlap.",
   fragment: "shader.glsl",
   uniforms: [

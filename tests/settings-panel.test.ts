@@ -27,7 +27,7 @@ const float = (name: string, extra: Partial<UniformManifest> = {}): UniformManif
 });
 
 const plasma: ShaderManifest = {
-  id: 'plasma', title: 'Plasma', category: 'Abstract', description: 'Plasma description', fragment: 'shader.glsl',
+  id: 'plasma', title: 'Plasma', category: 'Ambient', description: 'Plasma description', fragment: 'shader.glsl',
   uniforms: [
     float('speed'),
     { name: 'color1', type: 'color', default: '#112233', label: 'Color', description: 'color', group: 'Color' },
@@ -38,7 +38,7 @@ const plasma: ShaderManifest = {
   ],
 };
 const ribbons: ShaderManifest = {
-  id: 'silk-ribbons', title: 'Silk Ribbons', category: 'Abstract', fracture: undefined, fragment: 'shader.glsl',
+  id: 'silk-ribbons', title: 'Silk Ribbons', category: 'Ambient', fracture: undefined, fragment: 'shader.glsl',
   uniforms: [float('speed')],
 } as ShaderManifest;
 

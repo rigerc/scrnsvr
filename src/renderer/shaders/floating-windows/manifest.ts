@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const floatingWindowsManifest = manifest({
   id: "floating-windows",
   title: "Floating Windows",
-  category: "Ambient",
+  category: "Geometric",
   description: "Drifting circles and rounded windows reveal a shared wash of slowly moving color.",
   fragment: "shader.glsl",
   uniforms: [

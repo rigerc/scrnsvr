@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const opalFilmManifest = manifest({
   id: "opal-film",
   title: "Opal Film",
-  category: "Abstract",
+  category: "Ambient",
   description: "Pearlescent bands glide over a gently flexing, luminous surface.",
   fragment: "shader.glsl",
   uniforms: [

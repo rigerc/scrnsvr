@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const magneticFilamentsManifest = manifest({
   id: "magnetic-filaments",
   title: "Magnetic Filaments",
-  category: "Abstract",
+  category: "Ambient",
   description: "Fine luminous field lines bend around slowly orbiting magnetic poles.",
   fragment: "shader.glsl",
   uniforms: [

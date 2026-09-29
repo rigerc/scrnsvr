@@ -3,7 +3,7 @@ import { manifest } from '../../../shared/manifest';
 export const softApertureManifest = manifest({
   id: "soft-aperture",
   title: "Soft Aperture",
-  category: "Ambient",
+  category: "Geometric",
   description: "Offset rounded openings breathe slowly through washes of lilac, periwinkle, and cream.",
   fragment: "shader.glsl",
   uniforms: [
