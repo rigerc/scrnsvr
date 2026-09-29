@@ -106,6 +106,8 @@ The 54px top bar holds product name, Shaders/Clock/Settings tabs, and save statu
 
 The bank has two tile columns, changing to three at 1700px. The three work areas scroll independently on desktop. At 980px and below, the inspector moves below bank and preview; at 620px and below, the work areas stack. Mobile styling is a fallback, not the primary design target.
 
+After the featured tiles, the bank groups shaders into Ambient (light, fluid surfaces, and landscapes), Geometric (shapes and patterns), and Reactive (audio response), followed by Custom when present. Titles sort alphabetically within each group; featured shaders appear only once.
+
 ## Elevation & Depth
 
 The interface is flat. One-pixel rules and small shifts in charcoal provide separation. The shader imagery creates depth inside the preview and tile canvases. The custom shader dialog uses a dark backdrop.
@@ -136,3 +138,11 @@ Controls and shader images use 4–5px corners; the custom editor uses 8px. The 
 - Add decorative shadows or bright panel colors to the shell.
 - Hide the real shader or clock behind a static illustration.
 - Hide saved looks and shuffle timing under unrelated settings.
+
+## Discovery and editing refinements
+
+The gallery includes a compact search field and All/Favorites filters. Favorites are stored locally as a browsing preference, separate from shader configuration and shuffle membership. Empty results offer Clear filters; unavailable storage is explained as session-only favorites.
+
+The live preview follows the aspect ratio of the display containing the settings window, with a 16:9 fallback. Pause animation holds shader time in both the preview and gallery while allowing adjustments to redraw. Reduced-motion preferences start animations paused; explicit playback takes precedence. Fullscreen preview includes the clock and an Exit fullscreen control.
+
+Parameter descriptions occupy stable space instead of appearing on focus. Unchanged reset actions recede, and parameter locks are exposed through Show parameter locks; active locks remain visible. Reset, randomization, and applying a look each offer a named, single-step undo for that visual. Saved-look and shuffle operations retain keyboard focus, and failed autosaves provide Retry save without discarding edits.

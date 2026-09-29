@@ -82,6 +82,9 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
     const locks = context.options.locks;
     if (locks?.has(def.name)) locks.delete(def.name); else locks?.add(def.name);
     syncLock();
+    if (!locks?.has(def.name) && row.closest<HTMLElement>('[data-show-locks]')?.dataset.showLocks !== 'true') {
+      row.querySelector<HTMLElement>('input, select')?.focus();
+    }
   });
   syncLock();
   heading.append(label, lock, reset);
@@ -89,6 +92,7 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
   const description = document.createElement('p');
   description.id = `${id}-hint`;
   description.textContent = def.description ?? '';
+  description.hidden = !def.description;
   const { input, number } = createControlInput(def, name, description.id);
   input.id = id;
   input.dataset.name = def.name;
@@ -159,6 +163,7 @@ function buildRow(def: UniformManifest, context: ControlContext): ControlRow {
     sync();
     context.refreshVisibility();
     context.onChange();
+    input.focus();
   });
   const inputs = document.createElement('div');
   inputs.className = 'shader-control-inputs';
@@ -194,6 +199,27 @@ export function mountShaderControls(
 ) {
   const wasOpen = root.querySelector('details')?.open ?? false;
   root.replaceChildren();
+  const lockTools = document.createElement('div');
+  lockTools.className = 'parameter-lock-tools';
+  const toggleLocks = document.createElement('button');
+  toggleLocks.type = 'button';
+  toggleLocks.className = 'parameter-lock-toggle';
+  const lockHint = document.createElement('p');
+  lockHint.textContent = 'Locked parameters stay fixed when you randomize.';
+  const syncLocks = () => {
+    const shown = root.dataset.showLocks === 'true';
+    root.dataset.showLocks = String(shown);
+    toggleLocks.textContent = shown ? 'Hide parameter locks' : 'Show parameter locks';
+    toggleLocks.setAttribute('aria-expanded', String(shown));
+    lockHint.hidden = !shown;
+  };
+  toggleLocks.addEventListener('click', () => {
+    root.dataset.showLocks = String(root.dataset.showLocks !== 'true');
+    syncLocks();
+  });
+  syncLocks();
+  lockTools.append(toggleLocks, lockHint);
+  root.append(lockTools);
   const advanced = document.createElement('details');
   advanced.className = 'shader-advanced';
   advanced.open = wasOpen;

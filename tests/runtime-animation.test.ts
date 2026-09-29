@@ -26,7 +26,7 @@ vi.mock('ogl', () => ({
 }));
 
 afterEach(() => { vi.unstubAllGlobals(); delete window.scrnsvrAudio; });
-function mount(integrated: boolean) {
+function mount(integrated: boolean, playback?: { paused: boolean }) {
   vi.stubGlobal('devicePixelRatio', 1);
   vi.stubGlobal('ResizeObserver', class {
     constructor(resize: () => void) { state.resize = resize; }
@@ -45,11 +45,31 @@ function mount(integrated: boolean) {
     ...(integrated ? { animationTime: 'integrated' as const } : {}),
   };
   const values = { speed: 2 };
-  const dispose = mountShader(document.createElement('canvas'), definition, values);
+  const dispose = mountShader(document.createElement('canvas'), definition, values, 60, playback);
   return { values, dispose };
 }
 
 describe('runtime animation contract', () => {
+  it('pauses settings playback independently of speed and keeps edits live', () => {
+    const playback = { paused: false };
+    const { values, dispose } = mount(false, playback);
+    state.tick(100);
+    playback.paused = true;
+    state.tick(100);
+    state.tick(500);
+    expect(state.uniforms.uTime.value).toBe(0.1);
+    values.speed = 3;
+    state.tick(100);
+    expect(state.uniforms.speed.value).toBe(3);
+    expect(state.uniforms.uTime.value).toBe(0.1);
+    state.resize();
+    expect(state.uniforms.uTime.value).toBe(0.1);
+    playback.paused = false;
+    state.tick(500);
+    state.tick(100);
+    expect(state.uniforms.uTime.value).toBe(0.2);
+    dispose();
+  });
   it('integrates built-in motion, holds on resize/pause, and smooths audio while paused', () => {
     const { values, dispose } = mount(true);
     const mountedDate = [...state.uniforms.uDate.value as number[]];

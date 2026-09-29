@@ -7,6 +7,7 @@ import { silentAudio } from '../../shared/audio';
 import { AmbientAudio } from './ambient-audio';
 import { AnimationClock } from './animation-clock';
 import { ThumbnailScheduler } from './thumbnail-scheduler';
+import { PlaybackGate, type PlaybackState } from './playback';
 
 export interface ShaderDefinition {
   manifest: ShaderManifest;
@@ -29,7 +30,7 @@ export function oglValue(definition: UniformManifest, value: unknown): unknown {
 // across shader switches instead of resetting the cache over existing GL state.
 const renderers = new WeakMap<HTMLCanvasElement, Renderer>();
 
-function createScene(renderer: Renderer, shader: ShaderDefinition, values: Record<string, unknown>) {
+function createScene(renderer: Renderer, shader: ShaderDefinition, values: Record<string, unknown>, playback?: PlaybackState) {
   const gl = renderer.gl;
   const resolved = bindUniforms(shader.manifest.uniforms, values);
   const mountedAt = new Date();
@@ -37,9 +38,11 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const ambientAudio = new AmbientAudio();
   const clock = new AnimationClock();
   const integrated = shader.animationTime === 'integrated';
+  const gate = new PlaybackGate(playback);
   const usesAudio = /\buAudio\b/.test(shader.source);
   let unsubscribeAudio: (() => void) | undefined;
   const resume = () => {
+    if (playback?.paused) return;
     if (usesAudio && !unsubscribeAudio) unsubscribeAudio = window.scrnsvrAudio?.subscribe(frame => { audio = frame; });
   };
   const suspend = () => { unsubscribeAudio?.(); unsubscribeAudio = undefined; };
@@ -74,9 +77,12 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   return {
     resume,
     suspend,
-    draw(delta = 0) {
+    draw(delta = 0, force = false) {
+      if (playback?.paused) suspend(); else resume();
+      const frameDelta = gate.frame(delta, values, force);
+      if (frameDelta === undefined) return false;
       const latest = bindUniforms(shader.manifest.uniforms, values);
-      const activeSeconds = clock.advance(delta, Number(latest.speed ?? 1));
+      const activeSeconds = clock.advance(frameDelta, Number(latest.speed ?? 1));
       uniforms.uTime.value = integrated ? clock.phase : clock.elapsed;
       uniforms.uAudio.value = ambientAudio.update(audio, activeSeconds);
       const resolution = uniforms.uResolution.value as number[];
@@ -86,6 +92,7 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
         uniforms[definition.name].value = oglValue(definition, integrated && definition.name === 'speed' ? 1 : latest[definition.name]);
       }
       renderer.render({ scene: mesh });
+      return true;
     },
     dispose() {
       suspend();
@@ -104,6 +111,7 @@ export function mountShader(
   shader: ShaderDefinition,
   values: Record<string, unknown>,
   fps = 60,
+  playback?: PlaybackState,
 ): () => void {
   const inlineSize = { width: canvas.style.width, height: canvas.style.height };
   let renderer = renderers.get(canvas);
@@ -119,13 +127,13 @@ export function mountShader(
     renderers.set(canvas, renderer);
     Object.assign(canvas.style, inlineSize);
   }
-  const scene = createScene(renderer, shader, values);
+  const scene = createScene(renderer, shader, values, playback);
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
     renderer.setSize(width, height);
     Object.assign(canvas.style, inlineSize);
-    scene.draw();
+    scene.draw(0, true);
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -148,6 +156,7 @@ export function mountShaderThumbnail(
   canvas: HTMLCanvasElement,
   shader: ShaderDefinition,
   values: Record<string, unknown>,
+  playback?: PlaybackState,
 ): () => void {
   let key = thumbnailKeys.get(canvas);
   if (!key || key.shader !== shader || key.values !== values) {
@@ -158,15 +167,14 @@ export function mountShaderThumbnail(
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Unable to create thumbnail canvas');
     const renderer = thumbnailRenderer ??= new Renderer({ width: 240, height: 300, dpr: 1, alpha: false });
-    const scene = createScene(renderer, shader, values);
+    const scene = createScene(renderer, shader, values, playback);
     return {
       ...scene,
       draw(delta: number) {
         if (renderer.width !== canvas.width || renderer.height !== canvas.height) {
           renderer.setSize(canvas.width, canvas.height);
         }
-        scene.draw(delta);
-        context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
+        if (scene.draw(delta)) context.drawImage(renderer.gl.canvas, 0, 0, canvas.width, canvas.height);
       },
     };
   });

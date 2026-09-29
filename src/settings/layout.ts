@@ -8,7 +8,7 @@ export const settingsMarkup = `
       <button id="clock-tab" type="button" role="tab" aria-selected="false" aria-controls="clock-settings" tabindex="-1" data-tab="clock-settings">Clock</button>
       <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="system-settings" tabindex="-1" data-tab="system-settings">Settings</button>
     </nav>
-    <span class="save-status" data-status role="status">All changes saved locally</span>
+    <div class="save-feedback"><span class="save-status" data-status role="status">All changes saved locally</span><button type="button" data-action="retry-save" hidden>Retry save</button></div>
   </header>
 
   <div class="workspace">
@@ -24,9 +24,16 @@ export const settingsMarkup = `
       <div class="preview-panel">
         <div class="clock-stage">
           <canvas class="preview" width="720" height="574" aria-label="Live shader preview"></canvas>
+          <button type="button" class="fullscreen-exit" data-preview-exit>Exit fullscreen</button>
         </div>
+        <div class="preview-toolbar" aria-label="Preview controls">
+          <button type="button" data-preview-pause aria-pressed="false">Pause animation</button>
+          <button type="button" data-preview-fullscreen>Preview fullscreen</button>
+          <button type="button" data-action="undo-preview" disabled hidden>Undo</button>
+        </div>
+        <p class="preview-status" data-playback-status role="status"></p>
+        <p class="preview-status" data-preview-status role="status" hidden></p>
         <div class="preview-caption">
-          <span class="preview-kicker">Live preview</span>
           <h2 id="preview-title"></h2>
           <p class="preview-description"></p>
           <button type="button" data-action="edit-source" hidden>Edit source</button>

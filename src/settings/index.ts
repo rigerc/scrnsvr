@@ -59,7 +59,10 @@ export class SettingsPanel {
   private previewValues?: Record<string, Value>;
   private importingColors = false;
   private readonly parameterLocks = new Map<string, Set<string>>();
-  private randomUndo?: { shader: string; values: Record<string, Value> };
+  private readonly undoByShader = new Map<string, { values: Record<string, Value>; label: string }>();
+  private saveRevision = 0;
+  private saveQueue: Promise<void> = Promise.resolve();
+  private saveFailed = false;
   private refreshSchemeVisuals: () => void = () => {};
   private lastIntervalMinutes = 10;
   private pendingLookUpdate: string | undefined;
@@ -83,6 +86,8 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
   private render() {
     this.element.innerHTML = settingsMarkup;
     this.controls = this.element.querySelector('.controls')!; this.status = this.element.querySelector('[data-status]')!;
+    this.status.tabIndex = -1;
+    this.element.querySelector<HTMLButtonElement>('[data-action="retry-save"]')?.addEventListener('click', () => this.queueSave(true));
     const audioEnabled = this.element.querySelector<HTMLInputElement>('[data-audio-enabled]')!;
     audioEnabled.checked = this.config.audio.enabled;
     audioEnabled.addEventListener('change', () => { this.config.audio.enabled = audioEnabled.checked; this.queueSave(); });
@@ -167,6 +172,9 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       const card = document.createElement('div');
       card.className = 'shader-card';
       card.dataset.id = manifest.id;
+      card.dataset.title = manifest.title;
+      card.dataset.description = manifest.description ?? '';
+      card.dataset.category = manifest.category ?? 'Ambient';
       const select = document.createElement('button');
       select.type = 'button';
       select.className = 'shader-select';
@@ -213,7 +221,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     const featuredSet = new Set(featured.map(manifest => manifest.id));
     for (const category of shaderCategories) {
       const shaders = this.manifests
-        .filter(manifest => !featuredSet.has(manifest.id) && (manifest.category ?? 'Abstract') === category)
+        .filter(manifest => !featuredSet.has(manifest.id) && (manifest.category ?? 'Ambient') === category)
         .sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base', numeric: true }));
       if (!shaders.length) continue;
       const section = document.createElement('section');
@@ -250,7 +258,13 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
         const next = structuredClone(this.config);
         next.customShaders = [...(next.customShaders ?? []).filter(item => item.id !== shader.id), shader];
         next.shader = shader.id;
-        try { await window.scrnsvr.setConfig(next); }
+        try {
+          if (this.timer) clearTimeout(this.timer);
+          this.timer = undefined;
+          this.saveRevision++;
+          this.saveQueue = this.saveQueue.catch(() => undefined).then(() => window.scrnsvr.setConfig(next));
+          await this.saveQueue;
+        }
         catch (error) { this.queueSave(); throw error; }
         location.reload();
       },
@@ -259,19 +273,23 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.element.querySelector('[data-action="edit-source"]')!.addEventListener('click', () => editSource(true));
     this.bindGlobals();
     this.element.querySelector('[data-action="random"]')!.addEventListener('click', () => this.randomize());
-    this.element.querySelector('[data-action="reset"]')!.addEventListener('click', () => { this.replaceValues({}); this.renderControls(); this.clearRandomUndo(); this.queueSave(); });
-    this.element.querySelector('[data-action="undo-random"]')!.addEventListener('click', () => this.undoRandomize());
+    this.element.querySelector('[data-action="reset"]')!.addEventListener('click', () => { this.captureUndo('Undo reset'); this.replaceValues({}); this.renderControls(); this.queueSave(); });
+    this.element.querySelectorAll('[data-action="undo-random"], [data-action="undo-preview"]').forEach(button => {
+      button.addEventListener('click', () => this.undoRandomize());
+    });
     this.element.querySelector('[data-look-save-form]')!.addEventListener('submit', event => { event.preventDefault(); this.savePreset(); });
     this.element.querySelector('[data-preset]')!.addEventListener('input', () => this.cancelLookUpdate());
     this.element.querySelector('[data-action="update-look"]')!.addEventListener('click', () => this.savePreset(true));
-    this.element.querySelector('[data-action="cancel-update"]')!.addEventListener('click', () => this.cancelLookUpdate());
+    this.element.querySelector('[data-action="cancel-update"]')!.addEventListener('click', () => {
+      this.cancelLookUpdate();
+      (this.element.querySelector('[data-preset]') as HTMLElement).focus();
+    });
     this.element.querySelector('[data-action="import-noctalia"]')!.addEventListener('click', () => void this.importNoctaliaColors());
     this.element.querySelector('[data-shader-scheme]')!.addEventListener('input', event => this.applyShaderScheme((event.target as HTMLSelectElement).value));
     fillSchemeOptions(this.element.querySelector<HTMLSelectElement>('[data-shader-scheme]')!, { inherit: true });
     this.select(this.config.shader);
   }
   private select(id: string) {
-    this.clearRandomUndo();
     this.shader = this.manifests.find(m => m.id === id) ?? this.manifests[0];
     if (!this.shader) return;
     this.config.shader = this.shader.id;
@@ -282,6 +300,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.element.querySelector('#preview-title')!.textContent = this.shader.title;
     this.element.querySelector('.preview-description')!.textContent = this.shader.description ?? 'Adjust the controls to see your changes here immediately.';
     this.renderControls();
+    this.refreshUndoButton();
     this.updateColorImport();
     this.element.querySelector('[data-import-status]')!.textContent = this.shader.uniforms.some(u => u.type === 'color')
       ? 'Apply your desktop palette to this shader.'
@@ -299,9 +318,19 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     const canvas = this.element.querySelector('.preview') as HTMLCanvasElement;
     const stored = this.config.shaders[this.shader.id] ??= {};
     this.previewValues = effectiveShaderValues(this.shader, stored, this.config.colors);
-    this.stopPreview = this.preview
-      ? this.preview.mount(canvas, this.shader, this.previewValues)
-      : this.animateFallback(canvas);
+    const previewStatus = this.element.querySelector<HTMLElement>('[data-preview-status]');
+    try {
+      if (this.preview) {
+        this.stopPreview = this.preview.mount(canvas, this.shader, this.previewValues);
+        if (previewStatus) { previewStatus.textContent = ''; previewStatus.hidden = true; }
+      } else {
+        this.stopPreview = this.animateFallback(canvas);
+        if (previewStatus) { previewStatus.textContent = 'Preview unavailable. Select another visual or reopen settings.'; previewStatus.hidden = false; }
+      }
+    } catch {
+      this.stopPreview = this.animateFallback(canvas);
+      if (previewStatus) { previewStatus.textContent = 'Preview unavailable. Select another visual or reopen settings.'; previewStatus.hidden = false; }
+    }
   }
   private refreshPreviewValues() {
     if (!this.previewValues) return;
@@ -435,6 +464,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
   private buildRotationRow(entry: { shader: string; preset?: string }) {
     const item = document.createElement('li');
     item.className = 'shuffle-item';
+    item.dataset.key = rotationEntryKey(entry.shader, entry.preset);
     const load = document.createElement('button');
     load.type = 'button';
     load.className = 'shuffle-load shuffle-item-label';
@@ -449,6 +479,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     load.setAttribute('aria-label', `Load ${title.textContent}, ${entry.preset ?? 'current edits'}`);
     load.addEventListener('click', () => this.loadShuffleEntry(entry.shader, entry.preset));
     const remove = document.createElement('button');
+    remove.className = 'shuffle-remove';
     remove.type = 'button';
     remove.textContent = 'Remove';
     remove.setAttribute('aria-label', `Remove ${title.textContent}, ${entry.preset ?? 'current edits'} from shuffle`);
@@ -479,14 +510,24 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
   }
   private renderRotationList() {
     const list = this.element.querySelector('[data-rotation-list]') as HTMLUListElement;
+    const active = document.activeElement as HTMLElement | null;
+    const activeRow = active?.closest<HTMLElement>('.shuffle-item');
+    const focusKey = activeRow?.dataset.key;
+    const focusAction = active?.classList.contains('shuffle-load') ? 'load' : active?.classList.contains('shuffle-remove') ? 'remove' : undefined;
+    const focusedIndex = activeRow ? Array.from(list.querySelectorAll('.shuffle-item')).indexOf(activeRow) : -1;
     list.replaceChildren();
     for (const entry of this.config.rotation.entries) list.append(this.buildRotationRow(entry));
+    if (focusKey && focusAction) {
+      const same = list.querySelector<HTMLElement>(`.shuffle-item[data-key="${CSS.escape(focusKey)}"] .shuffle-${focusAction}`);
+      (same ?? list.querySelectorAll<HTMLElement>('.shuffle-item .shuffle-remove')[Math.min(Math.max(focusedIndex, 0), this.config.rotation.entries.length - 1)] ?? this.element.querySelector('[data-rotation="enabled"]'))?.focus();
+    }
     this.refreshRotationEmptyState();
   }
   private loadShuffleEntry(shaderId: string, preset?: string) {
     if (!this.manifests.some(manifest => manifest.id === shaderId)) return;
     const saved = preset ? this.config.presets[shaderId]?.[preset] : undefined;
     if (preset && !saved) return;
+    if (saved) this.captureUndo('Undo apply look', shaderId);
     if (saved) {
       const values = this.config.shaders[shaderId] ??= {};
       for (const key of Object.keys(values)) delete values[key];
@@ -511,16 +552,32 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     this.updateSchemeHint();
   }
   private clearRandomUndo() {
-    this.randomUndo = undefined;
-    const undo = this.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]');
-    if (undo) undo.disabled = true;
+    this.undoByShader.delete(this.shader.id);
+    this.refreshUndoButton();
   }
   private undoRandomize() {
-    if (!this.randomUndo || this.randomUndo.shader !== this.shader.id) return;
-    this.replaceValues(this.randomUndo.values);
+    const undo = this.undoByShader.get(this.shader.id);
+    if (!undo) return;
+    this.replaceValues(undo.values);
     this.clearRandomUndo();
     this.renderControls();
     this.queueSave();
+  }
+  private captureUndo(label: string, shaderId = this.shader.id) {
+    this.undoByShader.set(shaderId, { values: { ...(this.config.shaders[shaderId] ?? {}) }, label });
+    this.refreshUndoButton();
+  }
+  private refreshUndoButton() {
+    const undo = this.undoByShader.get(this.shader?.id);
+    this.element.querySelectorAll<HTMLButtonElement>('[data-action="undo-random"], [data-action="undo-preview"]').forEach(button => {
+      button.disabled = !undo;
+      button.textContent = undo?.label ?? 'Undo';
+      button.setAttribute('aria-label', undo?.label ?? 'Undo');
+      if (button.dataset.action === 'undo-preview') {
+        if (!undo && document.activeElement === button) this.element.querySelector<HTMLButtonElement>('[data-preview-pause]')?.focus();
+        button.hidden = !undo;
+      }
+    });
   }
   private randomize() {
     const stored = this.config.shaders[this.shader.id] ?? {};
@@ -532,10 +589,9 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     }
     const next = randomizeUniforms(this.shader.uniforms, stored, Math.random, protectedNames,
       effectiveShaderValues(this.shader, stored, this.config.colors));
-    this.randomUndo = { shader: this.shader.id, values: { ...stored } };
+    this.captureUndo('Undo randomize');
     this.replaceValues(next);
     this.renderControls();
-    this.element.querySelector<HTMLButtonElement>('[data-action="undo-random"]')!.disabled = false;
     this.queueSave();
   }
   private cancelLookUpdate() {
@@ -568,8 +624,17 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
   private renderPresets() {
     if (!this.shader) return;
     const shaderId = this.shader.id;
+    const active = document.activeElement as HTMLElement | null;
+    const focusedItem = active?.closest<HTMLElement>('.look-item');
+    const focusName = focusedItem?.dataset.lookName;
+    const focusClass = active?.matches('[data-current-shuffle]') ? 'current-shuffle'
+      : active?.classList.contains('look-apply') ? 'look-apply'
+      : active?.classList.contains('look-shuffle') ? 'look-shuffle'
+        : active?.classList.contains('look-rename') ? 'look-rename'
+          : active?.classList.contains('look-delete') ? 'look-delete' : undefined;
     this.element.querySelector('[data-look-shader]')!.textContent = this.shader.title;
     const currentButton = this.element.querySelector('[data-current-shuffle]') as HTMLButtonElement;
+    currentButton.classList.add('current-shuffle');
     const currentIncluded = this.config.rotation.entries.some(entry => entry.shader === shaderId && !entry.preset);
     currentButton.textContent = currentIncluded ? 'Remove from shuffle' : 'Add to shuffle';
     currentButton.setAttribute('aria-pressed', String(currentIncluded));
@@ -587,15 +652,17 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     for (const name of names) {
       const item = document.createElement('article');
       item.className = 'look-item';
+      item.dataset.lookName = name;
       const heading = document.createElement('strong');
       heading.textContent = name;
       const actions = document.createElement('div');
       actions.className = 'look-item-actions';
       const apply = document.createElement('button');
+      apply.className = 'look-apply';
       apply.type = 'button'; apply.textContent = 'Apply';
       apply.setAttribute('aria-label', `Apply ${name} to current edits`);
       apply.onclick = () => {
-        this.clearRandomUndo();
+        this.captureUndo('Undo apply look');
         this.replaceValues({ ...looks[name] });
         this.renderControls();
         this.refreshPreview();
@@ -604,6 +671,7 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       };
       const included = this.config.rotation.entries.some(entry => entry.shader === shaderId && entry.preset === name);
       const add = document.createElement('button');
+      add.className = 'look-shuffle';
       add.type = 'button'; add.textContent = included ? 'Remove from shuffle' : 'Add to shuffle';
       add.setAttribute('aria-pressed', String(included));
       add.setAttribute('aria-label', `${included ? 'Remove' : 'Add'} ${name} ${included ? 'from' : 'to'} shuffle`);
@@ -614,12 +682,14 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       const summary = document.createElement('summary'); summary.textContent = 'More actions';
       const menu = document.createElement('div'); menu.className = 'look-more-actions';
       const rename = document.createElement('button');
+      rename.className = 'look-rename';
       rename.type = 'button'; rename.textContent = 'Rename look';
       rename.onclick = () => {
         more.open = false;
         this.showRenameLook(item, shaderId, name);
       };
       const remove = document.createElement('button');
+      remove.className = 'look-delete';
       remove.type = 'button'; remove.textContent = 'Delete look';
       remove.onclick = () => {
         more.open = false;
@@ -629,6 +699,10 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       item.append(heading, actions, more);
       list.append(item);
     }
+    if (focusClass) {
+      const escaped = focusName ? CSS.escape(focusName) : '';
+      (focusClass === 'current-shuffle' ? currentButton : focusName ? list.querySelector<HTMLElement>(`.look-item[data-look-name="${escaped}"] .${focusClass}`) : null)?.focus();
+    }
   }
   private showRenameLook(item: HTMLElement, shaderId: string, oldName: string) {
     item.querySelector('.look-inline-action')?.remove();
@@ -637,7 +711,11 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     input.setAttribute('aria-label', `New name for ${oldName}`);
     const save = document.createElement('button'); save.type = 'submit'; save.textContent = 'Save name';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel';
-    cancel.onclick = () => form.remove();
+    const returnToLookActions = () => {
+      const more = item.querySelector<HTMLDetailsElement>('.look-more');
+      if (more) { more.open = true; more.querySelector('summary')?.focus(); }
+    };
+    cancel.onclick = () => { form.remove(); returnToLookActions(); };
     const error = document.createElement('p'); error.className = 'look-inline-error'; error.setAttribute('role', 'alert');
     form.onsubmit = event => {
       event.preventDefault();
@@ -650,8 +728,12 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
         delete looks[oldName];
         for (const entry of this.config.rotation.entries) if (entry.shader === shaderId && entry.preset === oldName) entry.preset = nextName;
         this.lookMessage(`Renamed “${oldName}” to “${nextName}”.`);
-        this.renderPresets(); this.renderRotationList(); this.queueSave();
-      } else form.remove();
+        this.renderPresets(); this.renderRotationList();
+        const renamedItem = this.element.querySelector<HTMLElement>(`.look-item[data-look-name="${CSS.escape(nextName)}"]`);
+        const more = renamedItem?.querySelector<HTMLDetailsElement>('.look-more');
+        if (more) { more.open = true; more.querySelector('summary')?.focus(); }
+        this.queueSave();
+      } else { form.remove(); returnToLookActions(); }
     };
     form.append(input, save, cancel, error); item.append(form); input.focus(); input.select();
   }
@@ -661,7 +743,11 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     const question = document.createElement('p'); question.textContent = `Delete “${name}”?`;
     const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel';
-    cancel.onclick = () => confirm.remove();
+    cancel.onclick = () => {
+      confirm.remove();
+      const more = item.querySelector<HTMLDetailsElement>('.look-more');
+      if (more) { more.open = true; more.querySelector('summary')?.focus(); }
+    };
     remove.onclick = () => {
       const wasIncluded = this.config.rotation.entries.some(entry => entry.shader === shaderId && entry.preset === name);
       delete this.config.presets[shaderId][name];
@@ -669,23 +755,39 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       if (!this.config.rotation.entries.length) this.config.rotation.enabled = false;
       this.lookMessage(`Deleted “${name}”${wasIncluded ? ' and removed it from shuffle' : ''}.`);
       this.renderPresets(); this.renderRotationList(); this.queueSave();
+      (this.element.querySelector('.look-item .look-apply') as HTMLElement | null ?? this.element.querySelector('[data-preset]'))?.focus();
     };
     confirm.append(question, remove, cancel); item.append(confirm); remove.focus();
   }
-  private queueSave() {
-    this.status.textContent = 'Saving…';
+  private queueSave(immediate = false) {
+    const revision = ++this.saveRevision;
+    const retry = this.element.querySelector<HTMLButtonElement>('[data-action="retry-save"]');
+    if (!this.saveFailed) this.status.textContent = 'Saving…';
     this.status.dataset.state = 'saving';
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(async () => {
-      try {
-        await window.scrnsvr.setConfig(this.config);
-        this.status.textContent = 'All changes saved locally';
-        this.status.dataset.state = 'saved';
-      } catch {
-        this.status.textContent = 'Could not save changes';
-        this.status.dataset.state = 'error';
-      }
-    }, 300);
+    this.timer = setTimeout(() => {
+      const snapshot = structuredClone(this.config);
+      this.saveQueue = this.saveQueue.catch(() => undefined).then(async () => {
+        try {
+          await window.scrnsvr.setConfig(snapshot);
+          if (revision !== this.saveRevision) return;
+          this.status.textContent = 'All changes saved locally';
+          this.status.dataset.state = 'saved';
+          this.saveFailed = false;
+          if (retry) {
+            const retryWasFocused = document.activeElement === retry;
+            retry.hidden = true;
+            if (retryWasFocused) this.status.focus();
+          }
+        } catch {
+          if (revision !== this.saveRevision) return;
+          this.status.textContent = 'Could not save. Your edits are still here.';
+          this.status.dataset.state = 'error';
+          this.saveFailed = true;
+          if (retry) retry.hidden = false;
+        }
+      });
+    }, immediate ? 0 : 300);
   }
 }
 
