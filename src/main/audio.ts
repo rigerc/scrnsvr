@@ -36,6 +36,7 @@ export class AudioEnvelope {
 /** One capture process shared by all windows; never captures the default mic. */
 export class PlaybackAudio {
   private child?: ChildProcessByStdio<null, Readable, Readable>;
+  private idleStopTimer?: ReturnType<typeof setTimeout>;
   private enabled = false;
   private listeners = new Set<(frame: AudioFrame) => void>();
   private frame = { ...silentAudio };
@@ -50,10 +51,27 @@ export class PlaybackAudio {
     this.sync();
   }
   subscribe(listener: (frame: AudioFrame) => void) {
+    this.cancelIdleStop();
     this.listeners.add(listener);
     listener(this.frame);
     this.sync();
-    return () => { this.listeners.delete(listener); if (!this.listeners.size) this.stop(); };
+    return () => {
+      if (this.listeners.delete(listener) && !this.listeners.size) this.scheduleIdleStop();
+    };
+  }
+  private cancelIdleStop() {
+    if (this.idleStopTimer) clearTimeout(this.idleStopTimer);
+    this.idleStopTimer = undefined;
+  }
+  private scheduleIdleStop() {
+    if (!this.child || this.idleStopTimer) return;
+    // Scene swaps briefly unsubscribe before the next scene subscribes. Keep
+    // capture alive across that handoff, but release it for non-audio scenes.
+    this.idleStopTimer = setTimeout(() => {
+      this.idleStopTimer = undefined;
+      if (!this.listeners.size) this.stop();
+    }, 250);
+    this.idleStopTimer.unref?.();
   }
   private sync() {
     if (!this.enabled || !this.listeners.size || this.child) return;
@@ -69,6 +87,7 @@ export class PlaybackAudio {
     child.stderr.on('data', (data: Buffer) => { detail = (detail + data.toString()).slice(-500); });
     const fail = () => {
       if (this.child !== child) return;
+      this.cancelIdleStop();
       this.child = undefined;
       this.publish({ ...silentAudio, status: `Audio unavailable. Install pulseaudio-utils and run PulseAudio or pipewire-pulse. Toggle audio off/on to retry. ${detail.trim()}` });
     };
@@ -76,6 +95,7 @@ export class PlaybackAudio {
     child.on('exit', fail);
   }
   stop() {
+    this.cancelIdleStop();
     const child = this.child;
     this.child = undefined;
     child?.kill();
