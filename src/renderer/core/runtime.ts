@@ -8,6 +8,8 @@ import { AmbientAudio } from './ambient-audio';
 import { AnimationClock } from './animation-clock';
 import { ThumbnailScheduler } from './thumbnail-scheduler';
 import { PlaybackGate, type PlaybackState } from './playback';
+import type { EffectRuntimeOptions } from '../../shared/effects';
+import { EffectStack, disposeProgram } from './effects';
 
 export interface ShaderDefinition {
   manifest: ShaderManifest;
@@ -30,7 +32,7 @@ export function oglValue(definition: UniformManifest, value: unknown): unknown {
 // across shader switches instead of resetting the cache over existing GL state.
 const renderers = new WeakMap<HTMLCanvasElement, Renderer>();
 
-function createScene(renderer: Renderer, shader: ShaderDefinition, values: Record<string, unknown>, playback?: PlaybackState) {
+function createScene(renderer: Renderer, shader: ShaderDefinition, values: Record<string, unknown>, playback?: PlaybackState, options?: EffectRuntimeOptions) {
   const gl = renderer.gl;
   const resolved = bindUniforms(shader.manifest.uniforms, values);
   const mountedAt = new Date();
@@ -39,6 +41,7 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
   const clock = new AnimationClock();
   const integrated = shader.animationTime === 'integrated';
   const gate = new PlaybackGate(playback);
+  const effects = options ? new EffectStack(renderer, options) : undefined;
   const usesAudio = /\buAudio\b/.test(shader.source);
   let unsubscribeAudio: (() => void) | undefined;
   const resume = () => {
@@ -79,7 +82,8 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
     suspend,
     draw(delta = 0, force = false) {
       if (playback?.paused) suspend(); else resume();
-      const frameDelta = gate.frame(delta, values, force);
+      const effectsChanged = effects?.reconcile() ?? false;
+      const frameDelta = gate.frame(delta, values, force || effectsChanged);
       if (frameDelta === undefined) return false;
       const latest = bindUniforms(shader.manifest.uniforms, values);
       const activeSeconds = clock.advance(frameDelta, Number(latest.speed ?? 1));
@@ -91,17 +95,15 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
       for (const definition of shader.manifest.uniforms) {
         uniforms[definition.name].value = oglValue(definition, integrated && definition.name === 'speed' ? 1 : latest[definition.name]);
       }
-      renderer.render({ scene: mesh });
+      if (effects) effects.render(mesh, frameDelta);
+      else renderer.render({ scene: mesh });
       return true;
     },
     dispose() {
       suspend();
       geometry.remove();
-      // OGL retains uploaded uniform values in its renderer cache.
-      for (const location of program.uniformLocations.values()) renderer.state.uniformLocations.delete(location);
-      gl.deleteShader(program.vertexShader);
-      gl.deleteShader(program.fragmentShader);
-      program.remove();
+      effects?.dispose();
+      disposeProgram(renderer, program);
     },
   };
 }
@@ -112,6 +114,7 @@ export function mountShader(
   values: Record<string, unknown>,
   fps = 60,
   playback?: PlaybackState,
+  options?: EffectRuntimeOptions,
 ): () => void {
   const inlineSize = { width: canvas.style.width, height: canvas.style.height };
   let renderer = renderers.get(canvas);
@@ -127,11 +130,11 @@ export function mountShader(
     renderers.set(canvas, renderer);
     Object.assign(canvas.style, inlineSize);
   }
-  const scene = createScene(renderer, shader, values, playback);
+  const scene = createScene(renderer, shader, values, playback, options);
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
-    renderer.setSize(width, height);
+    if (renderer.width !== width || renderer.height !== height) renderer.setSize(width, height);
     Object.assign(canvas.style, inlineSize);
     scene.draw(0, true);
   };

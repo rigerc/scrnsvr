@@ -52,10 +52,14 @@ describe('config', () => {
     process.env.XDG_CONFIG_HOME = temporary;
     expect(await loadConfig()).toEqual(defaultConfig);
     const first = ConfigSchema.parse({ shader: 'plasma' });
-    const last = ConfigSchema.parse({ shader: 'interference', global: { fps: 30 } });
+    const last = ConfigSchema.parse({ shader: 'interference', global: { fps: 30 }, effects: {
+      enabled: false, layers: [{ id: 'tape-1', effectId: 'vhs-distortion', enabled: true, values: { grain: 0.6 } }],
+    } });
     await Promise.all([saveConfig(first), saveConfig(last)]);
     const stored = JSON.parse(await readFile(configPath(), 'utf8'));
     expect(stored.shader).toBe('interference');
     expect(stored.global.fps).toBe(30);
+    expect(stored.effects).toEqual(last.effects);
+    expect((await loadConfig()).effects).toEqual(last.effects);
   });
 });

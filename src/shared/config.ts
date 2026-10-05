@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { clockFonts, clockPositions, defaultClockConfig } from './clock';
 import { RotationSchema } from './rotation';
 import { CustomShadersSchema } from './custom-shaders';
+import { EffectsSchema } from './effects';
 
 const ClockSchema = z.object({
   enabled: z.boolean().default(defaultClockConfig.enabled),
@@ -46,6 +47,7 @@ const ConfigObjectSchema = z.object({
   rotation: RotationSchema,
   colors: ColorSchemeSchema,
   customShaders: CustomShadersSchema,
+  effects: EffectsSchema,
   audio: z.object({ enabled: z.boolean().default(false) }).default({}),
   shaders: z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()]))).default({}),
   presets: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.union([z.number(), z.boolean(), z.string()])))).default({})

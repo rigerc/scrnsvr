@@ -321,7 +321,7 @@ body { overflow: hidden; }
 .shader-advanced .shader-control-group { margin-top: 16px; }
 
 .scrnsvr-settings .shader-actions { display: flex; gap: 9px; margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line); }
-.scrnsvr-settings :is(.shader-actions, .color-import, .looks-workspace, .looks-settings, .inspector-heading, .audio-settings, .clock-settings, .preview-caption) button:not(.uniform-reset) {
+.scrnsvr-settings :is(.shader-actions, .color-import, .looks-workspace, .looks-settings, .inspector-heading, .audio-settings, .clock-settings, .preview-caption, .effects-settings) button:not(.uniform-reset) {
   padding: 8px 11px;
   border: 1px solid var(--line-strong);
   border-radius: 5px;
@@ -329,12 +329,36 @@ body { overflow: hidden; }
   color: var(--ink);
   font-size: 12px;
 }
-.scrnsvr-settings :is(.shader-actions, .color-import, .looks-workspace, .looks-settings, .inspector-heading, .audio-settings, .clock-settings, .preview-caption) button:not(.uniform-reset):hover {
+.scrnsvr-settings :is(.shader-actions, .color-import, .looks-workspace, .looks-settings, .inspector-heading, .audio-settings, .clock-settings, .preview-caption, .effects-settings) button:not(.uniform-reset):hover {
   border-color: var(--signal);
   background: #38302c;
 }
 .scrnsvr-settings .shader-actions button { flex: 1; }
 .scrnsvr-settings .shader-actions [data-action="reset"] { color: var(--signal) !important; }
+/* Effects extend the existing inspector rather than introducing another workspace. */
+.effects-intro, .effects-empty, .effect-description, .effect-add p, .effect-status, .effect-layer-status {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.effect-add { margin: 22px 0 24px; }
+.effect-add > label { display: block; margin-bottom: 7px; color: var(--ink); font-size: 12px; }
+.effect-add-row { display: flex; gap: 8px; }
+.effect-add-row select { flex: 1; min-width: 0; padding: 7px 8px; }
+.effect-add-row button { flex: none; }
+.effect-stack-heading { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.effect-stack-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.effect-stack-heading span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.effect-list { padding: 0; margin: 0; list-style: none; }
+.effect-layer { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.effect-details summary { cursor: pointer; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.effect-layer-controls { padding-top: 6px; }
+.effect-layer .toggle-row { margin: 12px 0; }
+.effect-layer-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.scrnsvr-settings .effect-layer-actions button { padding: 6px 8px; }
+.effect-status:empty, .effect-layer-status:empty { display: none; }
+.effect-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .color-import, .audio-settings { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
 .scrnsvr-settings :is(.color-import, .audio-settings) h2 { margin: 0 0 14px; font-size: 14px; font-weight: 600; }
 .color-import label, .global > label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
@@ -575,12 +599,15 @@ body { overflow: hidden; }
 .uniform-reset:disabled { visibility: hidden; }
 @media (max-width: 980px) {
   .app-header { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; }
-  .main-tabs { justify-content: flex-end; }
+  .main-tabs { justify-content: flex-end; gap: 8px; }
+  .main-tabs button { min-width: 0; padding-right: 8px; padding-left: 8px; font-size: 14px; }
   .save-feedback { grid-column: 1 / -1; padding: 4px 16px 8px; }
   .inspector { scroll-margin-top: 90px; }
 }
 @media (max-width: 620px) {
   .app-header { grid-template-columns: 1fr; }
+  .main-tabs { gap: 4px; }
+  .main-tabs button { padding: 8px 4px; font-size: 12px; }
   .save-feedback { justify-content: flex-start; }
   .inspector { scroll-margin-top: 130px; }
 }

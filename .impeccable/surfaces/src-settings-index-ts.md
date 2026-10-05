@@ -22,3 +22,9 @@ Mode: Operate. Audience: Linux desktop users choosing a shader to preview, then 
 **FORM:** Visual Mixer, grounded direction 1, concept seed `ceeb1022`, chosen as Impeccable's pick by the user. The approved visual target is `.impeccable/mocks/decision/model-pick.png`.
 
 **FINISH:** unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Effects extension
+
+Effects extends the existing Operate inspector without changing the Visual Mixer world. The Effects tab beside Visuals exposes a globally bypassable, top-to-bottom stack of up to eight independent layers. Expanded VHS controls update the main GPU preview without resetting visual time. Keyboard move/remove actions retain focus; failures stay visible beside the preview. Gallery and clock remain unprocessed. The feature's proof is live composition, not a separate illustration.
+
+Finish review: independent read-only settings review accepted desktop (1280px), narrow (390px), and fullscreen captures with no findings. Unit and real Electron checks covered edits, focus, bypass, save failure/retry, reload, and gallery/clock exclusion. No shipping raster was added. DESIGN.md documents the new component.

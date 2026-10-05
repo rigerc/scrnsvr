@@ -1,4 +1,6 @@
 import type { Config } from '../shared/config';
+import { normalizeEffects, type EffectRuntimeOptions } from '../shared/effects';
+import { mountEffectsControls } from './effects';
 import { shaderCategories, type ShaderManifest } from '../shared/manifest';
 import { noctaliaShaderValues } from '../shared/noctalia';
 import { defaultClockConfig } from '../shared/clock';
@@ -39,7 +41,7 @@ function fillSchemeOptions(select: HTMLSelectElement, options: { inherit?: boole
   }
 }
 export interface PreviewRuntime {
-  mount(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void;
+  mount(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>, options?: EffectRuntimeOptions): () => void;
   mountThumbnail?(canvas: HTMLCanvasElement, shader: ShaderManifest, values: Record<string, Value>): () => void;
 }
 export interface SettingsOptions { root: HTMLElement; manifests: ShaderManifest[]; initial?: Config; preview?: PreviewRuntime; }
@@ -57,6 +59,7 @@ export class SettingsPanel {
   private preview?: PreviewRuntime;
   private stopPreview?: () => void;
   private previewValues?: Record<string, Value>;
+  private effectControls?: ReturnType<typeof mountEffectsControls>;
   private importingColors = false;
   private readonly parameterLocks = new Map<string, Set<string>>();
   private readonly undoByShader = new Map<string, { values: Record<string, Value>; label: string }>();
@@ -73,12 +76,13 @@ export class SettingsPanel {
   constructor(options: SettingsOptions) {
     this.manifests = options.manifests;
     this.preview = options.preview;
-this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, audio: { enabled: false }, colors: { scheme: 'none', overrides: {} }, customShaders: [], shaders: {}, presets: {} } as Config);
+this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, audio: { enabled: false }, colors: { scheme: 'none', overrides: {} }, effects: { enabled: true, layers: [] }, customShaders: [], shaders: {}, presets: {} } as Config);
     this.config.clock = { ...defaultClockConfig, ...this.config.clock };
     this.config.rotation ??= { enabled: false, entries: [], intervalMinutes: 0 };
     this.config.audio ??= { enabled: false };
     this.config.colors ??= { scheme: SCHEME_NONE, overrides: {} };
     this.config.colors.overrides ??= {};
+    this.config.effects = normalizeEffects(this.config.effects);
     this.element = options.root;
     this.element.className = 'scrnsvr-settings';
     this.render();
@@ -121,6 +125,12 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
       }
     };
     this.activateTab = activateTab;
+    this.effectControls = mountEffectsControls(
+      this.element.querySelector('#effects-settings') as HTMLElement,
+      this.config.effects,
+      () => this.queueSave(),
+      this.element.querySelector('[data-preview-effect-status]') as HTMLElement,
+    );
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', () => activateTab(tab));
       tab.addEventListener('keydown', event => {
@@ -319,9 +329,13 @@ this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field
     const stored = this.config.shaders[this.shader.id] ??= {};
     this.previewValues = effectiveShaderValues(this.shader, stored, this.config.colors);
     const previewStatus = this.element.querySelector<HTMLElement>('[data-preview-status]');
+    this.effectControls?.clearStatus();
     try {
       if (this.preview) {
-        this.stopPreview = this.preview.mount(canvas, this.shader, this.previewValues);
+        this.stopPreview = this.preview.mount(canvas, this.shader, this.previewValues, {
+          effects: this.config.effects,
+          onEffectStatus: status => this.effectControls?.reportStatus(status),
+        });
         if (previewStatus) { previewStatus.textContent = ''; previewStatus.hidden = true; }
       } else {
         this.stopPreview = this.animateFallback(canvas);

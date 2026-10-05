@@ -122,7 +122,8 @@ Controls and shader images use 4–5px corners; the custom editor uses 8px. The 
 - **Live preview:** large WebGL canvas with the actual clock overlay, followed by a ruled caption and shader description.
 - **Inspector control:** group label, compact name/reset row, slider or field, and numeric value where useful. Advanced controls collapse below the primary set.
 - **Looks & Shuffle:** the selected visual's saved looks sit beside a compact live preview, with the shuffle list and timing controls in the inspector. Named looks and current edits have separate, explicit add/remove actions.
-- **Navigation tabs:** plain text in the top bar; the selected tab receives a coral underline.
+- **Effects inspector:** a global Enable effects toggle and Add effect row sit above an ordered stack. Layer summaries disclose controls; explicit move buttons, reset, remove, and enable actions preserve keyboard access. The main preview shows the composed image while gallery thumbnails and the clock stay clean. Effect failures appear beside the preview, separate from save status.
+- **Navigation tabs:** Visuals, Effects, Looks & Shuffle, Clock, and Settings use plain text in the top bar; the selected tab receives a coral underline.
 - **Action button and input:** charcoal fills and fine borders, with coral hover and focus treatments.
 
 ## Do's and Don'ts

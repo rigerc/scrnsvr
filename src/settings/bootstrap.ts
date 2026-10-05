@@ -14,9 +14,9 @@ const preview: PreviewRuntime = {
   mountThumbnail(canvas, manifest, values) {
     return mountShaderThumbnail(canvas, available[manifest.id], values, playback);
   },
-  mount(canvas, manifest, values) {
+  mount(canvas, manifest, values, options) {
     const definition = available[manifest.id];
-    return definition ? mountShader(canvas, definition, values, 30, playback) : () => undefined;
+    return definition ? mountShader(canvas, definition, values, 30, playback, options) : () => undefined;
   },
 };
 

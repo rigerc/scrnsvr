@@ -30,6 +30,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 - 41 GLSL shaders, from quiet ambient gradients to reactive audio effects
 - 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
+- Global GPU effect stack: adjustable VHS Distortion, independent layers, reorder and bypass, live preview
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -66,6 +67,7 @@ npm run typecheck
 npm test
 # Chromium/WebGL rendering and settings integration checks (desktop or Xvfb)
 npm run check-shaders
+npm run check-effects
 ```
 
 CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
@@ -75,6 +77,16 @@ CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview
 Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
 
 Every shader supports speed, brightness, and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color. Existing settings and presets retain their values, with newly added parameters taking their defaults.
+
+### Global effects
+
+Open **Effects** and add **VHS Distortion** to give any built-in or custom visual an analog tape look. Adjust **Intensity**, **Grain**, **Scanlines**, **Color bleed**, and **Tracking distortion**; setting Intensity to zero bypasses that layer. Effects start empty, so existing configurations look unchanged.
+
+Stack up to eight layers, including multiple independently adjusted VHS layers. They run top to bottom; use Move up/down to change the order. Each layer can be disabled, reset, or removed. **Enable effects** bypasses the whole stack without deleting your adjustments.
+
+The stack is global: changing visuals, applying saved looks, randomizing, changing color schemes, or shuffling keeps the same effects. The main live preview, fullscreen preview, and screensaver show the result; gallery thumbnails stay clean. The clock stays crisp above the processed image, and fade transitions are unchanged.
+
+VHS motion continues when a visual's Speed is zero. **Pause animation** freezes both the visual and effects, while adjustments still redraw. Changes save locally using the normal autosave/retry flow and take effect in saver windows on their next launch or shader cycle. Unavailable or failed effects are skipped rather than blanking the visual. This version ships built-in VHS only; the custom shader editor creates visuals, not post-processing effects.
 
 ### Color schemes
 
@@ -86,7 +98,7 @@ Every built-in shader lives in `src/renderer/shaders/<id>/` as a `manifest.ts` (
 
 Resolved by `configPath()` in `src/shared/config.ts`:
 
-- active shader, global FPS / idle threshold / monitor scope, clock block, `colors` scheme and per-shader overrides, `shaders` values, `presets`
+- active shader, global FPS / idle threshold / monitor scope, clock block, `colors` scheme and per-shader overrides, `effects` global ordered stack, `shaders` values, `presets`
 - legacy top-level `fps`/`monitor` keys are migrated into `global` on load
 
 Example (`~/.config/scrnsvr/config.json`):
@@ -97,6 +109,10 @@ Example (`~/.config/scrnsvr/config.json`):
   "global": { "idleThresholdSeconds": 300, "fps": 60, "monitors": "primary" },
   "kiosk": true,
   "clock": { "enabled": true, "position": "center", "format": "24h", "showSeconds": false, "showDate": true },
+  "effects": {
+    "enabled": true,
+    "layers": [{ "id": "tape-1", "effectId": "vhs-distortion", "enabled": true, "values": { "intensity": 0.5, "grain": 0.2 } }]
+  },
   "shaders": { "plasma": { "speed": 0.65 } },
   "presets": {}
 }
@@ -118,7 +134,7 @@ systemctl --user enable --now scrnsvr.service
 ## Project layout
 
 - `src/main/` — Electron entry, CLI, idle daemon, Noctalia loader, IPC (`config:get/set`, `colors:import-noctalia`)
-- `src/renderer/` — OGL runtime (`core/runtime.ts`), clock overlay (`core/clock.ts`), shader set (`shaders/*/manifest.ts` + `shader.glsl`)
+- `src/renderer/` — OGL runtime (`core/runtime.ts`), post-processing effects (`effects/`), clock overlay (`core/clock.ts`), shader set (`shaders/*/manifest.ts` + `shader.glsl`)
 - `src/settings/` — settings window UI + clock controls
 - `src/shared/` — Zod config, clock/Noctalia helpers, IPC keys, shader manifest schema
 - `scripts/build.mjs` — esbuild bundles for main/preload/renderer/settings + static copies

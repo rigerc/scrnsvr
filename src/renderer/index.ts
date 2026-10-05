@@ -29,7 +29,10 @@ function createSceneState(config: Config, registry: ShaderRegistry, chosen: Shad
   return {
     config, registry, canvas,
     currentKey: rotationEntryKey(chosen.manifest.id, preset),
-    stop: mountShader(canvas, chosen, resolveShaderValues(config, registry, chosen.manifest.id, preset), config.global.fps),
+    stop: mountShader(canvas, chosen, resolveShaderValues(config, registry, chosen.manifest.id, preset), config.global.fps, undefined, {
+      effects: config.effects,
+      onEffectStatus: status => console.warn('[scrnsvr effects]', status.layerId ?? 'stack', status.message),
+    }),
   };
 }
 
@@ -42,7 +45,10 @@ function applyPick(state: SceneState, pick: CyclePick, fade?: FadeOverlay): void
   state.currentKey = key;
   const swap = () => {
     state.stop();
-    state.stop = mountShader(state.canvas, next, resolveShaderValues(state.config, state.registry, pick.shader, pick.preset), state.config.global.fps);
+    state.stop = mountShader(state.canvas, next, resolveShaderValues(state.config, state.registry, pick.shader, pick.preset), state.config.global.fps, undefined, {
+      effects: state.config.effects,
+      onEffectStatus: status => console.warn('[scrnsvr effects]', status.layerId ?? 'stack', status.message),
+    });
   };
   if (fade) fade.transition(swap);
   else swap();

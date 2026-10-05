@@ -4,6 +4,7 @@ export const settingsMarkup = `
     <div class="app-brand" aria-label="scrnsvr">scrnsvr</div>
     <nav class="main-tabs" role="tablist" aria-label="Settings views">
       <button id="shader-tab" type="button" role="tab" aria-selected="true" aria-controls="shader-settings" data-tab="shader-settings">Visuals</button>
+      <button id="effects-tab" type="button" role="tab" aria-selected="false" aria-controls="effects-settings" tabindex="-1" data-tab="effects-settings">Effects</button>
       <button id="looks-tab" type="button" role="tab" aria-selected="false" aria-controls="looks-settings" tabindex="-1" data-tab="looks-settings">Looks &amp; Shuffle</button>
       <button id="clock-tab" type="button" role="tab" aria-selected="false" aria-controls="clock-settings" tabindex="-1" data-tab="clock-settings">Clock</button>
       <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="system-settings" tabindex="-1" data-tab="system-settings">Settings</button>
@@ -33,6 +34,7 @@ export const settingsMarkup = `
         </div>
         <p class="preview-status" data-playback-status role="status"></p>
         <p class="preview-status" data-preview-status role="status" hidden></p>
+        <p class="preview-status" data-preview-effect-status role="status" aria-live="polite" hidden></p>
         <div class="preview-caption">
           <h2 id="preview-title"></h2>
           <p class="preview-description"></p>
@@ -95,6 +97,8 @@ export const settingsMarkup = `
           <p data-import-status role="status">Apply your desktop palette to this shader.</p>
         </section>
       </section>
+
+      <section id="effects-settings" class="effects-settings" role="tabpanel" aria-labelledby="effects-tab" hidden></section>
 
       <section id="looks-settings" class="looks-settings" role="tabpanel" aria-labelledby="looks-tab" hidden>
         <div class="shuffle-heading"><h2>Shuffle list</h2><span data-shuffle-count></span></div>
