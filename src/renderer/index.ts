@@ -2,6 +2,7 @@ import { shaderRegistry as builtins } from './shaders';
 import { withCustomShaders } from '../shared/custom-shaders';
 import { mountShader, type ShaderDefinition } from './core/runtime';
 import type { Config } from '../shared/config';
+import type { CyclePick } from '../shared/ipc';
 import { defaultClockConfig, type ClockConfig } from '../shared/clock';
 import { rotationEntryKey } from '../shared/rotation';
 import { resolveShaderSelection, resolveShaderValues, createPointerDismiss } from './core/selection';
@@ -9,7 +10,6 @@ import { mountClock } from './core/clock';
 import { mountFadeOverlay, type FadeOverlay } from './core/fade';
 
 type ShaderRegistry = Record<string, ShaderDefinition>;
-interface CyclePick { shader: string; preset?: string; }
 
 interface SceneState {
   config: Config;
@@ -81,7 +81,7 @@ function resolveClockConfig(config: Config): ClockConfig {
 }
 
 async function startRenderer(): Promise<void> {
-  const config = await window.scrnsvr.getConfig() as Config;
+  const config = await window.scrnsvr.getConfig();
   const params = new URLSearchParams(location.search);
   let registry = withCustomShaders(builtins, config.customShaders) as ShaderRegistry;
   const chosen = resolveShaderSelection(registry, resolveRequestedShader(params, config));

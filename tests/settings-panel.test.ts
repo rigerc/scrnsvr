@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPanel, type PreviewRuntime } from '../src/settings/index';
 import { defaultClockConfig } from '../src/shared/clock';
-import type { Config } from '../src/shared/config';
+import { defaultConfig, type Config } from '../src/shared/config';
 import type { ShaderManifest, UniformManifest } from '../src/shared/manifest';
 
 class FakeIntersectionObserver {
@@ -102,6 +102,21 @@ afterEach(() => {
 });
 
 describe('SettingsPanel', () => {
+  it('uses shared defaults with independent state when no initial config is supplied', () => {
+    const firstRoot = document.createElement('div');
+    const secondRoot = document.createElement('div');
+    document.body.append(firstRoot, secondRoot);
+    const first = new SettingsPanel({ root: firstRoot, manifests: [plasma], preview: makePreview() });
+    const fps = first.element.querySelector<HTMLInputElement>('[data-global="fps"]')!;
+    expect(fps.value).toBe(String(defaultConfig.global.fps));
+    fps.value = '90';
+    fps.dispatchEvent(new Event('input', { bubbles: true }));
+    const second = new SettingsPanel({ root: secondRoot, manifests: [plasma], preview: makePreview() });
+    expect(second.element.querySelector('#preview-title')?.textContent).toBe('Plasma');
+    expect(second.element.querySelector<HTMLInputElement>('[data-global="fps"]')!.value).toBe(String(defaultConfig.global.fps));
+    expect(defaultConfig.global.fps).toBe(60);
+  });
+
   it('mounts the shell, selects the shader and lists saved looks', () => {
     const preview = makePreview();
     const settings = panel(preview);

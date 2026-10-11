@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPanel, type PreviewRuntime } from '../src/settings/index';
+import { mountEffectsControls } from '../src/settings/effects';
 
 // This suite owns settings behavior, not the custom editor's GPU runtime.
 vi.mock('../src/settings/custom-shader-editor', () => ({ openCustomShaderEditor: vi.fn() }));
@@ -43,7 +44,10 @@ function makePanel(thumbnails = true) {
   return new SettingsPanel({ root, manifests: [shader, other], initial: config, preview }).element;
 }
 function button(root: ParentNode, selector: string) { return root.querySelector<HTMLButtonElement>(selector)!; }
-function add(root: ParentNode) { button(root, '[data-action="add-effect"]').click(); }
+function add(root: ParentNode, effectId?: string) {
+  if (effectId) root.querySelector<HTMLSelectElement>('[data-effect-choice]')!.value = effectId;
+  button(root, '[data-action="add-effect"]').click();
+}
 function rows(root: ParentNode) { return [...root.querySelectorAll<HTMLElement>('[data-effect-layer]')]; }
 function action(row: ParentNode, name: string) { return button(row, `[data-effect-action="${name}"]`); }
 function options() { return mount.mock.calls[0][3] as EffectRuntimeOptions; }
@@ -81,6 +85,49 @@ describe('global effect settings', () => {
     expect(root.querySelector('.preview-column')?.hasAttribute('hidden')).toBe(false);
     expect(root.querySelector('[data-effects-empty]')).toHaveProperty('hidden', false);
     expect(root.querySelector('[data-effect-choice] option')?.textContent).toBe('VHS Distortion');
+  });
+
+  it('offers the complete catalog in metadata order and explains its breadth in the empty state', () => {
+    const root = makePanel();
+    const choices = [...root.querySelectorAll<HTMLOptionElement>('[data-effect-choice] option')];
+    expect(choices).toHaveLength(17);
+    expect(choices.map(option => option.value)).toEqual(Object.keys(effectManifests));
+    expect(choices[0].value).toBe('vhs-distortion');
+    expect(root.querySelector('[data-effects-empty]')?.textContent).toContain('color grading, glow, and trails');
+  });
+
+  it.each(Object.values(effectManifests))('renders metadata-driven typed controls for $title', manifest => {
+    const root = makePanel(); add(root, manifest.id);
+    const row = rows(root)[0];
+    for (const def of manifest.uniforms) {
+      const control = row.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-effect-name="${def.name}"]`)!;
+      expect(control).toBeTruthy();
+      expect(row.querySelector(`label[for="${control.id}"]`)?.textContent).toBe(def.label ?? def.name);
+      expect(control.getAttribute('aria-label')).toContain(`${manifest.title}, layer 1`);
+      const hint = root.querySelector(`#${control.getAttribute('aria-describedby')}`);
+      expect(hint?.textContent).toBe(def.description ?? '');
+      if (def.type === 'float' || def.type === 'int') {
+        expect(control).toHaveProperty('type', 'range');
+        const number = row.querySelector<HTMLInputElement>(`[data-effect-number="${def.name}"]`)!;
+        expect(number.type).toBe('number');
+        for (const numeric of [control as HTMLInputElement, number]) {
+          expect(numeric.min).toBe(String(def.min));
+          expect(numeric.max).toBe(String(def.max));
+          expect(numeric.step).toBe(String(def.type === 'int' ? 1 : def.step ?? 0.01));
+          expect(numeric.value).toBe(String(def.default));
+          expect(numeric.getAttribute('aria-describedby')).toBe(hint?.id);
+        }
+      } else if (def.type === 'select') {
+        expect(control.tagName).toBe('SELECT');
+        expect([...(control as HTMLSelectElement).options].map(option => option.value)).toEqual(def.options);
+        expect(control.value).toBe(def.default);
+      } else {
+        expect(control).toHaveProperty('type', def.type === 'bool' ? 'checkbox' : 'color');
+        if (def.type === 'bool') expect(control).toHaveProperty('checked', def.default);
+        else expect(control.value).toBe(def.default);
+      }
+    }
+    expect(mount).toHaveBeenCalledTimes(1);
   });
 
   it('normalizes missing and damaged legacy effects without resetting visuals', () => {
@@ -140,6 +187,142 @@ describe('global effect settings', () => {
     const number = input(rows(root)[0], '[data-effect-number="intensity"]', '', 'change');
     expect(number.value).toBe('0.35');
     expect(config.effects.layers[0].values.intensity).toBe(0.35);
+  });
+
+  it('snaps integers, clamps bounds, accepts Enter and restores empty/invalid entry without saving', () => {
+    const root = document.createElement('div'); document.body.append(root);
+    const effects = makeConfig().effects;
+    const changed = vi.fn(); mountEffectsControls(root, effects, changed);
+    add(root, 'pixelate'); changed.mockClear();
+    const selector = '[data-effect-number="pixelSize"]';
+    const number = input(rows(root)[0], selector, '11.7', 'change');
+    expect(effects.layers[0].values.pixelSize).toBe(12);
+    expect(number.value).toBe('12');
+    expect(rows(root)[0].querySelector('[data-effect-name="pixelSize"]')).toHaveProperty('value', '12');
+    input(rows(root)[0], selector, '-4', 'change');
+    expect(effects.layers[0].values.pixelSize).toBe(1);
+    input(rows(root)[0], selector, '12345', 'change');
+    expect(effects.layers[0].values.pixelSize).toBe(96);
+    number.value = '18.4';
+    number.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(effects.layers[0].values.pixelSize).toBe(18);
+    changed.mockClear();
+    for (const invalid of ['', 'invalid', 'Infinity']) {
+      input(rows(root)[0], selector, invalid, 'change');
+      expect(number.value).toBe('18');
+      expect(effects.layers[0].values.pixelSize).toBe(18);
+    }
+    expect(changed).not.toHaveBeenCalled();
+    expect(document.body.contains(number)).toBe(true);
+  });
+
+  it('snaps floating-point steps relative to the declared minimum rather than zero', () => {
+    // A non-zero step origin proves the generic control, beyond today's catalog values.
+    effectManifests['step-origin-test'] = {
+      id: 'step-origin-test', title: 'Step origin test', description: '',
+      uniforms: [{ name: 'offset', type: 'float', default: 0.15, min: 0.15, max: 0.95, step: 0.2 }],
+    };
+    try {
+      const root = makePanel(); add(root, 'step-origin-test');
+      input(rows(root)[0], '[data-effect-number="offset"]', '0.38', 'change');
+      expect(config.effects.layers[0].values.offset).toBe(0.35);
+      input(rows(root)[0], '[data-effect-number="offset"]', '-9', 'change');
+      expect(config.effects.layers[0].values.offset).toBe(0.15);
+      input(rows(root)[0], '[data-effect-number="offset"]', '9', 'change');
+      expect(config.effects.layers[0].values.offset).toBe(0.95);
+    } finally { delete effectManifests['step-origin-test']; }
+  });
+
+  it('edits all input types live, saves and reloads repeated independent instances, and resets values only', async () => {
+    const root = makePanel(); const effects = options().effects!;
+    for (const id of ['pixelate', 'pixelate', 'vignette', 'halftone-print', 'datamosh-trails', 'palette-mapping', 'color-grade']) add(root, id);
+    input(rows(root)[0], '[data-effect-number="pixelSize"]', '17.8', 'change');
+    input(rows(root)[2], '[data-effect-name="edgeColor"]', '#aabbcc');
+    toggle(rows(root)[3], '[data-effect-name="invert"]', true);
+    input(rows(root)[4], '[data-effect-name="mode"]', 'Datamosh', 'change');
+    input(rows(root)[5], '[data-effect-name="palette"]', 'Ocean', 'change');
+    const warmth = input(rows(root)[6], '[data-effect-number="warmth"]', '-0.476', 'change');
+    warmth.focus(); input(rows(root)[6], '[data-effect-number="warmth"]', '-0.42', 'change');
+    expect(document.activeElement).toBe(warmth);
+    expect(effects.layers.map(layer => layer.values)).toMatchObject([
+      { pixelSize: 18 }, { pixelSize: 8 }, { edgeColor: '#aabbcc' }, { invert: true },
+      { mode: 'Datamosh' }, { palette: 'Ocean' }, { warmth: -0.42 },
+    ]);
+    expect(options().effects).toBe(effects);
+    expect(mount).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
+    const saved = structuredClone(setConfig.mock.lastCall![0] as Config);
+    expect(saved.effects).toEqual(effects);
+    config = saved;
+    const reloaded = makePanel();
+    expect(rows(reloaded)[0].querySelector('[data-effect-number="pixelSize"]')).toHaveProperty('value', '18');
+    expect(rows(reloaded)[2].querySelector('[data-effect-name="edgeColor"]')).toHaveProperty('value', '#aabbcc');
+    expect(rows(reloaded)[3].querySelector('[data-effect-name="invert"]')).toHaveProperty('checked', true);
+    expect(rows(reloaded)[4].querySelector('[data-effect-name="mode"]')).toHaveProperty('value', 'Datamosh');
+    expect(rows(reloaded)[5].querySelector('[data-effect-name="palette"]')).toHaveProperty('value', 'Ocean');
+    expect(config.effects).toEqual(effects);
+    const identities = config.effects.layers.map(layer => layer.id);
+    toggle(rows(reloaded)[3], '[data-effect-layer-enabled]', false);
+    for (const index of [0, 2, 3, 4, 5, 6]) {
+      const layer = config.effects.layers[index];
+      action(rows(reloaded)[index], 'reset').click();
+      expect(layer.values).toEqual(resolveEffectValues(effectManifests[layer.effectId]));
+      expect(document.activeElement).toBe(rows(reloaded)[index].querySelector('summary'));
+    }
+    expect(config.effects.layers[3].enabled).toBe(false);
+    expect(config.effects.layers.map(layer => layer.id)).toEqual(identities);
+    expect(config.effects.layers[1].values.pixelSize).toBe(8);
+    expect(mount).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(setConfig.mock.lastCall![0].effects).toEqual(config.effects);
+  });
+
+  it('keeps repeated color, bool and select controls independent through edits and resets at the stack cap', () => {
+    const root = makePanel();
+    for (const id of ['vignette', 'halftone-print', 'datamosh-trails', 'palette-mapping']) { add(root, id); add(root, id); }
+    expect(button(root, '[data-effect-add]').disabled).toBe(true);
+    input(rows(root)[0], '[data-effect-name="edgeColor"]', '#aabbcc');
+    toggle(rows(root)[2], '[data-effect-name="invert"]', true);
+    input(rows(root)[4], '[data-effect-name="mode"]', 'Datamosh', 'change');
+    input(rows(root)[6], '[data-effect-name="palette"]', 'Ember', 'change');
+    for (const index of [0, 2, 4, 6]) {
+      const first = config.effects.layers[index], second = config.effects.layers[index + 1];
+      const defaults = resolveEffectValues(effectManifests[first.effectId]);
+      expect(first.values).not.toEqual(defaults);
+      expect(second.values).toEqual(defaults);
+      action(rows(root)[index + 1], 'reset').click();
+      expect(first.values).not.toEqual(defaults);
+      action(rows(root)[index], 'reset').click();
+      expect(first.values).toEqual(defaults);
+      expect(second.values).toEqual(defaults);
+    }
+    expect(mount).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects out-of-manifest select values without saving and keeps typed edits on failed save/retry', async () => {
+    const standalone = document.createElement('div'); const changed = vi.fn();
+    const effects = makeConfig().effects;
+    mountEffectsControls(standalone, effects, changed); add(standalone, 'palette-mapping');
+    changed.mockClear();
+    const select = input(rows(standalone)[0], '[data-effect-name="palette"]', 'Invalid', 'change');
+    expect(select.value).toBe('Neon');
+    expect(effects.layers[0].values.palette).toBe('Neon');
+    expect(changed).not.toHaveBeenCalled();
+    setConfig.mockRejectedValueOnce(new Error('disk full'));
+    const root = makePanel(); add(root, 'vignette'); add(root, 'halftone-print'); add(root, 'palette-mapping');
+    input(rows(root)[0], '[data-effect-name="edgeColor"]', '#123456');
+    toggle(rows(root)[1], '[data-effect-name="invert"]', true);
+    input(rows(root)[2], '[data-effect-name="palette"]', 'Ember', 'change');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(root.querySelector('[data-status]')?.textContent).toContain('Could not save');
+    input(rows(root)[2], '[data-effect-name="palette"]', 'Ocean', 'change');
+    button(root, '[data-action="retry-save"]').click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(setConfig.mock.lastCall![0].effects.layers.map((layer: Config['effects']['layers'][number]) => layer.values)).toMatchObject([
+      { edgeColor: '#123456' }, { invert: true }, { palette: 'Ocean' },
+    ]);
+    expect(root.querySelector('[data-status]')?.textContent).toContain('All changes saved');
+    expect(mount).toHaveBeenCalledTimes(1);
   });
 
   it('reorders and removes by instance identity, retains expanded state and places focus predictably', () => {

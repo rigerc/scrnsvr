@@ -30,7 +30,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 
 - 41 GLSL shaders, from quiet ambient gradients to reactive audio effects
 - 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
-- Global GPU effect stack: adjustable VHS Distortion, independent layers, reorder and bypass, live preview
+- Global GPU effect stack: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom, and persistent datamosh/trails; independent layers, reorder and bypass, live preview
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
@@ -80,13 +80,37 @@ Every shader supports speed, brightness, and saturation. Speed at zero freezes a
 
 ### Global effects
 
-Open **Effects** and add **VHS Distortion** to give any built-in or custom visual an analog tape look. Adjust **Intensity**, **Grain**, **Scanlines**, **Color bleed**, and **Tracking distortion**; setting Intensity to zero bypasses that layer. Effects start empty, so existing configurations look unchanged.
+Open **Effects**, choose an effect, and click **Add effect** to process any built-in or custom visual. Every effect has an **Intensity** control to blend with the original image; zero bypasses that layer. Effects start empty, so existing configurations look unchanged.
 
-Stack up to eight layers, including multiple independently adjusted VHS layers. They run top to bottom; use Move up/down to change the order. Each layer can be disabled, reset, or removed. **Enable effects** bypasses the whole stack without deleting your adjustments.
+| Effect | Treatment and adjustments |
+| --- | --- |
+| VHS Distortion | Analog tape grain, scanlines, color bleed, and tracking distortion |
+| CRT Monitor | Curved glass, phosphor mask, scanlines, and screen-edge falloff |
+| Analog Film | Fine grain, warm/cool response, faded blacks, and slow exposure drift |
+| Pixelate | Pixel block size and grid aspect |
+| Ordered Dither | Bayer pattern size, color levels, and threshold strength |
+| Chromatic Aberration | Color-channel separation amount, direction, and edge bias |
+| Kaleidoscope | Mirrored segment count, rotation, center, and zoom |
+| Dream Blur | Soft blur with adjustable radius |
+| Digital Glitch | Occasional local block displacement, frequency, band size, and color split |
+| Lens Distortion | Barrel/pincushion distortion, center, and zoom |
+| Color Grade | Warmth, tint, contrast, saturation, and faded blacks |
+| Vignette | Colored edge shading with radius, softness, and strength |
+| Bloom | Thresholded highlights with separable blur radius and glow strength |
+| Liquid Glass | Drifting refraction waves with scale, speed, and strength |
+| Halftone Print | Rotated luminance-driven dots, dot size, and inverted ink |
+| Datamosh / Trails | Persistent frame feedback with smooth-trail/block-displacement modes, persistence, decay, and displacement |
+| Palette Mapping | Luminance mapped to Neon, Ember, Ocean, or Monochrome ramps |
+
+Stack up to eight layers, including multiple independently adjusted instances of the same effect. They run top to bottom; use Move up/down to change the order. Each layer can be disabled, reset, or removed. **Enable effects** bypasses the whole stack without deleting your adjustments.
+
+Try **Pixelate → Ordered Dither → CRT Monitor** for a retro display, **Kaleidoscope → VHS Distortion** for analog video art, or **Color Grade → Analog Film → Vignette** for a faded cinematic treatment. Order matters: blur before pixelation produces a different result from pixelation before blur.
 
 The stack is global: changing visuals, applying saved looks, randomizing, changing color schemes, or shuffling keeps the same effects. The main live preview, fullscreen preview, and screensaver show the result; gallery thumbnails stay clean. The clock stays crisp above the processed image, and fade transitions are unchanged.
 
-VHS motion continues when a visual's Speed is zero. **Pause animation** freezes both the visual and effects, while adjustments still redraw. Changes save locally using the normal autosave/retry flow and take effect in saver windows on their next launch or shader cycle. Unavailable or failed effects are skipped rather than blanking the visual. This version ships built-in VHS only; the custom shader editor creates visuals, not post-processing effects.
+Animated effects use their own timeline, so VHS, film, glitch, and refraction can continue when a visual's Speed is zero. **Pause animation** freezes both the visual and effects, including temporal history, while adjustments still redraw. Changes save locally using the normal autosave/retry flow and take effect in saver windows on their next launch or shader cycle. Unavailable or failed effects are skipped or bypassed rather than blanking the visual. The custom shader editor creates visuals, not post-processing effects.
+
+Bloom uses multiple GPU passes; Datamosh / Trails retains previous-frame textures separately for each instance. They cost more GPU time and memory than single-pass treatments, especially at high resolutions or across several monitors. History is reset when its input stack/settings or dimensions change, so reordering, disabling/re-enabling, or switching visuals does not leave old frames behind. Disabling effects or setting Intensity to zero releases unused render/history targets.
 
 ### Color schemes
 
@@ -96,7 +120,7 @@ Every built-in shader lives in `src/renderer/shaders/<id>/` as a `manifest.ts` (
 
 ## Config
 
-Resolved by `configPath()` in `src/shared/config.ts`:
+Resolved by `configPath()` in `src/main/config-store.ts` and validated by `ConfigSchema` in `src/shared/config.ts`:
 
 - active shader, global FPS / idle threshold / monitor scope, clock block, `colors` scheme and per-shader overrides, `effects` global ordered stack, `shaders` values, `presets`
 - legacy top-level `fps`/`monitor` keys are migrated into `global` on load
@@ -136,7 +160,7 @@ systemctl --user enable --now scrnsvr.service
 - `src/main/` — Electron entry, CLI, idle daemon, Noctalia loader, IPC (`config:get/set`, `colors:import-noctalia`)
 - `src/renderer/` — OGL runtime (`core/runtime.ts`), post-processing effects (`effects/`), clock overlay (`core/clock.ts`), shader set (`shaders/*/manifest.ts` + `shader.glsl`)
 - `src/settings/` — settings window UI + clock controls
-- `src/shared/` — Zod config, clock/Noctalia helpers, IPC keys, shader manifest schema
+- `src/shared/` — browser-safe Zod config and defaults, clock/Noctalia helpers, typed preload contracts and IPC keys, shader manifest schema; filesystem persistence lives in `src/main/config-store.ts`
 - `scripts/build.mjs` — esbuild bundles for main/preload/renderer/settings + static copies
 - `scripts/generate-shader-registry.mjs` — generates `src/renderer/shaders/generated.ts`
 - `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and the shader manifest and canonical-ABI contracts

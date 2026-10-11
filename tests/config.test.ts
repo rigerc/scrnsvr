@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ConfigSchema, configPath, defaultConfig, loadConfig, saveConfig } from '../src/shared/config';
+import { ConfigSchema, defaultConfig } from '../src/shared/config';
+import { configPath, loadConfig, saveConfig } from '../src/main/config-store';
 
 let temporary: string | undefined;
 afterEach(async () => {
@@ -46,6 +47,27 @@ describe('config', () => {
     expect(ConfigSchema.parse({}).global.fadeSeconds).toBe(1);
     expect(ConfigSchema.parse({ global: { fadeSeconds: 2.5 } }).global.fadeSeconds).toBe(2.5);
   });
+
+  it.each([undefined, '{broken', '{"global":{"fps":0}}'])(
+    'isolates fallback configs when the file contains %s', async contents => {
+      temporary = await mkdtemp(path.join(tmpdir(), 'scrnsvr-test-'));
+      process.env.XDG_CONFIG_HOME = temporary;
+      if (contents !== undefined) {
+        await mkdir(path.dirname(configPath()), { recursive: true });
+        await writeFile(configPath(), contents);
+      }
+      const first = await loadConfig();
+      const second = await loadConfig();
+      first.global.fps = 30;
+      first.clock.enabled = true;
+      first.shaders.plasma = { speed: 2 };
+      first.rotation.entries.push({ shader: 'plasma' });
+      first.effects.layers.push({ id: 'tape', effectId: 'vhs-distortion', enabled: true, values: {} });
+      expect(second).toEqual(defaultConfig);
+      expect(await loadConfig()).toEqual(defaultConfig);
+      expect(defaultConfig).toEqual(ConfigSchema.parse({}));
+    },
+  );
 
   it('falls back safely and atomically coalesces writes', async () => {
     temporary = await mkdtemp(path.join(tmpdir(), 'scrnsvr-test-'));

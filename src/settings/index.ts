@@ -1,4 +1,4 @@
-import type { Config } from '../shared/config';
+import { ConfigSchema, type Config } from '../shared/config';
 import { normalizeEffects, type EffectRuntimeOptions } from '../shared/effects';
 import { mountEffectsControls } from './effects';
 import { shaderCategories, type ShaderManifest } from '../shared/manifest';
@@ -76,7 +76,10 @@ export class SettingsPanel {
   constructor(options: SettingsOptions) {
     this.manifests = options.manifests;
     this.preview = options.preview;
-this.config = options.initial ?? ({ shader: this.manifests[0]?.id ?? 'flow-field', fps: 60, monitor: 'primary', kiosk: true, settings: true, global: { idleThresholdSeconds: 300, fps: 60, fadeSeconds: 1, inhibitOnAudio: false, inhibitOnFullscreen: true, monitors: 'primary' }, clock: defaultClockConfig, rotation: { enabled: false, entries: [], intervalMinutes: 0 }, audio: { enabled: false }, colors: { scheme: 'none', overrides: {} }, effects: { enabled: true, layers: [] }, customShaders: [], shaders: {}, presets: {} } as Config);
+    this.config = options.initial ?? ConfigSchema.parse({
+      shader: this.manifests[0]?.id ?? 'flow-field',
+      settings: true,
+    });
     this.config.clock = { ...defaultClockConfig, ...this.config.clock };
     this.config.rotation ??= { enabled: false, entries: [], intervalMinutes: 0 };
     this.config.audio ??= { enabled: false };

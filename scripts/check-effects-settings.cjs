@@ -7,6 +7,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const root = path.resolve(__dirname, '..');
 const temporary = createHarness({ prefix: 'scrnsvr-effects-settings-' });
 const { ConfigSchema } = bundleModule('src/shared/config.ts', { outDir: temporary });
+const { effectManifests } = bundleModule('src/shared/effects.ts', { outDir: temporary });
 let saved = ConfigSchema.parse({ shader: 'plasma', clock: { enabled: true, showSeconds: false }, shaders: { plasma: { speed: 0 } } });
 let rejectNextSave = false;
 ipcMain.handle('config:get', () => saved);
@@ -77,9 +78,86 @@ async function browserChecks(win) {
     assert(document.querySelector('.clock-overlay'), 'Clock overlay disappeared');
     const thumbnail = document.querySelector('.shader-select canvas');
     assert(thumbnail.getContext('2d'), 'Gallery thumbnail no longer uses the shared clean 2D path');
+    window.captureEffectFrame = frame;
     window.effectUiSnapshot = { firstId: rows()[0].dataset.effectLayer };
     return { layers: rows().length, paused: true, clock: true, rendererReused: true, cleanBypass: true };
   }.toString()})()`);
+}
+
+async function catalogChecks(win) {
+  const report = await win.webContents.executeJavaScript(`(${async function catalog(manifests) {
+    const assert = (value, message) => { if (!value) throw Error(message); };
+    const frame = window.captureEffectFrame;
+    const choice = document.querySelector('[data-effect-choice]');
+    assert(choice.options.length === 17, 'Expected the complete seventeen-effect selector');
+    const add = async id => {
+      choice.value = id;
+      await frame(() => document.querySelector('[data-action="add-effect"]').click());
+      return [...document.querySelectorAll('[data-effect-layer]')].at(-1);
+    };
+    const edit = async (row, name, value) => {
+      const input = row.querySelector('[data-effect-name="' + name + '"]');
+      await frame(() => {
+        if (input.type === 'checkbox') input.checked = value;
+        else input.value = String(value);
+        input.dispatchEvent(new Event(input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+      });
+      return input;
+    };
+    for (const manifest of Object.values(manifests)) {
+      const row = await add(manifest.id);
+      assert(row.querySelectorAll('[data-effect-control]').length === manifest.uniforms.length, manifest.id + ': missing controls');
+      for (const def of manifest.uniforms) {
+        const input = row.querySelector('[data-effect-name="' + def.name + '"]');
+        assert(input, manifest.id + ': missing ' + def.name);
+        const kind = def.type === 'select' ? input.tagName === 'SELECT' :
+          def.type === 'bool' ? input.type === 'checkbox' : def.type === 'color' ? input.type === 'color' : input.type === 'range';
+        assert(kind, manifest.id + ': wrong control type for ' + def.name);
+      }
+      assert(document.querySelector('[data-preview-effect-status]').hidden, manifest.id + ': unexpected runtime failure');
+      await frame(() => row.querySelector('[data-effect-action="remove"]').click());
+    }
+    // Exercise multipass + temporal + color composition through the actual mounted preview.
+    await add('bloom');
+    await add('datamosh-trails');
+    await add('color-grade');
+    const pause = document.querySelector('[data-preview-pause]');
+    await frame(() => pause.click());
+    for (let step = 0; step < 6; step++) await frame(() => {});
+    await frame(() => pause.click());
+    assert(pause.getAttribute('aria-pressed') === 'true', 'Mixed-stack playback did not pause');
+    assert(document.querySelector('[data-preview-effect-status]').hidden, 'Mixed bloom/trails/color-grade stack failed');
+    while (document.querySelectorAll('[data-effect-layer]').length > 1) {
+      const row = document.querySelectorAll('[data-effect-layer]')[1];
+      await frame(() => row.querySelector('[data-effect-action="remove"]').click());
+    }
+    const pixel = await add('pixelate');
+    await edit(pixel, 'pixelSize', 26);
+    const vignette = await add('vignette');
+    await edit(vignette, 'edgeColor', '#ff8040');
+    const dots = await add('halftone-print');
+    await edit(dots, 'invert', true);
+    const palette = await add('palette-mapping');
+    await edit(palette, 'palette', 'Ocean');
+    const trails = await add('datamosh-trails');
+    await edit(trails, 'mode', 'Datamosh');
+    assert(document.querySelectorAll('[data-effect-layer]').length === 6, 'Typed edits lost layer instances');
+    assert(document.querySelector('[data-preview-effect-status]').hidden, 'Typed edits caused runtime failure');
+    return { effects: Object.keys(manifests).length, numeric: true, color: true, boolean: true, select: true, mixedStack: true };
+  }.toString()})(${JSON.stringify(effectManifests)})`);
+  await waitSaved(win);
+  const layer = id => saved.effects.layers.find(item => item.effectId === id);
+  if (layer('pixelate')?.values.pixelSize !== 26 || layer('vignette')?.values.edgeColor !== '#ff8040' ||
+      layer('halftone-print')?.values.invert !== true || layer('palette-mapping')?.values.palette !== 'Ocean' ||
+      layer('datamosh-trails')?.values.mode !== 'Datamosh') throw Error('Typed effect edits did not persist through preload/config validation');
+  await win.webContents.executeJavaScript(`(async () => {
+    while (document.querySelectorAll('[data-effect-layer]').length > 1) {
+      const row = document.querySelectorAll('[data-effect-layer]')[1];
+      await window.captureEffectFrame(() => row.querySelector('[data-effect-action="remove"]').click());
+    }
+  })()`);
+  await waitSaved(win);
+  console.log(JSON.stringify(report));
 }
 
 async function waitSaved(win) {
@@ -122,12 +200,27 @@ async function screenshots(win) {
     })`);
     fs.writeFileSync(path.join(captures, name + '.png'), (await win.webContents.capturePage()).toPNG());
   };
-  await win.webContents.executeJavaScript(`document.querySelector('#effects-tab').click()`);
+  const showEffect = async id => {
+    await win.webContents.executeJavaScript(`(() => {
+      document.querySelector('#effects-tab').click();
+      for (const row of [...document.querySelectorAll('[data-effect-layer]')]) row.querySelector('[data-effect-action="remove"]').click();
+      document.querySelector('[data-effect-choice]').value = ${JSON.stringify(id)};
+      document.querySelector('[data-action="add-effect"]').click();
+    })()`);
+  };
+  await showEffect('vignette');
   await shot('effects-desktop');
+  await showEffect('halftone-print');
+  await shot('effects-desktop-checkbox');
+  await showEffect('palette-mapping');
+  await shot('effects-desktop-select');
   win.setSize(390, 900);
   await win.webContents.executeJavaScript(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
   await win.webContents.executeJavaScript(`document.querySelector('.inspector').scrollIntoView({block: 'start', behavior: 'instant'})`);
   await shot('effects-narrow');
+  await showEffect('vignette');
+  await win.webContents.executeJavaScript(`document.querySelector('[data-effect-name="edgeColor"]').scrollIntoView({block: 'end', behavior: 'instant'})`);
+  await shot('effects-narrow-color');
   win.setSize(1280, 900);
   await win.webContents.executeJavaScript(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
   await win.webContents.executeJavaScript(`document.querySelector('[data-preview-fullscreen]').click()`, true);
@@ -147,6 +240,7 @@ app.whenReady().then(async () => {
   await waitForControls(win, { root });
   console.log(JSON.stringify(await browserChecks(win)));
   await waitSaved(win);
+  await catalogChecks(win);
   await saveFailureChecks(win);
   const expected = structuredClone(saved.effects);
   await waitForControls(win, { root });

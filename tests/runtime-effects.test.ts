@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   tick: (_delta: number) => {}, resize: () => {},
   programs: [] as any[], draws: [] as any[], targets: [] as any[],
   shaderDeletes: vi.fn(), programDeletes: vi.fn(), textureDeletes: vi.fn(), framebufferDeletes: vi.fn(), geometryDeletes: vi.fn(),
-  complete: true, renderer: undefined as any,
+  complete: true, checks: 0, failCheck: Infinity, breakShaders: true, renderer: undefined as any,
 }));
 vi.mock('../src/renderer/core/loop', () => ({ startLoop: (tick: typeof state.tick) => { state.tick = tick; return vi.fn(); } }));
 vi.mock('../src/renderer/effects', () => ({ effectRegistry: {
@@ -15,6 +15,15 @@ vi.mock('../src/renderer/effects', () => ({ effectRegistry: {
   other: { id: 'other', title: 'Other', source: 'other', uniforms: [] },
   broken: { id: 'broken', title: 'Broken', source: 'broken', uniforms: [] },
   unlinked: { id: 'unlinked', title: 'Unlinked', source: 'unlinked', uniforms: [] },
+  bloom: { id: 'bloom', title: 'Bloom', passes: ['extract', 'horizontal', 'vertical'], source: 'combine', uniforms: [] },
+  history: { id: 'history', title: 'History', history: true, source: 'history', uniforms: [{ name: 'intensity', type: 'float', default: 1, min: 0, max: 1 }] },
+  typed: { id: 'typed', title: 'Typed', source: 'typed', uniforms: [
+    { name: 'color', type: 'color', default: '#ffffff' },
+    { name: 'mode', type: 'select', default: 'First', options: ['First', 'Second'] },
+    { name: 'count', type: 'int', default: 2, min: 1, max: 8 },
+    { name: 'invert', type: 'bool', default: false },
+  ] },
+  brokenPass: { id: 'brokenPass', title: 'Broken Pass', passes: ['extract', 'broken'], source: 'combine', uniforms: [] },
 } }));
 vi.mock('ogl', () => {
   let id = 0;
@@ -26,7 +35,7 @@ vi.mock('ogl', () => {
         getShaderParameter: (shader: any) => !shader.broken,
         getProgramParameter: (program: any) => !program.unlinked,
         getShaderInfoLog: () => 'compile error', getProgramInfoLog: () => 'link error',
-        checkFramebufferStatus: () => state.complete ? 2 : 9, getError: () => 0,
+        checkFramebufferStatus: () => state.complete && ++state.checks !== state.failCheck ? 2 : 9, getError: () => 0,
         deleteShader: state.shaderDeletes, deleteTexture: state.textureDeletes, deleteFramebuffer: state.framebufferDeletes,
         framebufferTexture2D() {},
       };
@@ -36,14 +45,15 @@ vi.mock('ogl', () => {
       render({ scene, target }: any) {
         this.state.currentProgram = scene.program.id;
         for (const location of scene.program.uniformLocations.values()) this.state.uniformLocations.set(location, 0);
-        state.draws.push({ program: scene.program, target, time: scene.program.uniforms.uTime.value, intensity: scene.program.uniforms.intensity?.value });
+        state.draws.push({ program: scene.program, target, time: scene.program.uniforms.uTime.value, intensity: scene.program.uniforms.intensity?.value,
+          uniforms: Object.fromEntries(Object.entries(scene.program.uniforms).map(([name, uniform]: any) => [name, uniform.value])) });
       }
     },
     Program: class {
       id = ++id; uniformLocations = new Map([['location', {}]]);
-      vertexShader = {}; fragmentShader: any; program: any; uniforms: any;
+      vertexShader = {}; fragmentShader: any; program: any; uniforms: any; source: string;
       constructor(_gl: any, { uniforms, fragment }: any) {
-        this.uniforms = uniforms; this.fragmentShader = { broken: fragment === 'broken' }; this.program = { unlinked: fragment === 'unlinked' };
+        this.source = fragment; this.uniforms = uniforms; this.fragmentShader = { broken: fragment === 'broken' && state.breakShaders }; this.program = { unlinked: fragment === 'unlinked' };
         state.programs.push(this);
       }
       remove() { state.programDeletes(this); }
@@ -69,13 +79,108 @@ function mount(effects: EffectsConfig, paused = false) {
   return { playback, values, statuses, stop };
 }
 beforeEach(() => {
-  state.programs = []; state.draws = []; state.targets = []; state.complete = true;
+  state.programs = []; state.draws = []; state.targets = []; state.complete = true; state.checks = 0; state.failCheck = Infinity; state.breakShaders = true;
   vi.clearAllMocks();
   vi.stubGlobal('devicePixelRatio', 1);
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { state.resize = callback; } observe() {} disconnect() {} });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+describe('advanced effect stack', () => {
+  it('preserves layer input across intermediate passes, repeated multipass layers, and ordering with three scratch targets', () => {
+    const effects = { enabled: true, layers: [layer('before'), layer('bloom-a', 'bloom'), layer('bloom-b', 'bloom'), layer('after')] };
+    const { stop } = mount(effects);
+    expect(state.targets).toHaveLength(3);
+    expect(state.draws.map(draw => draw.program.source)).toEqual(['base', 'tape', 'extract', 'horizontal', 'vertical', 'combine', 'extract', 'horizontal', 'vertical', 'combine', 'tape']);
+    for (const start of [2, 6]) {
+      const original = state.draws[start].uniforms.uInput;
+      for (const draw of state.draws.slice(start, start + 4)) {
+        expect(draw.uniforms.uOriginal).toBe(original);
+        expect(draw.target?.texture).not.toBe(draw.uniforms.uInput);
+        expect(draw.target?.texture).not.toBe(original);
+      }
+    }
+    effects.layers = [effects.layers[0]]; state.tick(100);
+    expect(state.textureDeletes).toHaveBeenCalledTimes(1);
+    stop();
+    expect(state.textureDeletes).toHaveBeenCalledTimes(3);
+    expect(state.framebufferDeletes).toHaveBeenCalledTimes(3);
+  });
+
+  it('maps metadata color/select/bool/int to actual upload values', () => {
+    const effects = { enabled: true, layers: [{ ...layer('typed', 'typed'), values: { color: '#8040ff', mode: 'Second', count: 3.6, invert: true } }] };
+    const { stop } = mount(effects);
+    expect(state.draws.at(-1).uniforms).toMatchObject({ color: [128 / 255, 64 / 255, 1], mode: 1, count: 4, invert: 1 });
+    stop();
+  });
+
+  it('owns independent double-buffered histories, freezes forced redraws and suspension gaps, and resets without resetting time', () => {
+    const effects = { enabled: true, layers: [layer('a', 'history', 1), layer('b', 'history', 1)] };
+    const { playback, stop } = mount(effects);
+    const historyDraws = () => state.draws.filter(draw => draw.program.source === 'history');
+    expect(state.targets).toHaveLength(6); // two scratch + two history per instance
+    expect(historyDraws().map(draw => draw.uniforms.uHistoryValid)).toEqual([0, 0]);
+    expect(historyDraws()[0].target).not.toBe(historyDraws()[1].target);
+    state.draws = []; state.tick(100);
+    const running = historyDraws();
+    expect(running.map(draw => draw.uniforms.uHistoryValid)).toEqual([1, 1]);
+    expect(running.map(draw => draw.uniforms.uDelta)).toEqual([0.1, 0.1]);
+    for (const draw of running) expect(draw.target.texture).not.toBe(draw.uniforms.uHistory);
+    playback.paused = true; state.tick(100);
+    state.draws = []; state.resize(); state.resize();
+    expect(historyDraws()).toHaveLength(0);
+    expect(state.draws.filter(draw => draw.program.source.includes('texture2D')).map(draw => draw.uniforms.uInput)).toEqual([running[0].target.texture, running[1].target.texture, running[0].target.texture, running[1].target.texture]);
+    effects.layers[0].values.intensity = 0.8; state.draws = []; state.tick(100);
+    expect(historyDraws().map(draw => draw.uniforms.uHistoryValid)).toEqual([0, 0]);
+    expect(historyDraws().map(draw => draw.time)).toEqual([0.1, 0.1]);
+    state.renderer.gl.drawingBufferWidth = 257; state.draws = []; state.resize();
+    expect(historyDraws().map(draw => draw.uniforms.uHistoryValid)).toEqual([0, 0]);
+    expect(state.targets.every(target => target.width === 257)).toBe(true);
+    playback.paused = false; state.tick(500); state.draws = []; state.tick(5000);
+    expect(historyDraws()).toHaveLength(0);
+    state.tick(100); expect(historyDraws().map(draw => draw.time)).toEqual([0.2, 0.2]);
+    effects.layers[0].values.intensity = 0; state.tick(100);
+    expect(state.textureDeletes).toHaveBeenCalledTimes(2);
+    effects.layers = []; state.tick(100);
+    expect(state.textureDeletes).toHaveBeenCalledTimes(6);
+    stop();
+    expect(state.framebufferDeletes).toHaveBeenCalledTimes(6);
+    expect(state.renderer.state.uniformLocations.size).toBe(0);
+  });
+
+  it('bypasses safely after partial history allocation failure and clears/reports recovery', () => {
+    state.failCheck = 3; // single scratch, then second history framebuffer fails
+    const effects = { enabled: true, layers: [layer('a', 'history')] };
+    const { statuses, stop } = mount(effects);
+    expect(state.draws.at(-1).program.source).toBe('base');
+    expect(state.textureDeletes).toHaveBeenCalledTimes(3);
+    state.tick(100); expect(state.targets).toHaveLength(3);
+    state.failCheck = Infinity; effects.layers[0].values.intensity = 0.8; state.tick(100);
+    expect(statuses).toHaveBeenLastCalledWith({ message: '' });
+    state.failCheck = state.checks + 2; state.renderer.gl.drawingBufferWidth = 257; state.resize();
+    expect(statuses.mock.lastCall?.[0].message).toContain('Effect stack bypassed');
+    expect(state.draws.at(-1).program.source).toBe('base');
+    stop(); expect(state.textureDeletes).toHaveBeenCalledTimes(6);
+  });
+
+  it('cleans up partially compiled multipass work and retries on edits', () => {
+    const effects = { enabled: true, layers: [layer('bad', 'brokenPass'), layer('healthy')] };
+    const { statuses, stop } = mount(effects);
+    expect(state.programDeletes).toHaveBeenCalledTimes(2);
+    expect(state.draws.map(draw => draw.program.source)).toEqual(['base', 'tape']);
+    state.tick(100); expect(statuses).toHaveBeenCalledTimes(1);
+    effects.layers[0].values.intensity = 0.7; state.tick(100);
+    expect(state.programDeletes).toHaveBeenCalledTimes(4);
+    state.breakShaders = false; effects.layers[0].values.intensity = 0.9; state.tick(100);
+    expect(statuses).toHaveBeenLastCalledWith({ layerId: 'bad', message: '' });
+    expect(state.draws.at(-2).program.source).toBe('combine');
+    // A new compile failure after recovery must be reported again.
+    effects.layers = [layer('bad', 'broken'), layer('healthy')]; state.breakShaders = true; state.tick(100);
+    expect(statuses.mock.lastCall?.[0].message).toContain('could not compile');
+    stop();
+  });
+});
 
 describe('runtime effect stack', () => {
   it.each([

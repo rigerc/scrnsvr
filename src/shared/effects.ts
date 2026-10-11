@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { UniformManifest, UniformValue } from './manifest';
+import { effectManifests } from './effect-catalog';
+export { effectManifests } from './effect-catalog';
 
 export const MAX_EFFECT_LAYERS = 8;
 export interface EffectManifest {
@@ -8,7 +10,14 @@ export interface EffectManifest {
   description: string;
   uniforms: UniformManifest[];
 }
-export interface EffectDefinition extends EffectManifest { source: string; }
+export interface EffectDefinition extends EffectManifest {
+  /** Final fragment pass; uOriginal is the input image at this layer's boundary. */
+  source: string;
+  /** Optional intermediate fragment passes, run in order before the final source. */
+  passes?: string[];
+  /** Supply uHistory/uHistoryValid and retain this instance's previous output. */
+  history?: boolean;
+}
 export interface EffectLayer {
   id: string;
   effectId: string;
@@ -26,23 +35,6 @@ export interface EffectRuntimeOptions {
   effects?: EffectsConfig;
   onEffectStatus?: (status: EffectStatus) => void;
 }
-
-const slider = (name: string, label: string, value: number, description: string): UniformManifest => ({
-  name, label, type: 'float', default: value, min: 0, max: 1, step: 0.01, description,
-});
-export const effectManifests: Record<string, EffectManifest> = {
-  'vhs-distortion': {
-    id: 'vhs-distortion', title: 'VHS Distortion',
-    description: 'Analog tape texture, color bleed, and drifting tracking interference.',
-    uniforms: [
-      slider('intensity', 'Intensity', 0.5, 'Blend the tape effect with the original image. Zero bypasses this layer.'),
-      slider('grain', 'Grain', 0.2, 'Animated fine-grained tape noise.'),
-      slider('scanlines', 'Scanlines', 0.25, 'Subtle horizontal scanline shading.'),
-      slider('colorBleed', 'Color bleed', 0.2, 'Separate color channels horizontally.'),
-      slider('tracking', 'Tracking distortion', 0.15, 'Horizontal jitter and a drifting interference band.'),
-    ],
-  },
-};
 
 export function resolveEffectValues(manifest: EffectManifest, values: Record<string, unknown> = {}): Record<string, UniformValue> {
   return Object.fromEntries(manifest.uniforms.map(def => {

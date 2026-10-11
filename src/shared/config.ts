@@ -1,6 +1,3 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import path from 'node:path';
 import { z } from 'zod';
 import { clockFonts, clockPositions, defaultClockConfig } from './clock';
 import { RotationSchema } from './rotation';
@@ -66,33 +63,3 @@ export const ConfigSchema = z.preprocess((candidate) => {
 }, ConfigObjectSchema).transform(value => ({ ...value, fps: value.global.fps, monitor: value.global.monitors }));
 export type Config = z.infer<typeof ConfigSchema>;
 export const defaultConfig: Config = ConfigSchema.parse({});
-export function configPath(): string {
-  const base = process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config');
-  return path.join(base, 'scrnsvr', 'config.json');
-}
-export async function loadConfig(): Promise<Config> {
-  try { return ConfigSchema.parse(JSON.parse(await readFile(configPath(),'utf8'))); } catch { return defaultConfig; }
-}
-let timer: ReturnType<typeof setTimeout> | undefined;
-let waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
-export function saveConfig(config: Config): Promise<void> {
-  if (timer) clearTimeout(timer);
-  return new Promise((resolve, reject) => {
-    waiters.push({ resolve, reject });
-    timer = setTimeout(async () => {
-      const pending = waiters;
-      waiters = [];
-      try {
-        const file = configPath();
-        const validated = ConfigSchema.parse(config);
-        await mkdir(path.dirname(file), { recursive: true });
-        const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
-        await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, 'utf8');
-        await rename(temporary, file);
-        pending.forEach(({ resolve: done }) => done());
-      } catch (error) {
-        pending.forEach(({ reject: fail }) => fail(error));
-      }
-    }, 150);
-  });
-}

@@ -15,7 +15,7 @@ export function mountEffectsControls(root: HTMLElement, config: EffectsConfig, o
       <p data-effect-limit></p>
     </div>
     <div class="effect-stack-heading"><h3>Applied top to bottom</h3><span data-effect-count></span></div>
-    <p class="effects-empty" data-effects-empty>No effects yet. Add VHS Distortion to start a tape-inspired stack.</p>
+    <p class="effects-empty" data-effects-empty>No effects yet. Explore analog texture, pixel patterns, lens distortion, color grading, glow, and trails. Add an effect to start your stack.</p>
     <ol class="effect-list" data-effect-list aria-label="Effect layers applied top to bottom"></ol>
     <p class="effect-status" data-effect-status role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="effect-announcement" data-effect-announcement role="status" aria-live="polite" aria-atomic="true"></p>`;
@@ -95,28 +95,61 @@ export function mountEffectsControls(root: HTMLElement, config: EffectsConfig, o
           const label = document.createElement('label'); label.textContent = def.label ?? def.name;
           const id = `effect-control-${nextControlId++}`; label.htmlFor = id;
           const hint = document.createElement('p'); hint.id = `${id}-hint`; hint.textContent = def.description ?? '';
-          const range = document.createElement('input'); range.type = 'range'; range.id = id; range.dataset.effectName = def.name;
-          range.setAttribute('aria-label', `${def.label ?? def.name}: ${labelFor(layer)}`);
-          const number = document.createElement('input'); number.type = 'number'; number.dataset.effectNumber = def.name; number.setAttribute('aria-label', `${def.label ?? def.name} value: ${labelFor(layer)}`);
-          for (const input of [range, number]) {
-            input.min = String(def.min ?? 0); input.max = String(def.max ?? 1); input.step = String(def.step ?? 0.01);
-            input.value = String(resolved[def.name]); input.setAttribute('aria-describedby', hint.id);
-          }
-          const commit = (input: HTMLInputElement) => {
-            const value = Number(input.value);
-            // Invalid direct entry returns to the last valid value instead of damaging config.
-            if (input.value.trim() && Number.isFinite(value)) {
-              const step = def.step ?? 0.01;
-              layer.values[def.name] = resolveEffectValues(manifest, { [def.name]: Number((Math.round(value / step) * step).toFixed(8)) })[def.name];
-              onChange();
-            }
-            const current = resolveEffectValues(manifest, layer.values)[def.name];
-            range.value = String(current); number.value = String(current);
+          const inputs = document.createElement('div'); inputs.className = 'shader-control-inputs';
+          const describe = (control: HTMLInputElement | HTMLSelectElement) => {
+            control.id = id; control.dataset.effectName = def.name;
+            control.setAttribute('aria-label', `${def.label ?? def.name}: ${labelFor(layer)}`);
+            control.setAttribute('aria-describedby', hint.id);
           };
-          range.addEventListener('input', () => commit(range));
-          number.addEventListener('change', () => commit(number));
-          number.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); commit(number); } });
-          const inputs = document.createElement('div'); inputs.className = 'shader-control-inputs'; inputs.append(range, number);
+          if (def.type === 'float' || def.type === 'int') {
+            const range = document.createElement('input'); range.type = 'range'; describe(range);
+            const number = document.createElement('input'); number.type = 'number'; number.dataset.effectNumber = def.name;
+            number.setAttribute('aria-label', `${def.label ?? def.name} value: ${labelFor(layer)}`);
+            const min = def.min ?? 0, max = def.max ?? 1;
+            const step = def.type === 'int' ? 1 : def.step ?? 0.01;
+            for (const input of [range, number]) {
+              input.min = String(min); input.max = String(max); input.step = String(step);
+              input.value = String(resolved[def.name]); input.setAttribute('aria-describedby', hint.id);
+            }
+            const commit = (input: HTMLInputElement) => {
+              const value = Number(input.value);
+              // Invalid direct entry returns to the last valid value instead of damaging config.
+              if (input.value.trim() && Number.isFinite(value)) {
+                const bounded = Math.max(min, Math.min(max, value));
+                const snapped = Number((min + Math.round((bounded - min) / step) * step).toFixed(8));
+                layer.values[def.name] = resolveEffectValues(manifest, { [def.name]: snapped })[def.name];
+                onChange();
+              }
+              const current = resolveEffectValues(manifest, layer.values)[def.name];
+              range.value = String(current); number.value = String(current);
+            };
+            range.addEventListener('input', () => commit(range));
+            number.addEventListener('change', () => commit(number));
+            number.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); commit(number); } });
+            inputs.append(range, number);
+          } else if (def.type === 'select') {
+            const select = document.createElement('select'); describe(select);
+            for (const value of def.options ?? []) {
+              const option = document.createElement('option'); option.value = value; option.textContent = value;
+              select.append(option);
+            }
+            select.value = String(resolved[def.name]);
+            select.addEventListener('change', () => {
+              if (def.options?.includes(select.value)) { layer.values[def.name] = select.value; onChange(); }
+              select.value = String(resolveEffectValues(manifest, layer.values)[def.name]);
+            });
+            inputs.append(select);
+          } else {
+            const input = document.createElement('input'); input.type = def.type === 'bool' ? 'checkbox' : 'color'; describe(input);
+            if (def.type === 'bool') {
+              input.checked = Boolean(resolved[def.name]);
+              input.addEventListener('change', () => { layer.values[def.name] = input.checked; onChange(); });
+            } else {
+              input.value = String(resolved[def.name]);
+              input.addEventListener('input', () => { layer.values[def.name] = input.value; onChange(); });
+            }
+            inputs.append(input);
+          }
           heading.append(label); row.append(heading, inputs, hint); body.append(row);
         }
       }

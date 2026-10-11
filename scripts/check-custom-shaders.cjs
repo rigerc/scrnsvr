@@ -67,7 +67,7 @@ async function previewAndSaveImported({ run, waitFor, loadConfig }) {
     throw Error('Blank custom preview');
   });
   await run(() => document.querySelector('[data-custom-save]').click());
-  await waitFor(() => !!document.querySelector('[data-category="Custom"] .shader-card'));
+  await waitFor(() => !!document.querySelector('.shader-card[data-category="Custom"]'));
   const saved = await loadConfig();
   if (saved.customShaders.length !== 1 || saved.shader !== saved.customShaders[0].id) throw Error('Save did not persist');
   return saved.customShaders[0].id;
@@ -107,7 +107,8 @@ async function runCustomShaderChecks({ win, run, waitFor, loadConfig }) {
 }
 
 app.whenReady().then(async () => {
-  const { loadConfig, saveConfig, ConfigSchema } = bundleModule('src/shared/config.ts', { outDir: temporary });
+  const { ConfigSchema } = bundleModule('src/shared/config.ts', { outDir: temporary });
+  const { loadConfig, saveConfig } = bundleModule('src/main/config-store.ts', { outDir: temporary });
   ipcMain.handle('config:get', loadConfig);
   ipcMain.handle('config:set', (_, config) => saveConfig(ConfigSchema.parse(config)));
   const { win, errors } = createWindow();

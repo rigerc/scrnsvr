@@ -1,7 +1,6 @@
 import { mountSettings, type PreviewRuntime } from './index';
 import { shaderRegistry } from '../renderer/shaders';
 import { mountShader, mountShaderThumbnail } from '../renderer/core/runtime';
-import type { Config } from '../shared/config';
 import { withCustomShaders } from '../shared/custom-shaders';
 import { mountPreviewControls } from './preview-controls';
 import { mountDiscovery } from './discovery';
@@ -23,7 +22,7 @@ const preview: PreviewRuntime = {
 void (async () => {
   const root = document.querySelector('#settings');
   if (!(root instanceof HTMLElement)) throw new Error('Settings root is missing');
-  const initial = await window.scrnsvr.getConfig() as Config;
+  const initial = await window.scrnsvr.getConfig();
   available = withCustomShaders(shaderRegistry, initial.customShaders);
   mountSettings({ root, manifests: Object.values(available).map(({ manifest }) => manifest), initial, preview });
   const stopControls = mountPreviewControls(root, playback);
