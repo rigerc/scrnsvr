@@ -11,10 +11,11 @@ export interface ScrnsvrApi {
   importNoctaliaColors(): Promise<NoctaliaImportResult>;
   close(): void;
   onCycle(listener: (pick: CyclePick) => void): () => void;
+  onDismiss?(listener: () => void): () => void;
 }
 
 export interface ScrnsvrAudioApi {
   subscribe(listener: (frame: AudioFrame) => void): () => void;
 }
 
-export const IPC = { getConfig:'config:get', setConfig:'config:set', importNoctaliaColors:'colors:import-noctalia', close:'window:close', cycle:'rotation:cycle', audio:'audio:frame', audioSubscribe:'audio:subscribe', audioUnsubscribe:'audio:unsubscribe' } as const;
+export const IPC = { getConfig:'config:get', setConfig:'config:set', importNoctaliaColors:'colors:import-noctalia', close:'window:close', dismiss:'screensaver:dismiss', cycle:'rotation:cycle', audio:'audio:frame', audioSubscribe:'audio:subscribe', audioUnsubscribe:'audio:unsubscribe' } as const;

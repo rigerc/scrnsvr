@@ -35,6 +35,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
 - Primary / all-monitors rendering, kiosk mode, configurable FPS (1–240)
+- Native Wayland layer-shell overlays on supported compositors, with fullscreen-window fallback
 - Settings window by default (argless or `--settings`); screensaver via `--open` (fullscreen) or `--preview --shader <id>` (windowed); headless thumbnail capture (`--thumbnail`)
 - Config at `~/.config/scrnsvr/config.json` (or `$XDG_CONFIG_HOME/scrnsvr/config.json`), Zod-validated with atomic writes
 - Linux packaging: AppImage + deb via electron-builder, ships a systemd user unit (`scrnsvr.service`)
@@ -44,6 +45,7 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 - Linux with Node 24 + npm
 - Electron 44 (devDependency, allowed via `allowScripts`)
 - `busctl` only if you rely on the logind idle fallback (Wayland without Electron idle data)
+- Optional layer-shell build: C/C++ compiler, `pkg-config`, Node and libuv development headers, `libwayland-dev`, and `wayland-scanner` (`libwayland-bin` on Debian/Ubuntu). Set `NODE_INCLUDE_DIR` if Node headers are outside the usual include paths. Packaged builds include the native module.
 
 ## Quick start
 
@@ -70,7 +72,30 @@ npm run check-shaders
 npm run check-effects
 ```
 
-CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--backend auto|layer-shell|fullscreen`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+
+### Wayland layer-shell
+
+The default `auto` backend uses `wlr-layer-shell` when a Wayland display and the native module are available. Each selected monitor receives a surface in the overlay layer, covering panels and fullscreen applications. Keyboard, click, scroll, touch, or pointer movement beyond 12 logical pixels dismisses the screensaver across all monitors. Settings and windowed previews use regular Electron windows.
+
+Layer-shell is supported by Hyprland, Sway, KDE Plasma, and other compatible compositors; GNOME does not provide it ([compatibility](https://github.com/wmww/gtk-layer-shell#supported-desktops)). Automatic mode falls back to fullscreen windows if native startup fails. GPU texture export is attempted first, with bitmap frames as the driver fallback. If an output is added, removed, or changes scale, the screensaver closes; the daemon selects outputs again on its next launch. A runtime compositor or renderer failure also closes the group and makes subsequent automatic launches use fullscreen windows.
+
+```sh
+# Require native Wayland presentation, or report the startup error
+npx electron dist/main/index.js --open --backend layer-shell
+# Use the original fullscreen windows
+npx electron dist/main/index.js --open --backend fullscreen
+# Compile the native module on its own
+npm run build:layer-shell
+# Package the app (requires a successful native build)
+npm run dist
+# Briefly display a shader and verify native rendering and frame release
+npm run check-layer-shell
+# Exercise the bitmap producer explicitly
+node scripts/check-layer-shell.cjs --shm
+```
+
+`npm run build` attempts the native build and continues with fullscreen support if development dependencies are missing. See the [backend design](docs/decisions/0001-wlr-layer-shell.md) for frame ownership and platform limits.
 
 ## Shader controls
 

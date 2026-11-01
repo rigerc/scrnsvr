@@ -98,9 +98,11 @@ async function startRenderer(): Promise<void> {
     applyPick(state, pick, fade);
   });
 
-  setupDismiss(fade);
+  const dismiss = setupDismiss(fade);
+  const unsubscribeDismiss = window.scrnsvr.onDismiss?.(dismiss);
   addEventListener('pagehide', () => {
     unsubscribeCycle?.();
+    unsubscribeDismiss?.();
     state.stop();
     fade?.destroy();
     clock.destroy();

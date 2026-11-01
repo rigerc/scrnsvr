@@ -6,6 +6,8 @@ if (palettes.status !== 0) process.exit(palettes.status ?? 1);
 const generated = spawnSync(process.execPath, ['scripts/generate-shader-registry.mjs'], { stdio: 'inherit' });
 if (generated.status !== 0) process.exit(generated.status ?? 1);
 await mkdir('dist', { recursive:true });
+const native = spawnSync(process.execPath, ['scripts/build-layer-shell.mjs', ...(process.argv.includes('--require-layer-shell') ? ['--required'] : [])], { stdio: 'inherit' });
+if (native.status !== 0) process.exit(native.status ?? 1);
 // `src/shared/gpu-flags.ts` is a second entry so the check scripts can require
 // the shared software-GL switch list from `dist/shared/gpu-flags.js`.
 await build({entryPoints:['src/main/index.ts','src/preload/index.ts','src/shared/gpu-flags.ts'],outdir:'dist',bundle:true,platform:'node',format:'cjs',sourcemap:true,external:['electron'],loader:{'.glsl':'text'},logLevel:'info'});

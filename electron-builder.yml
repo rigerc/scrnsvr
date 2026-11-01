@@ -5,9 +5,12 @@ directories:
   buildResources: assets
 files:
   - dist/**
+  - '!dist/native/generated/**'
   - packaging/**
   - assets/**
   - package.json
+asarUnpack:
+  - dist/native/*.node
 linux:
   target: [AppImage, deb]
   syncDesktopName: true

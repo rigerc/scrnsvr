@@ -22,6 +22,11 @@ const api: ScrnsvrApi = {
   setConfig: config => ipcRenderer.invoke(IPC.setConfig, config),
   importNoctaliaColors: () => ipcRenderer.invoke(IPC.importNoctaliaColors),
   close: () => ipcRenderer.send(IPC.close),
+  onDismiss: listener => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC.dismiss, handler);
+    return () => ipcRenderer.removeListener(IPC.dismiss, handler);
+  },
   onCycle: listener => {
     const handler = (_event: unknown, pick: CyclePick) => listener(pick);
     ipcRenderer.on(IPC.cycle, handler);
