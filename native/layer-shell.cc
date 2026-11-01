@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
-#include <cmath>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -181,7 +180,8 @@ static wl_pointer_listener pointerListener = [] {
   l.motion = [](void* data, wl_pointer*, uint32_t, wl_fixed_t x, wl_fixed_t y) {
     auto s = static_cast<Session*>(data);
     double px = wl_fixed_to_double(x), py = wl_fixed_to_double(y);
-    if (s->pointerOrigin && std::hypot(px - s->pointerX, py - s->pointerY) > 12) s->dismiss();
+    double dx = px - s->pointerX, dy = py - s->pointerY;
+    if (s->pointerOrigin && dx * dx + dy * dy > 144) s->dismiss();
     if (!s->pointerOrigin) { s->pointerOrigin = true; s->pointerX = px; s->pointerY = py; }
   };
   l.button = [](void* data, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t state) { if (state == WL_POINTER_BUTTON_STATE_PRESSED) static_cast<Session*>(data)->dismiss(); };
