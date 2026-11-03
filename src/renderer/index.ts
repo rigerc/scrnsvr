@@ -55,11 +55,12 @@ function applyPick(state: SceneState, pick: CyclePick, fade?: FadeOverlay): void
 }
 
 /** Any user input closes the screensaver; a pointer must travel a little first. */
-function setupDismiss(fade?: FadeOverlay): () => void {
+function setupDismiss(fade: FadeOverlay | undefined, onDismiss: () => void): () => void {
   let dismissed = false;
   const dismiss = () => {
     if (dismissed) return;
     dismissed = true;
+    onDismiss();
     if (fade) fade.fadeOut(() => window.scrnsvr.close());
     else window.scrnsvr.close();
   };
@@ -89,16 +90,20 @@ async function startRenderer(): Promise<void> {
   const state = createSceneState(config, registry, chosen, params);
   const clock = mountClock(document.body, resolveClockConfig(config));
   const fade = createFade(params, config);
+  let dismissing = false;
 
   // Cycling is coordinated by the main process so every monitor swaps together.
   const unsubscribeCycle = window.scrnsvr.onCycle?.(async (pick) => {
-    Object.assign(config, await window.scrnsvr.getConfig());
+    if (dismissing) return;
+    const refreshed = await window.scrnsvr.getConfig();
+    if (dismissing) return;
+    Object.assign(config, refreshed);
     registry = withCustomShaders(builtins, config.customShaders) as ShaderRegistry;
     state.registry = registry;
     applyPick(state, pick, fade);
   });
 
-  const dismiss = setupDismiss(fade);
+  const dismiss = setupDismiss(fade, () => { dismissing = true; });
   const unsubscribeDismiss = window.scrnsvr.onDismiss?.(dismiss);
   addEventListener('pagehide', () => {
     unsubscribeCycle?.();

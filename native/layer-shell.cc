@@ -33,6 +33,8 @@ struct Output {
   zwlr_layer_surface_v1* layer = nullptr;
   int width = 0, height = 0;
   unsigned frames = 0;
+  uint32_t finalToken = 0;
+  wl_callback* finalCallback = nullptr;
 };
 struct Frame {
   Session* session;
@@ -97,6 +99,7 @@ struct Session {
     }
     while (!frames.empty()) release(frames.begin()->first);
     for (auto& [id, out] : outputs) {
+      if (out->finalCallback) wl_callback_destroy(out->finalCallback);
       if (out->layer) zwlr_layer_surface_v1_destroy(out->layer);
       if (out->surface) wl_surface_destroy(out->surface);
       if (out->proxy) wl_output_destroy(out->proxy);
@@ -287,6 +290,8 @@ static const zwlr_layer_surface_v1_listener layerListener = {
 static void present(Frame* frame) {
   auto s = frame->session;
   auto& out = s->outputs.at(frame->output);
+  // DMA-BUF imports finish asynchronously; none may replace the exit buffer.
+  if (out->finalToken && frame->token != out->finalToken) { s->release(frame->token); return; }
   static const wl_buffer_listener listener = { [](void* data, wl_buffer*) { auto f = static_cast<Frame*>(data); f->session->release(f->token); } };
   wl_buffer_add_listener(frame->buffer, &listener, frame);
   wl_surface_set_buffer_scale(out->surface, out->scale);
@@ -369,13 +374,28 @@ static napi_value open(napi_env env, napi_callback_info info) {
   return nullptr;
   API_END
 }
+static void bitmapBuffer(Frame& frame, uint32_t width, uint32_t height, const void* bytes = nullptr) {
+  uint64_t required = uint64_t(width) * height * 4;
+  if (!width || !height || required > INT32_MAX) throw std::runtime_error("Invalid bitmap size");
+  int fd = memfd_create("scrnsvr-frame", MFD_CLOEXEC);
+  if (fd < 0) throw std::runtime_error("Cannot allocate frame");
+  if (ftruncate(fd, required) < 0) { ::close(fd); throw std::runtime_error("Cannot size frame"); }
+  frame.bytes = required;
+  frame.memory = mmap(nullptr, required, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (frame.memory == MAP_FAILED) { ::close(fd); throw std::runtime_error("Cannot map frame"); }
+  // Fresh memfd storage is zero-filled. XRGB makes an empty exit buffer opaque.
+  if (bytes) std::memcpy(frame.memory, bytes, required);
+  auto pool = wl_shm_create_pool(frame.session->shm, fd, required);
+  frame.buffer = wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, bytes ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
+  wl_shm_pool_destroy(pool); ::close(fd);
+}
 static napi_value submit(napi_env env, napi_callback_info info) {
   API_BEGIN
   auto s = session(env, argv[0]); auto id = integer(env, argv[1]); auto token = integer(env, argv[2]);
   napi_value accepted; napi_get_boolean(env, false, &accepted);
   if (s->closed || !s->outputs.count(id) || s->frames.count(token)) return accepted;
   auto& out = s->outputs.at(id);
-  if (!out->surface || out->width <= 0 || out->height <= 0 || out->frames >= 3) return accepted;
+  if (!out->surface || out->finalToken || out->width <= 0 || out->height <= 0 || out->frames >= 3) return accepted;
   auto width = integer(env, get(env, argv[3], "width")), height = integer(env, get(env, argv[3], "height"));
   if (width != uint32_t(out->width * out->scale) || height != uint32_t(out->height * out->scale)) return accepted;
   auto frame = std::make_unique<Frame>(); frame->session = s; frame->output = id; frame->token = token;
@@ -385,16 +405,7 @@ static napi_value submit(napi_env env, napi_callback_info info) {
     napi_get_buffer_info(env, argv[4], &bytes, &size);
     uint64_t required = uint64_t(width) * height * 4;
     if (required > INT32_MAX || size != required) return accepted;
-    int fd = memfd_create("scrnsvr-frame", MFD_CLOEXEC);
-    if (fd < 0) throw std::runtime_error("Cannot allocate frame");
-    if (ftruncate(fd, required) < 0) { ::close(fd); throw std::runtime_error("Cannot size frame"); }
-    frame->bytes = required;
-    frame->memory = mmap(nullptr, required, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (frame->memory == MAP_FAILED) { ::close(fd); throw std::runtime_error("Cannot map frame"); }
-    std::memcpy(frame->memory, bytes, size);
-    auto pool = wl_shm_create_pool(s->shm, fd, required);
-    frame->buffer = wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, WL_SHM_FORMAT_ARGB8888);
-    wl_shm_pool_destroy(pool); ::close(fd);
+    bitmapBuffer(*frame, width, height, bytes);
   } else {
     if (!s->dmabuf) return accepted;
     auto format = integer(env, get(env, argv[4], "format"));
@@ -413,6 +424,29 @@ static napi_value submit(napi_env env, napi_callback_info info) {
   napi_get_boolean(env, true, &accepted); return accepted;
   API_END
 }
+static napi_value finish(napi_env env, napi_callback_info info) {
+  API_BEGIN
+  auto s = session(env, argv[0]); auto id = integer(env, argv[1]); auto token = integer(env, argv[2]);
+  if (s->closed || !s->outputs.count(id)) return nullptr;
+  auto& out = s->outputs.at(id);
+  if (out->finalToken) return nullptr;
+  if (!token || s->frames.count(token) || !out->surface || out->width <= 0 || out->height <= 0) throw std::runtime_error("Cannot finish layer-shell output");
+  auto frame = std::make_unique<Frame>(); frame->session = s; frame->output = id; frame->token = token;
+  bitmapBuffer(*frame, out->width * out->scale, out->height * out->scale);
+  out->finalToken = token;
+  out->finalCallback = wl_surface_frame(out->surface);
+  static const wl_callback_listener listener = { [](void* data, wl_callback* callback, uint32_t) {
+    auto output = static_cast<Output*>(data);
+    wl_callback_destroy(callback); output->finalCallback = nullptr;
+    output->session->emit({"finished", "", output->id, output->finalToken});
+  } };
+  wl_callback_add_listener(out->finalCallback, &listener, out.get());
+  auto raw = frame.get(); s->frames[token] = std::move(frame); ++out->frames;
+  present(raw);
+  watch(s);
+  return nullptr;
+  API_END
+}
 static napi_value close(napi_env env, napi_callback_info info) {
   API_BEGIN
   session(env, argv[0])->close(); return nullptr;
@@ -424,6 +458,7 @@ static napi_value init(napi_env env, napi_value exports) {
     {"outputs", nullptr, outputs, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"open", nullptr, open, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"submit", nullptr, submit, nullptr, nullptr, nullptr, napi_default, nullptr},
+    {"finish", nullptr, finish, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"close", nullptr, close, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(methods) / sizeof(methods[0]), methods);

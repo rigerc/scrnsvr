@@ -25,9 +25,17 @@ class FakeWindow extends EventEmitter {
   setSize = vi.fn();
   isDestroyed() { return this.destroyed; }
   destroy() { if (!this.destroyed) { this.destroyed = true; this.emit('closed'); } }
+  close() {
+    const event = { preventDefault: vi.fn() };
+    this.emit('close', event);
+    if (!event.preventDefault.mock.calls.length) this.destroy();
+  }
   paint() {
     const texture = { textureInfo: textureInfo(), release: vi.fn() } as OffscreenSharedTexture;
-    this.webContents.emit('paint', { texture });
+    this.webContents.emit('paint', { texture }, {}, {
+      isEmpty: () => false, getSize: () => ({ width: 1920, height: 1080 }),
+      getScaleFactors: () => [1], toBitmap: () => Buffer.alloc(4),
+    });
     return texture;
   }
 }
@@ -37,7 +45,7 @@ function harness({ count = 1, loadWindow = async () => {}, sharedTextures = true
   const host: LayerHost = {
     create: vi.fn(listener => { callback = listener; return {}; }),
     outputs: vi.fn(() => outputs.slice(0, count)),
-    open: vi.fn(), close: vi.fn(), submit: vi.fn(() => true),
+    open: vi.fn(), close: vi.fn(), submit: vi.fn(() => true), finish: vi.fn(),
   };
   const runtimeError = vi.fn();
   const emit = (event: Partial<LayerEvent> & Pick<LayerEvent, 'type'>) => callback({ output: 1, token: 0, width: 1920, height: 1080, scale: 1, message: '', ...event });
@@ -79,6 +87,67 @@ describe('layer-shell selection and texture import', () => {
 });
 
 describe('layer-shell lifecycle', () => {
+  it.each([true, false])('waits for every final black frame before teardown (shared textures: %s)', async sharedTextures => {
+    const h = harness({ count: 2, sharedTextures });
+    await h.ready();
+    h.emit({ type: 'presented', output: 1 }); h.emit({ type: 'presented', output: 2 });
+    await h.promise;
+    const texture = h.windows[0].paint();
+    h.emit({ type: 'dismiss' });
+    h.windows[0].close();
+    h.windows[0].close();
+    expect(h.host.finish).toHaveBeenCalledExactlyOnceWith(expect.anything(), 1, 2);
+    expect(h.host.close).not.toHaveBeenCalled();
+    expect(h.windows[0].destroyed).toBe(false);
+    expect(texture.release).toHaveBeenCalledTimes(sharedTextures ? 0 : 1);
+    expect(h.windows[0].paint().release).toHaveBeenCalledOnce();
+    expect(h.host.submit).toHaveBeenCalledTimes(1);
+    h.emit({ type: 'finished', token: 1 }); // An unrelated frame cannot finish shutdown.
+    h.emit({ type: 'presented', token: 2 }); // A commit is not the final-frame callback.
+    expect(h.host.close).not.toHaveBeenCalled();
+    h.emit({ type: 'finished', token: 2 });
+    expect(h.host.close).not.toHaveBeenCalled();
+    h.windows[1].close();
+    expect(h.host.finish).toHaveBeenLastCalledWith(expect.anything(), 2, 3);
+    h.emit({ type: 'finished', output: 2, token: 3 });
+    expect(h.windows.every(window => window.destroyed)).toBe(true);
+    expect(h.host.close).toHaveBeenCalledOnce();
+    expect(texture.release).toHaveBeenCalledOnce();
+  });
+  it('discards bitmap readback that completes after the final frame starts', async () => {
+    const h = harness();
+    await h.ready(); h.emit({ type: 'presented' }); await h.promise;
+    let resolveCapture!: (image: Awaited<ReturnType<typeof h.windows[0]['webContents']['capturePage']>>) => void;
+    const image = await h.windows[0].webContents.capturePage();
+    h.windows[0].webContents.capturePage.mockImplementationOnce(() => new Promise(resolve => { resolveCapture = resolve; }));
+    h.emit({ type: 'gpu-failed' });
+    h.windows[0].close();
+    resolveCapture(image);
+    await Promise.resolve();
+    expect(h.host.submit).not.toHaveBeenCalled();
+    h.emit({ type: 'finished', token: 1 });
+    expect(h.host.close).toHaveBeenCalledOnce();
+  });
+  it('bounds shutdown when the compositor never sends a final-frame callback', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    await h.ready(); h.emit({ type: 'presented' }); await h.promise;
+    h.windows[0].close();
+    expect(h.host.finish).toHaveBeenCalledOnce();
+    expect(h.host.close).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(6001);
+    expect(h.host.close).toHaveBeenCalledOnce();
+    expect(h.windows[0].destroyed).toBe(true);
+  });
+  it('cleans up when creating the final native buffer fails', async () => {
+    const h = harness();
+    await h.ready(); h.emit({ type: 'presented' }); await h.promise;
+    vi.mocked(h.host.finish).mockImplementationOnce(() => { throw new Error('Cannot allocate frame'); });
+    h.windows[0].close();
+    expect(h.runtimeError).toHaveBeenCalledOnce();
+    expect(h.host.close).toHaveBeenCalledOnce();
+    expect(h.windows[0].destroyed).toBe(true);
+  });
   it('waits for every output, bounds queued frames, and leases textures until release', async () => {
     const h = harness({ count: 2 });
     await h.ready();

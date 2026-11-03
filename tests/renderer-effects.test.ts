@@ -20,9 +20,35 @@ afterEach(() => {
   window.dispatchEvent(new Event('pagehide'));
   vi.clearAllMocks();
   vi.resetModules();
+  window.history.replaceState({}, '', '/');
 });
 
 describe('screensaver effects integration', () => {
+  it.each([false, true])('ignores queued and subsequent cycle requests after dismissal (nofade: %s)', async nofade => {
+    document.body.innerHTML = '<canvas></canvas>';
+    if (nofade) window.history.replaceState({}, '', '/?nofade=1');
+    const config = ConfigSchema.parse({ shader: 'flow-field' });
+    let cycle!: (pick: { shader: string }) => unknown;
+    let dismiss!: () => void;
+    const getConfig = vi.fn(async () => config);
+    window.scrnsvr = {
+      getConfig, setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
+      onCycle: listener => { cycle = listener; return vi.fn(); },
+      onDismiss: listener => { dismiss = listener; return vi.fn(); },
+    };
+    await import('../src/renderer/index');
+    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
+    let resolveConfig!: (value: typeof config) => void;
+    getConfig.mockImplementationOnce(() => new Promise(resolve => { resolveConfig = resolve; }));
+    const cycling = cycle({ shader: 'plasma' });
+    dismiss();
+    resolveConfig(config);
+    await cycling;
+    await cycle({ shader: 'plasma' });
+    expect(getConfig).toHaveBeenCalledTimes(2);
+    expect(state.mount).toHaveBeenCalledOnce();
+    expect(window.scrnsvr.close).toHaveBeenCalledOnce();
+  });
   it('passes the global stack on launch and refreshed stack on shuffle without altering the clock', async () => {
     document.body.innerHTML = '<canvas></canvas>';
     let config = ConfigSchema.parse({

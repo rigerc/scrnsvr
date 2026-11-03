@@ -11,6 +11,7 @@ export interface LayerHost {
   outputs(session: unknown): LayerOutput[];
   open(session: unknown, output: number): void;
   submit(session: unknown, output: number, token: number, size: { width: number; height: number }, frame: Buffer | DmaBuffer): boolean;
+  finish(session: unknown, output: number, token: number): void;
   close(session: unknown): void;
 }
 
@@ -52,6 +53,7 @@ interface Renderer {
   capturing: boolean;
   pending: Set<number>;
   lastCapture: number;
+  finalToken?: number;
 }
 interface LayerShellOptions {
   primary?: Pick<Display, 'label' | 'bounds'>;
@@ -84,6 +86,7 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
   const textures = new Map<number, OffscreenSharedTexture>();
   const presented = new Set<number>();
   const loaded = new Set<number>();
+  const finished = new Set<number>();
   const windows: BrowserWindow[] = [];
   let session: unknown;
   let selected: LayerOutput[] = [];
@@ -127,6 +130,13 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
     }
   };
   const nextToken = () => { token = token === 0xffffffff ? 1 : token + 1; return token; };
+  const dismiss = () => {
+    if (dismissing || closed) return;
+    dismissing = true;
+    // A failed renderer or missing final-frame callback must not retain input.
+    dismissTimer = setTimeout(close, 6000);
+    for (const window of windows) if (!window.isDestroyed()) window.webContents.send(IPC.dismiss);
+  };
   const submit = (id: number, renderer: Renderer, size: { width: number; height: number }, frame: Buffer | DmaBuffer, texture?: OffscreenSharedTexture) => {
     const sequence = nextToken();
     if (!host.submit(session, id, sequence, size, frame)) return false;
@@ -141,15 +151,16 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
     return submit(id, renderer, { width: Math.round(size.width * scale), height: Math.round(size.height * scale) }, image.toBitmap({ scaleFactor: scale }));
   };
   const capture = async (id: number, renderer: Renderer) => {
-    if (closed || !loaded.has(id) || renderer.capturing || renderer.pending.size >= 2 || Date.now() - renderer.lastCapture < 1000 / options.fps) return;
+    if (closed || renderer.finalToken !== undefined || !loaded.has(id) || renderer.capturing || renderer.pending.size >= 2 || Date.now() - renderer.lastCapture < 1000 / options.fps) return;
     renderer.capturing = true;
     renderer.lastCapture = Date.now();
     try {
       const image = await renderer.window.webContents.capturePage();
-      if (!closed && !renderer.window.isDestroyed()) submitImage(id, renderer, image);
+      if (!closed && renderer.finalToken === undefined && !renderer.window.isDestroyed()) submitImage(id, renderer, image);
     } catch (error) {
       // Chromium can reject readback while the first compositor frame is pending.
       // The startup deadline handles a renderer that never produces usable frames.
+      if (renderer.finalToken !== undefined) return;
       if (!closed && ready) fail(error instanceof Error ? error : new Error(String(error)));
       else if (!closed && options.sharedTextures !== false && Date.now() - started > 250) fail(new SharedTextureUnavailable('GPU texture export and readback failed'));
     }
@@ -168,12 +179,12 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
         checkReady();
       } else if (event.type === 'gpu-failed') {
         if (renderer) { renderer.gpu = false; void capture(event.output, renderer); }
+      } else if (event.type === 'finished') {
+        if (renderer?.finalToken === undefined || renderer.finalToken !== event.token) return;
+        finished.add(event.output);
+        if (selected.every(output => finished.has(output.id))) close();
       } else if (event.type === 'dismiss') {
-        if (dismissing) return;
-        dismissing = true;
-        for (const window of windows) if (!window.isDestroyed()) window.webContents.send(IPC.dismiss);
-        // A failed renderer must never leave an input-grabbing overlay behind.
-        dismissTimer = setTimeout(close, 6000);
+        dismiss();
       } else if (event.type === 'closed' || event.type === 'topology') {
         // Closing the group on hotplug avoids keeping stale output geometry.
         close();
@@ -192,13 +203,23 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
           gpu: options.sharedTextures !== false, capturing: false, pending: new Set(), lastCapture: 0 };
         renderers.set(event.output, state);
         window.webContents.setFrameRate(options.fps);
+        window.on('close', closeEvent => {
+          closeEvent.preventDefault();
+          if (closed || state.finalToken !== undefined) return;
+          dismiss();
+          // Keep the renderer alive until every native surface has its black
+          // buffer. Chromium's final paint can lag behind its close IPC.
+          state.finalToken = nextToken();
+          try { host.finish(session, event.output, state.finalToken); }
+          catch (error) { fail(error instanceof Error ? error : new Error(String(error))); }
+        });
         window.on('closed', () => {
           close();
         });
         window.webContents.on('render-process-gone', (_event, details) => fail(new Error(`Layer-shell renderer exited: ${details.reason}`)));
         window.webContents.on('paint', (paintEvent, _dirty, image) => {
           const texture = paintEvent.texture;
-          if (closed || state.pending.size >= 2) { texture?.release(); return; }
+          if (closed || state.finalToken !== undefined || state.pending.size >= 2) { texture?.release(); return; }
           let retained = false;
           try {
             if (state.gpu && texture) {

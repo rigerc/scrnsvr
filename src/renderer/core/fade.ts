@@ -32,6 +32,8 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
   host.append(overlay);
 
   let raf = 0;
+  let dismissing = false;
+  let destroyed = false;
   const startedAt = performance.now();
   const stepIn = (now: number) => {
     overlay.style.opacity = String(fadeInOpacity(now - startedAt, fadeMs));
@@ -42,18 +44,21 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
 
   return {
     fadeOut(close) {
+      if (dismissing || destroyed) return;
+      dismissing = true;
       cancelAnimationFrame(raf);
-      if (fadeMs <= 0) { close(); return; }
+      if (fadeMs <= 0) { overlay.style.opacity = '1'; close(); return; }
       const outStart = performance.now();
-      overlay.style.opacity = '0';
+      const opacity = Number(overlay.style.opacity);
       const stepOut = (now: number) => {
-        overlay.style.opacity = String(fadeOutOpacity(now - outStart, fadeMs));
+        overlay.style.opacity = String(opacity + (1 - opacity) * fadeOutOpacity(now - outStart, fadeMs));
         if (Number(overlay.style.opacity) < 1) raf = requestAnimationFrame(stepOut);
         else close();
       };
       raf = requestAnimationFrame(stepOut);
     },
     transition(swap) {
+      if (dismissing || destroyed) return;
       cancelAnimationFrame(raf);
       if (fadeMs <= 0) { swap(); return; }
       // Fade out (half time), swap the scene, then fade back in (half time).
@@ -73,10 +78,12 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
       raf = requestAnimationFrame(stepOut);
     },
     setOpacity(value) {
+      if (dismissing || destroyed) return;
       cancelAnimationFrame(raf);
       overlay.style.opacity = String(value);
     },
     destroy() {
+      destroyed = true;
       cancelAnimationFrame(raf);
       overlay.remove();
     },
