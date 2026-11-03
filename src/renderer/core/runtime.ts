@@ -74,6 +74,13 @@ function createScene(renderer: Renderer, shader: ShaderDefinition, values: Recor
     depthWrite: false,
     cullFace: false,
   });
+  // OGL logs link failures and leaves an incomplete Program. Reject it before
+  // drawing so a failed replacement cannot disturb the running GL scene.
+  if (!gl.getProgramParameter(program.program, gl.LINK_STATUS)) {
+    const message = gl.getProgramInfoLog(program.program) || `Could not link shader ${shader.manifest.id}`;
+    disposeProgram(renderer, program);
+    throw new Error(message);
+  }
   const geometry = new Triangle(gl);
   const mesh = new Mesh(gl, { geometry, program });
   resume();
@@ -139,9 +146,16 @@ export function mountShader(
     scene.draw(0, true);
   };
   const observer = new ResizeObserver(resize);
-  observer.observe(canvas);
-  resize();
-  const stopLoop = startLoop(delta => scene.draw(delta), fps);
+  let stopLoop: () => void;
+  try {
+    observer.observe(canvas);
+    resize();
+    stopLoop = startLoop(delta => scene.draw(delta), fps);
+  } catch (error) {
+    observer.disconnect();
+    scene.dispose();
+    throw error;
+  }
   return () => {
     stopLoop();
     observer.disconnect();

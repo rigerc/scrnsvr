@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountShader, type ShaderDefinition } from '../src/renderer/core/runtime';
+import { Renderer, Program, Triangle } from 'ogl';
 
 const state = vi.hoisted(() => ({
   uniforms: {} as Record<string, { value: unknown }>,
   tick: (_delta: number) => {},
   resize: () => {},
+  linked: true,
 }));
 vi.mock('../src/renderer/core/loop', () => ({ startLoop: (tick: (delta: number) => void) => { state.tick = tick; return () => {}; } }));
 vi.mock('ogl', () => ({
   Renderer: class {
-    gl = { drawingBufferWidth: 100, drawingBufferHeight: 50, deleteShader: vi.fn() };
+    gl = { drawingBufferWidth: 100, drawingBufferHeight: 50, deleteShader: vi.fn(),
+      LINK_STATUS: 1, getProgramParameter: () => state.linked, getProgramInfoLog: () => 'link failed' };
     state = { uniformLocations: new Map() };
     setSize() {}
     render() {}
@@ -25,7 +28,7 @@ vi.mock('ogl', () => ({
   Color: class {},
 }));
 
-afterEach(() => { vi.unstubAllGlobals(); delete window.scrnsvrAudio; });
+afterEach(() => { state.linked = true; vi.unstubAllGlobals(); vi.restoreAllMocks(); delete window.scrnsvrAudio; });
 function mount(integrated: boolean, playback?: { paused: boolean }) {
   vi.stubGlobal('devicePixelRatio', 1);
   vi.stubGlobal('ResizeObserver', class {
@@ -50,6 +53,22 @@ function mount(integrated: boolean, playback?: { paused: boolean }) {
 }
 
 describe('runtime animation contract', () => {
+  it('rejects and disposes an unlinked shader before attempting to draw it', () => {
+    state.linked = false;
+    const removeProgram = vi.spyOn(Program.prototype, 'remove');
+    const render = vi.spyOn(Renderer.prototype, 'render');
+    expect(() => mount(false)).toThrow('link failed');
+    expect(render).not.toHaveBeenCalled();
+    expect(removeProgram).toHaveBeenCalledOnce();
+  });
+  it('disposes a replacement scene when its first draw fails', () => {
+    const removeProgram = vi.spyOn(Program.prototype, 'remove');
+    const removeGeometry = vi.spyOn(Triangle.prototype, 'remove');
+    vi.spyOn(Renderer.prototype, 'render').mockImplementationOnce(() => { throw new Error('first draw failed'); });
+    expect(() => mount(false)).toThrow('first draw failed');
+    expect(removeProgram).toHaveBeenCalledOnce();
+    expect(removeGeometry).toHaveBeenCalledOnce();
+  });
   it('pauses settings playback independently of speed and keeps edits live', () => {
     const playback = { paused: false };
     const { values, dispose } = mount(false, playback);

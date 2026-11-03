@@ -1,6 +1,7 @@
 // Real compositor smoke check. Briefly maps a screensaver on the primary output.
 // --shm exercises the CPU fallback; --input tests native pointer dismissal on Hyprland.
 // --instant exercises zero-duration dismissal.
+// --cycle uses bitmap frames to check real scene swaps and failed-shader recovery.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -35,13 +36,14 @@ app.whenReady().then(async () => {
   const statistics = { gpu: 0, shm: 0, released: 0, dismissed: 0, finished: 0 };
   const finalTokens = new Map();
   const frameSizes = new Map();
+  const pixels = [];
   const host = {
     ...native,
     // N-API descriptors are non-enumerable.
     outputs: native.outputs, open: native.open,
     close: session => {
-      assert.equal(statistics.finished, windows.length, 'Surfaces closed before their final-frame callbacks');
-      native.close(session);
+      try { assert.equal(statistics.finished, windows.length, 'Surfaces closed before their final-frame callbacks'); }
+      finally { native.close(session); }
     },
     finish: (session, output, token) => {
       finalTokens.set(output, token);
@@ -65,16 +67,34 @@ app.whenReady().then(async () => {
       const accepted = native.submit(...args);
       if (accepted) frameSizes.set(args[1], args[3]);
       if (accepted) statistics[Buffer.isBuffer(args[4]) ? 'shm' : 'gpu']++;
+      if (accepted && process.argv.includes('--cycle') && Buffer.isBuffer(args[4])) {
+        const { width, height } = args[3];
+        const offset = (Math.floor(height / 2) * width + Math.floor(width / 2)) * 4;
+        // NativeImage bitmap storage is BGRA; inspect the actual compositor frame.
+        pixels.push([args[4][offset + 2], args[4][offset + 1], args[4][offset]]);
+      }
       return accepted;
     },
   };
-  ipcMain.handle('config:get', () => ({ ...defaultConfig, shader: 'plasma', global: { ...defaultConfig.global, fps: 30, fadeSeconds: process.argv.includes('--instant') ? 0 : 0.1 } }));
+  const config = { ...defaultConfig, shader: 'plasma', global: { ...defaultConfig.global, fps: 30, fadeSeconds: process.argv.includes('--instant') ? 0 : 0.1 },
+    customShaders: [
+      { id: 'custom-red', title: 'Red', source: 'void main(){gl_FragColor=vec4(1.0,0.0,0.0,1.0);}' },
+      { id: 'custom-blue', title: 'Blue', source: 'void main(){gl_FragColor=vec4(0.0,0.0,1.0,1.0);}' },
+      { id: 'custom-broken', title: 'Broken', source: 'void main(){gl_FragColor=missing_value;}' },
+    ],
+  };
+  const warnings = [];
+  ipcMain.handle('config:get', () => config);
   ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
   windows = await createLayerShellWindows({
-    host, primary: screen.getPrimaryDisplay(), fps: 30, sharedTextures: !process.argv.includes('--shm'),
-    createWindow: (width, height, scale, sharedTextures) => new BrowserWindow({ width, height, show: false, frame: false, backgroundColor: '#000000',
-      webPreferences: { preload: path.join(root, 'dist/preload/index.js'), sandbox: true, contextIsolation: true,
-        backgroundThrottling: false, offscreen: { useSharedTexture: sharedTextures, deviceScaleFactor: scale } } }),
+    host, primary: screen.getPrimaryDisplay(), fps: 30, sharedTextures: !process.argv.includes('--shm') && !process.argv.includes('--cycle'),
+    createWindow: (width, height, scale, sharedTextures) => {
+      const window = new BrowserWindow({ width, height, show: false, frame: false, backgroundColor: '#000000',
+        webPreferences: { preload: path.join(root, 'dist/preload/index.js'), sandbox: true, contextIsolation: true,
+          backgroundThrottling: false, offscreen: { useSharedTexture: sharedTextures, deviceScaleFactor: scale } } });
+      window.webContents.on('console-message', event => warnings.push(event.message));
+      return window;
+    },
     loadWindow: window => window.loadFile(path.join(root, 'dist/renderer/index.html'), { query: { shader: 'plasma' } }),
     onRuntimeError: value => { error = value; },
   });
@@ -87,6 +107,38 @@ app.whenReady().then(async () => {
     resolve(context.getImageData(0, 0, 32, 32).data.some((value, index) => index % 4 !== 3 && value > 20));
   }))`);
   assert.ok(hasColor, 'Renderer produced a black image');
+  if (process.argv.includes('--cycle')) {
+    const waitForColor = async (channel, mustSwap = false) => {
+      const start = Date.now();
+      let index = pixels.length, black = false;
+      while (Date.now() - start < 2000) {
+        for (; index < pixels.length; index++) {
+          const pixel = pixels[index];
+          black ||= pixel.every(value => value < 5);
+          // Color management can map full red/blue below 255 on the output.
+          if (pixel[channel] > 200 && pixel[channel === 0 ? 2 : 0] < 5 &&
+              await windows[0].webContents.executeJavaScript("Number(document.querySelector('.fade-overlay').style.opacity) === 0")) {
+            if (mustSwap && config.global.fadeSeconds > 0) assert.ok(black, 'Scene swapped without a black compositor frame');
+            return;
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      throw Error('Transition did not present the expected scene: ' + JSON.stringify({ pixels: pixels.slice(-8), warnings }));
+    };
+    windows[0].webContents.send('rotation:cycle', { shader: 'custom-red' });
+    await waitForColor(0, true);
+    const warningCount = warnings.length;
+    windows[0].webContents.send('rotation:cycle', { shader: 'custom-broken' });
+    // Give the request a full transition before checking recovery; red is
+    // already visible at the start of this deliberately failing swap.
+    await new Promise(resolve => setTimeout(resolve, 350));
+    await waitForColor(0);
+    assert.ok(warnings.slice(warningCount).some(message => message.includes('keeping the current scene')), 'Broken scene did not exercise recovery');
+    windows[0].webContents.send('rotation:cycle', { shader: 'custom-blue' });
+    await waitForColor(2, true);
+    console.log('Layer-shell transitions through black, failed-shader recovery and subsequent swaps passed');
+  }
   const closed = Promise.all(windows.map(window => new Promise(resolve => window.once('closed', resolve))));
   if (process.argv.includes('--input')) {
     originalCursor = JSON.parse(execFileSync('hyprctl', ['-j', 'cursorpos'], { encoding: 'utf8' }));
@@ -108,4 +160,8 @@ app.whenReady().then(async () => {
   console.log('Layer-shell rendering, frame release and shutdown passed:', statistics);
   clearTimeout(timeout);
   app.quit();
-}).catch(value => { console.error(value); for (const window of windows) if (!window.isDestroyed()) window.destroy(); app.exit(1); });
+}).catch(value => {
+  console.error(value);
+  try { for (const window of windows) if (!window.isDestroyed()) window.destroy(); }
+  finally { app.exit(1); }
+});

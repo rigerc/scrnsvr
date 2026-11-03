@@ -1,5 +1,7 @@
 import type { Config } from '../shared/config';
-import { pickRotationEntry } from '../shared/rotation';
+import type { BrowserWindow } from 'electron';
+import { pickRotationEntry, rotationEntryKey } from '../shared/rotation';
+import { IPC } from '../shared/ipc';
 
 export interface RendererTarget { shaderId: string; preset?: string; }
 export interface RendererBounds { x: number; y: number; width: number; height: number; }
@@ -33,4 +35,29 @@ export function rendererQuery(shaderId: string, preset?: string): Record<string,
   const query: Record<string, string> = { shader: shaderId };
   if (preset) query.preset = preset;
   return query;
+}
+
+/** Broadcast one choice to the group, excluding its actual initial selection. */
+export function startWindowGroupCycling(windows: BrowserWindow[], options: {
+  initial: RendererTarget;
+  config: Config;
+  loadConfig: () => Promise<Config>;
+  shaderIds: (config: Config) => string[];
+}): void {
+  const intervalMs = options.config.rotation.intervalMinutes * 60_000;
+  if (!options.config.rotation.enabled || !(intervalMs > 0)) return;
+  let currentKey = rotationEntryKey(options.initial.shaderId, options.initial.preset);
+  const timer = setInterval(async () => {
+    const latest = await options.loadConfig();
+    const pick = pickRotationEntry(latest.rotation, latest.shaders, latest.presets, options.shaderIds(latest), Math.random, currentKey);
+    if (!pick) return;
+    currentKey = rotationEntryKey(pick.shaderId, pick.preset);
+    for (const window of windows) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.cycle, { shader: pick.shaderId, preset: pick.preset });
+    }
+  }, intervalMs);
+  timer.unref?.();
+  for (const window of windows) window.once('closed', () => {
+    if (windows.every(window => window.isDestroyed())) clearInterval(timer);
+  });
 }

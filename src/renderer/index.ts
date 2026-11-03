@@ -16,6 +16,7 @@ interface SceneState {
   registry: ShaderRegistry;
   canvas: HTMLCanvasElement;
   currentKey: string;
+  requestedKey?: string;
   stop: () => void;
 }
 
@@ -41,14 +42,25 @@ function applyPick(state: SceneState, pick: CyclePick, fade?: FadeOverlay): void
   const next = state.registry[pick.shader];
   if (!next) return;
   const key = rotationEntryKey(pick.shader, pick.preset);
-  if (key === state.currentKey) return;
-  state.currentKey = key;
+  if (key === state.requestedKey || (key === state.currentKey && !state.requestedKey)) return;
+  state.requestedKey = key;
   const swap = () => {
+    state.requestedKey = undefined;
+    if (key === state.currentKey) return;
+    let stop: () => void;
+    try {
+      // Mount first so a broken replacement cannot dispose the running scene.
+      stop = mountShader(state.canvas, next, resolveShaderValues(state.config, state.registry, pick.shader, pick.preset), state.config.global.fps, undefined, {
+        effects: state.config.effects,
+        onEffectStatus: status => console.warn('[scrnsvr effects]', status.layerId ?? 'stack', status.message),
+      });
+    } catch (error) {
+      console.warn(`scrnsvr could not switch to ${pick.shader}; keeping the current scene`, error);
+      return;
+    }
     state.stop();
-    state.stop = mountShader(state.canvas, next, resolveShaderValues(state.config, state.registry, pick.shader, pick.preset), state.config.global.fps, undefined, {
-      effects: state.config.effects,
-      onEffectStatus: status => console.warn('[scrnsvr effects]', status.layerId ?? 'stack', status.message),
-    });
+    state.stop = stop;
+    state.currentKey = key;
   };
   if (fade) fade.transition(swap);
   else swap();
@@ -91,12 +103,14 @@ async function startRenderer(): Promise<void> {
   const clock = mountClock(document.body, resolveClockConfig(config));
   const fade = createFade(params, config);
   let dismissing = false;
+  let cycleRequest = 0;
 
   // Cycling is coordinated by the main process so every monitor swaps together.
   const unsubscribeCycle = window.scrnsvr.onCycle?.(async (pick) => {
     if (dismissing) return;
+    const request = ++cycleRequest;
     const refreshed = await window.scrnsvr.getConfig();
-    if (dismissing) return;
+    if (dismissing || request !== cycleRequest) return;
     Object.assign(config, refreshed);
     registry = withCustomShaders(builtins, config.customShaders) as ShaderRegistry;
     state.registry = registry;

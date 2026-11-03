@@ -6,7 +6,6 @@ import { parseArgs, resolveMode } from './cli';
 import { attachPowerResume, IdleDaemon, type RendererChild } from './daemon';
 import { ConfigSchema, type Config } from '../shared/config';
 import { loadConfig, saveConfig } from './config-store';
-import { pickRotationEntry, rotationEntryKey } from '../shared/rotation';
 import { shouldInhibitScreensaver } from './inhibit';
 import { IPC } from '../shared/ipc';
 import { loadNoctaliaColors } from './noctalia';
@@ -14,7 +13,7 @@ import { shaderIds, shaderRegistry } from '../renderer/shaders';
 import { withCustomShaders } from '../shared/custom-shaders';
 import { applySoftwareGl } from '../shared/gpu-flags';
 import { PlaybackAudio } from './audio';
-import { rendererQuery, rendererWindowOptions, resolveRendererTarget } from './windows';
+import { rendererQuery, rendererWindowOptions, resolveRendererTarget, startWindowGroupCycling } from './windows';
 import { createLayerShellWindows, useLayerShell } from './layer-shell';
 
 const playbackAudio = new PlaybackAudio();
@@ -79,7 +78,10 @@ async function createRendererWindows(shaderOverride?: string, preview = false): 
     for (const other of windows) if (!other.isDestroyed()) other.close();
   });
   // Auto-cycle needs an anchor so --open (one-shot) can swap while it runs too.
-  if (!preview && intervalEnabled(config) && windows.length > 0) startWindowGroupCycling(windows);
+  if (!preview && intervalEnabled(config) && windows.length > 0) startWindowGroupCycling(windows, {
+    initial: { shaderId, preset }, config, loadConfig,
+    shaderIds: latest => Object.keys(withCustomShaders(shaderRegistry, latest.customShaders)),
+  });
   return windows;
 }
 
@@ -109,29 +111,6 @@ function renderDisplays(config: Config, preview: boolean): Electron.Display[] {
 /** Screensaver mode (`--open`) has no daemon group; cycle its windows directly. */
 function intervalEnabled(config: Config): boolean {
   return config.rotation.enabled && config.rotation.intervalMinutes > 0;
-}
-
-function startWindowGroupCycling(windows: BrowserWindow[]): void {
-  void loadConfig().then((config) => {
-    const intervalMs = config.rotation.intervalMinutes * 60_000;
-    if (!(intervalMs > 0)) return;
-    let currentKey: string | undefined;
-    const timer = setInterval(async () => {
-      const latest = await loadConfig();
-      const pick = pickRotationEntry(latest.rotation, latest.shaders, latest.presets, Object.keys(withCustomShaders(shaderRegistry, latest.customShaders)), Math.random, currentKey);
-      if (!pick) return;
-      currentKey = rotationEntryKey(pick.shaderId, pick.preset);
-      for (const window of windows) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.cycle, { shader: pick.shaderId, preset: pick.preset });
-      }
-    }, intervalMs);
-    timer.unref?.();
-    for (const window of windows) {
-      window.once('closed', () => {
-        if (windows.every((w) => w.isDestroyed())) clearInterval(timer);
-      });
-    }
-  });
 }
 
 async function createSettingsWindow(): Promise<BrowserWindow> {

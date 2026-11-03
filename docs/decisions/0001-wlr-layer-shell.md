@@ -28,6 +28,8 @@ Native input sends a dismissal notification to every renderer through the preloa
 
 Unit tests cover selection, modifier precision, texture leases, bounded submissions, startup cleanup, input shutdown, hotplug, and GPU import fallback. `scripts/check-layer-shell.cjs` exercises the real compositor and production renderer/preload, checks shader pixels, continuous presentation, frame release, and teardown. `--shm` forces bitmap frames; `--input` also checks pointer dismissal through Hyprland 0.55+ and restores the cursor. These checks briefly cover the primary display.
 
+`--cycle` uses bitmap frames to check shader transitions through black, recovery from a broken custom shader, and subsequent swaps by sampling the pixels submitted to Wayland. Transition regression tests also cover overlapping picks, mount cleanup, retry after failure, and excluding the initial selection from the first scheduled cycle.
+
 On the development NVIDIA/Hyprland system, shared-texture export fails and automatic retry with bitmap frames works. DMA-BUF presentation remains driver dependent; it needs hardware verification on a driver that exports compatible textures. Bitmap frames preserve GPU shader rendering but incur CPU readback and copy costs. Actual mixed-scale and multi-monitor hardware still need verification beyond the lifecycle unit tests.
 
 Layer-shell supplies desktop overlay behavior, not session locking or authentication. Idle detection is unchanged.
