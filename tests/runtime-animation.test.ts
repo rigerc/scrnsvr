@@ -8,8 +8,11 @@ const state = vi.hoisted(() => ({
   tick: (_delta: number) => {},
   resize: () => {},
   linked: true,
+  start: vi.fn(),
+  stop: vi.fn(),
+  audioStop: vi.fn(),
 }));
-vi.mock('../src/renderer/core/loop', () => ({ startLoop: (tick: (delta: number) => void) => { state.tick = tick; return () => {}; } }));
+vi.mock('../src/renderer/core/loop', () => ({ startLoop: (tick: (delta: number) => void) => { state.tick = tick; state.start(); return state.stop; } }));
 vi.mock('ogl', () => ({
   Renderer: class {
     gl = { drawingBufferWidth: 100, drawingBufferHeight: 50, deleteShader: vi.fn(),
@@ -39,7 +42,7 @@ function mount(integrated: boolean, playback?: { paused: boolean }) {
   window.scrnsvrAudio = {
     subscribe: callback => {
       callback({ level: 1, bass: 1, mid: 1, treble: 1, status: 'Active' });
-      return () => {};
+      return state.audioStop;
     },
   };
   const definition: ShaderDefinition = {
@@ -53,6 +56,38 @@ function mount(integrated: boolean, playback?: { paused: boolean }) {
 }
 
 describe('runtime animation contract', () => {
+  it('stops drawing and audio while inactive, defers resize, and resumes with a fresh loop', () => {
+    let activity!: (active: boolean) => void;
+    const unsubscribe = vi.fn();
+    vi.stubGlobal('scrnsvr', { onRenderingActive: (listener: typeof activity) => {
+      activity = listener; listener(true); return unsubscribe;
+    } });
+    const render = vi.spyOn(Renderer.prototype, 'render');
+    const { dispose } = mount(true);
+    const audio = vi.spyOn(window.scrnsvrAudio!, 'subscribe');
+    state.tick(100);
+    const phase = state.uniforms.uTime.value;
+    const stops = state.stop.mock.calls.length;
+    const audioStops = state.audioStop.mock.calls.length;
+    activity(false);
+    activity(false);
+    expect(state.stop).toHaveBeenCalledTimes(stops + 1);
+    expect(state.audioStop).toHaveBeenCalledTimes(audioStops + 1);
+    render.mockClear();
+    state.resize();
+    expect(render).not.toHaveBeenCalled();
+    activity(true);
+    expect(audio).toHaveBeenCalledOnce();
+    expect(render).toHaveBeenCalledOnce();
+    expect(state.uniforms.uTime.value).toBe(phase);
+    state.tick(100);
+    expect(state.uniforms.uTime.value).toBeCloseTo(Number(phase) + 0.2);
+    dispose();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    render.mockClear();
+    activity(true); state.resize();
+    expect(render).not.toHaveBeenCalled();
+  });
   it('rejects and disposes an unlinked shader before attempting to draw it', () => {
     state.linked = false;
     const removeProgram = vi.spyOn(Program.prototype, 'remove');

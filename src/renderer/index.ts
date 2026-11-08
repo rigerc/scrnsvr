@@ -17,6 +17,8 @@ interface SceneState {
   canvas: HTMLCanvasElement;
   currentKey: string;
   requestedKey?: string;
+  active?: boolean;
+  pendingPick?: CyclePick;
   stop: () => void;
 }
 
@@ -39,13 +41,17 @@ function createSceneState(config: Config, registry: ShaderRegistry, chosen: Shad
 
 /** Swap the mounted scene for a cycle pick, honoring the fade overlay when present. */
 function applyPick(state: SceneState, pick: CyclePick, fade?: FadeOverlay): void {
+  if (state.active === false) { state.pendingPick = pick; return; }
   const next = state.registry[pick.shader];
   if (!next) return;
   const key = rotationEntryKey(pick.shader, pick.preset);
   if (key === state.requestedKey || (key === state.currentKey && !state.requestedKey)) return;
+  state.pendingPick = pick;
   state.requestedKey = key;
   const swap = () => {
     state.requestedKey = undefined;
+    if (state.active === false) { state.pendingPick = pick; return; }
+    state.pendingPick = undefined;
     if (key === state.currentKey) return;
     let stop: () => void;
     try {
@@ -104,24 +110,40 @@ async function startRenderer(): Promise<void> {
   const fade = createFade(params, config);
   let dismissing = false;
   let cycleRequest = 0;
+  const unsubscribeActivity = window.scrnsvr.onRenderingActive?.(active => {
+    if (dismissing) return;
+    state.active = active;
+    if (!active) {
+      // Cancel in-flight fades without mounting a replacement on a dark output.
+      fade?.setOpacity(0);
+      state.requestedKey = undefined;
+    } else if (state.pendingPick) {
+      const pick = state.pendingPick;
+      state.pendingPick = undefined;
+      void cycle(pick);
+    }
+  });
 
   // Cycling is coordinated by the main process so every monitor swaps together.
-  const unsubscribeCycle = window.scrnsvr.onCycle?.(async (pick) => {
+  async function cycle(pick: CyclePick) {
     if (dismissing) return;
     const request = ++cycleRequest;
+    if (state.active === false) { state.pendingPick = pick; return; }
     const refreshed = await window.scrnsvr.getConfig();
     if (dismissing || request !== cycleRequest) return;
     Object.assign(config, refreshed);
     registry = withCustomShaders(builtins, config.customShaders) as ShaderRegistry;
     state.registry = registry;
     applyPick(state, pick, fade);
-  });
+  }
+  const unsubscribeCycle = window.scrnsvr.onCycle?.(cycle);
 
   const dismiss = setupDismiss(fade, () => { dismissing = true; });
   const unsubscribeDismiss = window.scrnsvr.onDismiss?.(dismiss);
   addEventListener('pagehide', () => {
     unsubscribeCycle?.();
     unsubscribeDismiss?.();
+    unsubscribeActivity?.();
     state.stop();
     fade?.destroy();
     clock.destroy();

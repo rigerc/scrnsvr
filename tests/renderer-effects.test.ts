@@ -38,6 +38,32 @@ afterEach(() => {
 });
 
 describe('screensaver cycling and effects integration', () => {
+  it('defers in-flight and subsequent shader picks while the output is inactive', async () => {
+    document.body.innerHTML = '<canvas></canvas>';
+    const config = ConfigSchema.parse({ shader: 'flow-field', global: { fadeSeconds: 1 } });
+    let cycle!: (pick: { shader: string }) => unknown;
+    let activity!: (active: boolean) => void;
+    window.scrnsvr = {
+      getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
+      onCycle: listener => { cycle = listener; return vi.fn(); },
+      onRenderingActive: listener => { activity = listener; listener(true); return vi.fn(); },
+    };
+    await import('../src/renderer/index');
+    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
+    advance(1000);
+    await cycle({ shader: 'plasma' });
+    advance(200);
+    activity(false);
+    advance(30000);
+    expect(state.mount).toHaveBeenCalledOnce();
+    await cycle({ shader: 'silk-ribbons' });
+    expect(state.mount).toHaveBeenCalledOnce();
+    activity(true);
+    await vi.waitFor(() => expect(window.scrnsvr.getConfig).toHaveBeenCalledTimes(3));
+    advance(500);
+    expect(state.mount).toHaveBeenCalledTimes(2);
+    expect((state.mount.mock.calls[1] as unknown as [unknown, { manifest: { id: string } }])[1].manifest.id).toBe('silk-ribbons');
+  });
   async function start(seconds = 1) {
     document.body.innerHTML = '<canvas></canvas>';
     const config = ConfigSchema.parse({ shader: 'flow-field', global: { fadeSeconds: seconds } });

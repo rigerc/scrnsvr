@@ -35,6 +35,8 @@ struct Output {
   unsigned frames = 0;
   uint32_t finalToken = 0;
   wl_callback* finalCallback = nullptr;
+  wl_callback* frameCallback = nullptr;
+  bool submitting = false;
 };
 struct Frame {
   Session* session;
@@ -100,6 +102,7 @@ struct Session {
     while (!frames.empty()) release(frames.begin()->first);
     for (auto& [id, out] : outputs) {
       if (out->finalCallback) wl_callback_destroy(out->finalCallback);
+      if (out->frameCallback) wl_callback_destroy(out->frameCallback);
       if (out->layer) zwlr_layer_surface_v1_destroy(out->layer);
       if (out->surface) wl_surface_destroy(out->surface);
       if (out->proxy) wl_output_destroy(out->proxy);
@@ -297,6 +300,17 @@ static void present(Frame* frame) {
   wl_surface_set_buffer_scale(out->surface, out->scale);
   wl_surface_attach(out->surface, frame->buffer, 0, 0);
   wl_surface_damage(out->surface, 0, 0, out->width, out->height);
+  out->submitting = false;
+  if (!out->finalToken) {
+    out->frameCallback = wl_surface_frame(out->surface);
+    static const wl_callback_listener listener = { [](void* data, wl_callback* callback, uint32_t) {
+      auto output = static_cast<Output*>(data);
+      wl_callback_destroy(callback);
+      output->frameCallback = nullptr;
+      output->session->emit({"frame-ready", "", output->id});
+    } };
+    wl_callback_add_listener(out->frameCallback, &listener, out.get());
+  }
   wl_surface_commit(out->surface);
   s->emit({"presented", "", out->id, frame->token});
 }
@@ -309,6 +323,7 @@ static const zwp_linux_buffer_params_v1_listener paramsListener = {
   [](void* data, zwp_linux_buffer_params_v1*) {
     auto frame = static_cast<Frame*>(data);
     auto s = frame->session;
+    s->outputs.at(frame->output)->submitting = false;
     s->emit({"gpu-failed", "Compositor rejected DMA-BUF import", frame->output});
     s->release(frame->token);
   },
@@ -395,7 +410,7 @@ static napi_value submit(napi_env env, napi_callback_info info) {
   napi_value accepted; napi_get_boolean(env, false, &accepted);
   if (s->closed || !s->outputs.count(id) || s->frames.count(token)) return accepted;
   auto& out = s->outputs.at(id);
-  if (!out->surface || out->finalToken || out->width <= 0 || out->height <= 0 || out->frames >= 3) return accepted;
+  if (!out->surface || out->finalToken || out->frameCallback || out->submitting || out->width <= 0 || out->height <= 0 || out->frames >= 3) return accepted;
   auto width = integer(env, get(env, argv[3], "width")), height = integer(env, get(env, argv[3], "height"));
   if (width != uint32_t(out->width * out->scale) || height != uint32_t(out->height * out->scale)) return accepted;
   auto frame = std::make_unique<Frame>(); frame->session = s; frame->output = id; frame->token = token;
@@ -418,7 +433,7 @@ static napi_value submit(napi_env env, napi_callback_info info) {
     zwp_linux_buffer_params_v1_add(frame->params, fd, 0, offset, stride, hi, lo);
     zwp_linux_buffer_params_v1_create(frame->params, width, height, format, 0);
   }
-  auto raw = frame.get(); s->frames[token] = std::move(frame); ++out->frames;
+  auto raw = frame.get(); s->frames[token] = std::move(frame); ++out->frames; out->submitting = true;
   if (raw->buffer) present(raw);
   watch(s);
   napi_get_boolean(env, true, &accepted); return accepted;
@@ -434,6 +449,7 @@ static napi_value finish(napi_env env, napi_callback_info info) {
   auto frame = std::make_unique<Frame>(); frame->session = s; frame->output = id; frame->token = token;
   bitmapBuffer(*frame, out->width * out->scale, out->height * out->scale);
   out->finalToken = token;
+  if (out->frameCallback) { wl_callback_destroy(out->frameCallback); out->frameCallback = nullptr; }
   out->finalCallback = wl_surface_frame(out->surface);
   static const wl_callback_listener listener = { [](void* data, wl_callback* callback, uint32_t) {
     auto output = static_cast<Output*>(data);

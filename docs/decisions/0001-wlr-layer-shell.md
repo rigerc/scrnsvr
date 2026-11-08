@@ -34,6 +34,18 @@ On the development NVIDIA/Hyprland system, shared-texture export fails and autom
 
 Layer-shell supplies desktop overlay behavior, not session locking or authentication. Idle detection is unchanged.
 
+## Display power-off and rendering suspension
+
+Normal commits request one `wl_surface.frame` callback per output. The host rejects further frames until that callback arrives; buffer release remains a separate texture-ownership signal. The existing `presented` event means a buffer was committed, not that it reached the physical display.
+
+If a callback remains outstanding for one second, the main process stops offscreen painting and capture for that output and sends a cached preload activity update. The renderer cancels its shader/effect loop, unsubscribes from reactive audio, suppresses resize redraws, cancels in-flight fades, and defers shader cycling until the output resumes. The outstanding native callback remains alive so the compositor can wake the renderer. Resume starts a fresh animation epoch and applies the latest deferred cycle using current configuration. Other outputs continue independently.
+
+Dismissal skips final-frame waits for suspended outputs. Visible outputs still finish their black transition; the group shutdown deadline remains a fallback for an unresponsive renderer or compositor. Native callbacks, stall timers and texture leases are cleaned up with the group.
+
+Frame callbacks indicate when drawing is useful; missing callbacks can also mean an obscured surface. They do not identify a precise power state. This follows the [core Wayland frame-callback contract](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface-request-frame). We deliberately avoid keeping `wlr-output-power-management-v1` objects merely to observe power: the protocol permits exclusive control, and [wlroots rejects a second controller for an output](https://github.com/swaywm/wlroots/blob/master/types/wlr_output_power_management_v1.c#L142), which could interfere with desktop power management.
+
+`node scripts/check-layer-shell.cjs --software --shm --stall --cycle` withholds real compositor frame callbacks, checks that animation and submissions stop, then delivers the callbacks to verify resume, scene transitions and teardown. This does not change monitor power settings. Unit tests cover independent outputs, retained texture releases, duplicate activity events, deferred resize/cycling, and dismissal while stalled. Fullscreen-window fallback relies on Chromium's visibility reporting; explicit power detection and daemon launch suppression while displays are off are not supplied by this change.
+
 ## Vendored protocols
 
 The XML copyright/license notices are retained. `wayland-scanner` generates bindings at build time.

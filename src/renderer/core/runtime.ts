@@ -138,7 +138,12 @@ export function mountShader(
     Object.assign(canvas.style, inlineSize);
   }
   const scene = createScene(renderer, shader, values, playback, options);
+  let active = true;
+  let disposed = false;
+  let hostActive = true;
+  let stopLoop: (() => void) | undefined;
   const resize = () => {
+    if (!active || disposed) return;
     const width = Math.max(1, canvas.clientWidth || canvas.width);
     const height = Math.max(1, canvas.clientHeight || canvas.height);
     if (renderer.width !== width || renderer.height !== height) renderer.setSize(width, height);
@@ -146,18 +151,43 @@ export function mountShader(
     scene.draw(0, true);
   };
   const observer = new ResizeObserver(resize);
-  let stopLoop: () => void;
+  const updateActivity = () => {
+    const next = hostActive && !document.hidden;
+    if (disposed || active === next) return;
+    active = next;
+    stopLoop?.();
+    stopLoop = undefined;
+    if (active) {
+      scene.resume();
+      resize();
+      // A fresh loop resets its epoch; suspended time never enters animation/effects.
+      stopLoop = startLoop(delta => scene.draw(delta), fps);
+    } else scene.suspend();
+  };
+  let unsubscribeActivity: (() => void) | undefined;
   try {
     observer.observe(canvas);
     resize();
     stopLoop = startLoop(delta => scene.draw(delta), fps);
+    document.addEventListener('visibilitychange', updateActivity);
+    unsubscribeActivity = window.scrnsvr?.onRenderingActive?.(next => {
+      hostActive = next;
+      updateActivity();
+    });
+    updateActivity();
   } catch (error) {
+    stopLoop?.();
+    unsubscribeActivity?.();
+    document.removeEventListener('visibilitychange', updateActivity);
     observer.disconnect();
     scene.dispose();
     throw error;
   }
   return () => {
-    stopLoop();
+    disposed = true;
+    stopLoop?.();
+    unsubscribeActivity?.();
+    document.removeEventListener('visibilitychange', updateActivity);
     observer.disconnect();
     scene.dispose();
   };

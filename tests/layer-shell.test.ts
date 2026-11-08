@@ -20,6 +20,7 @@ class FakeWindow extends EventEmitter {
   destroyed = false;
   webContents = Object.assign(new EventEmitter(), {
     setFrameRate: vi.fn(), send: vi.fn(), invalidate: vi.fn(),
+    startPainting: vi.fn(), stopPainting: vi.fn(),
     capturePage: vi.fn(async () => ({ getSize: () => ({ width: 1920, height: 1080 }), getScaleFactors: () => [1], toBitmap: () => Buffer.alloc(4) })),
   });
   setSize = vi.fn();
@@ -154,6 +155,10 @@ describe('layer-shell lifecycle', () => {
     let resolved = false;
     void h.promise.then(() => { resolved = true; });
     const first = h.windows[0].paint();
+    // A new frame is permitted by a compositor callback, not buffer release.
+    const blocked = h.windows[0].paint();
+    expect(blocked.release).toHaveBeenCalledOnce();
+    h.emit({ type: 'frame-ready' });
     const second = h.windows[0].paint();
     const dropped = h.windows[0].paint();
     expect(dropped.release).toHaveBeenCalledOnce();
@@ -255,5 +260,65 @@ describe('layer-shell lifecycle', () => {
     expect(vi.mocked(h.host.submit).mock.calls[1][4]).toBeInstanceOf(Buffer);
     h.emit({ type: 'presented' }); await h.promise;
     h.windows[0].destroy();
+  });
+
+  it.each([true, false])('suspends only stalled outputs and resumes on a callback (GPU: %s)', async sharedTextures => {
+    vi.useFakeTimers();
+    const h = harness({ count: 2, sharedTextures });
+    await h.ready();
+    h.emit({ type: 'presented', output: 1 }); h.emit({ type: 'presented', output: 2 });
+    await h.promise;
+    const texture = h.windows[0].paint();
+    h.windows[1].paint();
+    h.emit({ type: 'frame-ready', output: 2 });
+    // Releasing the buffer is not permission to animate a hidden output.
+    h.emit({ type: 'release', token: 1 });
+    await vi.advanceTimersByTimeAsync(1001);
+    expect(h.windows[0].webContents.stopPainting).toHaveBeenCalledOnce();
+    expect(h.windows[0].webContents.send).toHaveBeenCalledWith(IPC.renderingActive, false);
+    expect(h.windows[1].webContents.stopPainting).not.toHaveBeenCalled();
+    expect(h.windows[0].paint().release).toHaveBeenCalledOnce();
+    expect(h.host.submit).toHaveBeenCalledTimes(2);
+    expect(texture.release).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(h.host.submit).toHaveBeenCalledTimes(2);
+    h.emit({ type: 'frame-ready' });
+    expect(h.windows[0].webContents.startPainting).toHaveBeenCalledOnce();
+    expect(h.windows[0].webContents.send).toHaveBeenLastCalledWith(IPC.renderingActive, true);
+    h.windows[0].paint();
+    expect(h.host.submit).toHaveBeenCalledTimes(3);
+    h.windows[0].destroy();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(h.windows[0].webContents.stopPainting).toHaveBeenCalledOnce();
+  });
+
+  it('dismisses immediately when all outputs are stalled, without waiting for final callbacks', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    await h.ready(); h.emit({ type: 'presented' }); await h.promise;
+    const texture = h.windows[0].paint();
+    await vi.advanceTimersByTimeAsync(1001);
+    h.emit({ type: 'dismiss' });
+    expect(h.host.finish).not.toHaveBeenCalled();
+    expect(h.host.close).toHaveBeenCalledOnce();
+    expect(texture.release).toHaveBeenCalledOnce();
+    h.emit({ type: 'frame-ready' });
+    expect(h.windows[0].webContents.startPainting).not.toHaveBeenCalled();
+  });
+
+  it('dismisses a mixed group without waiting on its stalled output', async () => {
+    vi.useFakeTimers();
+    const h = harness({ count: 2 });
+    await h.ready();
+    h.emit({ type: 'presented', output: 1 }); h.emit({ type: 'presented', output: 2 });
+    await h.promise;
+    h.windows[0].paint();
+    await vi.advanceTimersByTimeAsync(1001);
+    h.emit({ type: 'dismiss' });
+    expect(h.windows[1].webContents.send).toHaveBeenCalledWith(IPC.dismiss);
+    h.windows[1].close();
+    const finalToken = vi.mocked(h.host.finish).mock.calls[0][2];
+    h.emit({ type: 'finished', output: 2, token: finalToken });
+    expect(h.host.close).toHaveBeenCalledOnce();
   });
 });

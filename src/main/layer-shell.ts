@@ -54,7 +54,13 @@ interface Renderer {
   pending: Set<number>;
   lastCapture: number;
   finalToken?: number;
+  framePending: boolean;
+  suspended: boolean;
+  stallTimer?: ReturnType<typeof setTimeout>;
 }
+
+// A frame callback is a visibility hint, not proof of a particular power state.
+const FRAME_STALL_MS = 1000;
 interface LayerShellOptions {
   primary?: Pick<Display, 'label' | 'bounds'>;
   fps: number;
@@ -109,6 +115,7 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
     clearTimeout(timer);
     clearTimeout(dismissTimer);
     if (session) host.close(session);
+    for (const renderer of renderers.values()) clearTimeout(renderer.stallTimer);
     for (const texture of textures.values()) texture.release();
     textures.clear();
     for (const window of windows) if (!window.isDestroyed()) window.destroy();
@@ -130,16 +137,39 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
     }
   };
   const nextToken = () => { token = token === 0xffffffff ? 1 : token + 1; return token; };
+  const setSuspended = (renderer: Renderer, suspended: boolean) => {
+    if (renderer.suspended === suspended || renderer.window.isDestroyed()) return;
+    renderer.suspended = suspended;
+    renderer.window.webContents.send(IPC.renderingActive, !suspended);
+    if (suspended) renderer.window.webContents.stopPainting();
+    else {
+      renderer.window.webContents.startPainting();
+      renderer.window.webContents.invalidate();
+    }
+  };
   const dismiss = () => {
     if (dismissing || closed) return;
     dismissing = true;
     // A failed renderer or missing final-frame callback must not retain input.
     dismissTimer = setTimeout(close, 6000);
-    for (const window of windows) if (!window.isDestroyed()) window.webContents.send(IPC.dismiss);
+    for (const [id, renderer] of renderers) {
+      clearTimeout(renderer.stallTimer);
+      if (renderer.suspended) {
+        // No visible fade or final callback can be expected from this output.
+        finished.add(id);
+        renderer.finalToken = nextToken();
+      } else if (!renderer.window.isDestroyed()) renderer.window.webContents.send(IPC.dismiss);
+    }
+    if (selected.every(output => finished.has(output.id))) close();
   };
   const submit = (id: number, renderer: Renderer, size: { width: number; height: number }, frame: Buffer | DmaBuffer, texture?: OffscreenSharedTexture) => {
     const sequence = nextToken();
     if (!host.submit(session, id, sequence, size, frame)) return false;
+    renderer.framePending = true;
+    clearTimeout(renderer.stallTimer);
+    renderer.stallTimer = setTimeout(() => {
+      if (!closed && !dismissing && renderer.framePending) setSuspended(renderer, true);
+    }, FRAME_STALL_MS);
     renderer.pending.add(sequence);
     if (texture) textures.set(sequence, texture);
     return true;
@@ -151,12 +181,12 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
     return submit(id, renderer, { width: Math.round(size.width * scale), height: Math.round(size.height * scale) }, image.toBitmap({ scaleFactor: scale }));
   };
   const capture = async (id: number, renderer: Renderer) => {
-    if (closed || renderer.finalToken !== undefined || !loaded.has(id) || renderer.capturing || renderer.pending.size >= 2 || Date.now() - renderer.lastCapture < 1000 / options.fps) return;
+    if (closed || renderer.suspended || renderer.framePending || renderer.finalToken !== undefined || !loaded.has(id) || renderer.capturing || renderer.pending.size >= 2 || Date.now() - renderer.lastCapture < 1000 / options.fps) return;
     renderer.capturing = true;
     renderer.lastCapture = Date.now();
     try {
       const image = await renderer.window.webContents.capturePage();
-      if (!closed && renderer.finalToken === undefined && !renderer.window.isDestroyed()) submitImage(id, renderer, image);
+      if (!closed && !renderer.suspended && !renderer.framePending && renderer.finalToken === undefined && !renderer.window.isDestroyed()) submitImage(id, renderer, image);
     } catch (error) {
       // Chromium can reject readback while the first compositor frame is pending.
       // The startup deadline handles a renderer that never produces usable frames.
@@ -177,8 +207,20 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
       } else if (event.type === 'presented') {
         presented.add(event.output);
         checkReady();
+      } else if (event.type === 'frame-ready') {
+        if (renderer && renderer.finalToken === undefined && !dismissing) {
+          renderer.framePending = false;
+          clearTimeout(renderer.stallTimer);
+          setSuspended(renderer, false);
+          renderer.window.webContents.invalidate();
+        }
       } else if (event.type === 'gpu-failed') {
-        if (renderer) { renderer.gpu = false; void capture(event.output, renderer); }
+        if (renderer) {
+          renderer.framePending = false;
+          clearTimeout(renderer.stallTimer);
+          renderer.gpu = false;
+          void capture(event.output, renderer);
+        }
       } else if (event.type === 'finished') {
         if (renderer?.finalToken === undefined || renderer.finalToken !== event.token) return;
         finished.add(event.output);
@@ -200,13 +242,16 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
         const window = options.createWindow(event.width, event.height, event.scale, options.sharedTextures !== false);
         windows.push(window);
         const state: Renderer = { window, width: event.width, height: event.height, scale: event.scale,
-          gpu: options.sharedTextures !== false, capturing: false, pending: new Set(), lastCapture: 0 };
+          gpu: options.sharedTextures !== false, capturing: false, pending: new Set(), lastCapture: 0,
+          framePending: false, suspended: false };
         renderers.set(event.output, state);
         window.webContents.setFrameRate(options.fps);
         window.on('close', closeEvent => {
           closeEvent.preventDefault();
           if (closed || state.finalToken !== undefined) return;
           dismiss();
+          if (closed || state.finalToken !== undefined) return;
+          clearTimeout(state.stallTimer);
           // Keep the renderer alive until every native surface has its black
           // buffer. Chromium's final paint can lag behind its close IPC.
           state.finalToken = nextToken();
@@ -219,7 +264,7 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
         window.webContents.on('render-process-gone', (_event, details) => fail(new Error(`Layer-shell renderer exited: ${details.reason}`)));
         window.webContents.on('paint', (paintEvent, _dirty, image) => {
           const texture = paintEvent.texture;
-          if (closed || state.finalToken !== undefined || state.pending.size >= 2) { texture?.release(); return; }
+          if (closed || state.suspended || state.framePending || state.finalToken !== undefined || state.pending.size >= 2) { texture?.release(); return; }
           let retained = false;
           try {
             if (state.gpu && texture) {
@@ -237,6 +282,8 @@ async function startLayerShellWindows(options: LayerShellOptions): Promise<Brows
         void options.loadWindow(window).then(() => {
           if (closed) return;
           loaded.add(event.output);
+          // Preload can start after an early stall; repeat the current state.
+          if (state.suspended) window.webContents.send(IPC.renderingActive, false);
           if (dismissing) window.webContents.send(IPC.dismiss);
           window.webContents.invalidate();
           checkReady();

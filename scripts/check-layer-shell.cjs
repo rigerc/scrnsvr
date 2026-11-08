@@ -2,6 +2,7 @@
 // --shm exercises the CPU fallback; --input tests native pointer dismissal on Hyprland.
 // --instant exercises zero-duration dismissal.
 // --cycle uses bitmap frames to check real scene swaps and failed-shader recovery.
+// --stall withholds frame callbacks to exercise suspension/resume without changing DPMS.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -37,6 +38,9 @@ app.whenReady().then(async () => {
   const finalTokens = new Map();
   const frameSizes = new Map();
   const pixels = [];
+  let holdCallbacks = false;
+  const heldCallbacks = new Map();
+  let deliverEvent;
   const host = {
     ...native,
     // N-API descriptors are non-enumerable.
@@ -53,7 +57,9 @@ app.whenReady().then(async () => {
       const size = frameSizes.get(output);
       assert.equal(native.submit(session, output, token + 1, size, Buffer.alloc(size.width * size.height * 4, 255)), false);
     },
-    create: listener => native.create(event => {
+    create: listener => {
+      deliverEvent = listener;
+      return native.create(event => {
       if (event.type === 'release') statistics.released++;
       if (event.type === 'dismiss') statistics.dismissed++;
       if (event.type === 'finished') {
@@ -61,8 +67,13 @@ app.whenReady().then(async () => {
         statistics.finished++;
       }
       if (process.argv.includes('--verbose')) console.log('Wayland:', event);
+      if (holdCallbacks && event.type === 'frame-ready') {
+        heldCallbacks.set(event.output, event);
+        return;
+      }
       listener(event);
-    }),
+      });
+    },
     submit: (...args) => {
       const accepted = native.submit(...args);
       if (accepted) frameSizes.set(args[1], args[3]);
@@ -107,6 +118,33 @@ app.whenReady().then(async () => {
     resolve(context.getImageData(0, 0, 32, 32).data.some((value, index) => index % 4 !== 3 && value > 20));
   }))`);
   assert.ok(hasColor, 'Renderer produced a black image');
+  if (process.argv.includes('--stall')) {
+    await windows[0].webContents.executeJavaScript(`(() => {
+      window.__animationCallbacks = 0;
+      const request = window.requestAnimationFrame;
+      window.requestAnimationFrame = callback => request.call(window, now => {
+        window.__animationCallbacks++;
+        callback(now);
+      });
+    })()`);
+    holdCallbacks = true;
+    await new Promise(resolve => setTimeout(resolve, 1400));
+    assert.ok(heldCallbacks.size > 0, 'No real compositor callbacks were withheld');
+    assert.ok(windows.every(window => !window.webContents.isPainting()), 'Stalled output kept painting');
+    const submissions = statistics.gpu + statistics.shm;
+    const callbacks = await windows[0].webContents.executeJavaScript('window.__animationCallbacks');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.equal(statistics.gpu + statistics.shm, submissions, 'Stalled output kept submitting');
+    assert.equal(await windows[0].webContents.executeJavaScript('window.__animationCallbacks'), callbacks, 'Stalled renderer kept animating');
+    holdCallbacks = false;
+    for (const event of heldCallbacks.values()) deliverEvent(event);
+    heldCallbacks.clear();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.ok(windows.every(window => window.webContents.isPainting()), 'Output did not resume painting');
+    assert.ok(statistics.gpu + statistics.shm > submissions, 'Output did not resume submitting');
+    assert.ok(await windows[0].webContents.executeJavaScript('window.__animationCallbacks') > callbacks, 'Shader loop did not resume');
+    console.log('Stalled compositor callbacks suspend painting and animation; callback delivery resumes both');
+  }
   if (process.argv.includes('--cycle')) {
     const waitForColor = async (channel, mustSwap = false) => {
       const start = Date.now();
