@@ -1,6 +1,6 @@
 # ADR-001: Native Wayland presentation for the screensaver
 
-Status: Accepted. Date: 2026-11-01.
+Status: Superseded by [ADR-002](0002-native-renderer.md) (native rendering). Surface placement, input and output selection carried over. Date: 2026-11-01.
 
 ## Context
 

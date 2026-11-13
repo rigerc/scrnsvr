@@ -10,7 +10,7 @@ files:
   - assets/**
   - package.json
 asarUnpack:
-  - dist/native/*.node
+  - dist/native/scrnsvr-renderer
 linux:
   target: [AppImage, deb]
   syncDesktopName: true

@@ -37,27 +37,38 @@ export function rendererQuery(shaderId: string, preset?: string): Record<string,
   return query;
 }
 
-/** Broadcast one choice to the group, excluding its actual initial selection. */
-export function startWindowGroupCycling(windows: BrowserWindow[], options: {
+export interface CyclingOptions {
   initial: RendererTarget;
   config: Config;
   loadConfig: () => Promise<Config>;
   shaderIds: (config: Config) => string[];
-}): void {
+}
+
+/** Pick a new rotation entry on the configured interval, never repeating the one on screen. Returns a stop function. */
+export function startCycling(options: CyclingOptions & { send: (target: RendererTarget, config: Config) => void }): (() => void) | undefined {
   const intervalMs = options.config.rotation.intervalMinutes * 60_000;
-  if (!options.config.rotation.enabled || !(intervalMs > 0)) return;
+  if (!options.config.rotation.enabled || !(intervalMs > 0)) return undefined;
   let currentKey = rotationEntryKey(options.initial.shaderId, options.initial.preset);
   const timer = setInterval(async () => {
     const latest = await options.loadConfig();
     const pick = pickRotationEntry(latest.rotation, latest.shaders, latest.presets, options.shaderIds(latest), Math.random, currentKey);
     if (!pick) return;
     currentKey = rotationEntryKey(pick.shaderId, pick.preset);
-    for (const window of windows) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.cycle, { shader: pick.shaderId, preset: pick.preset });
-    }
+    options.send({ shaderId: pick.shaderId, preset: pick.preset }, latest);
   }, intervalMs);
   timer.unref?.();
+  return () => clearInterval(timer);
+}
+
+/** Broadcast one choice to the group, excluding its actual initial selection. */
+export function startWindowGroupCycling(windows: BrowserWindow[], options: CyclingOptions): void {
+  const stop = startCycling({ ...options, send: target => {
+    for (const window of windows) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.cycle, { shader: target.shaderId, preset: target.preset });
+    }
+  } });
+  if (!stop) return;
   for (const window of windows) window.once('closed', () => {
-    if (windows.every(window => window.isDestroyed())) clearInterval(timer);
+    if (windows.every(window => window.isDestroyed())) stop();
   });
 }

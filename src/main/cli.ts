@@ -1,4 +1,4 @@
-import type { WindowBackend } from './layer-shell';
+import type { WindowBackend } from './native-renderer';
 
 export interface CliOptions {
   settings: boolean;

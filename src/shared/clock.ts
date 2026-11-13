@@ -38,6 +38,19 @@ export function clockFontFamily(config: ClockConfig): string {
   return families[config.font];
 }
 
+/** The same choices as a Pango family list for the native renderer, which has no CSS generics like system-ui. */
+export function clockPangoFamily(config: ClockConfig): string {
+  const families = {
+    system: 'sans-serif',
+    serif: 'Georgia, Liberation Serif, serif',
+    monospace: 'DejaVu Sans Mono, Liberation Mono, monospace',
+    rounded: 'Nunito, Quicksand, sans-serif',
+    // Commas would split a custom name into several families.
+    custom: config.customFont.trim() ? `${config.customFont.trim().replace(/[,;]/g, ' ')}, sans-serif` : 'sans-serif',
+  };
+  return families[config.font];
+}
+
 export function formatClock(now: Date, config: ClockConfig, locale?: string) {
   const parts = new Intl.DateTimeFormat(locale, {
     hour: config.format === '24h' ? '2-digit' : 'numeric', minute: '2-digit',
