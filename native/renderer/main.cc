@@ -531,6 +531,22 @@ int compileCheck(App& app) {
   return failures ? Failed : Closed;
 }
 
+/** "x,y" with optional signs. Avoids sscanf, which glibc 2.38 redirects to a newer symbol. */
+bool parsePosition(const std::string& text, int& x, int& y) {
+  size_t i = 0;
+  auto integer = [&](int& out) {
+    bool negative = i < text.size() && text[i] == '-';
+    if (i < text.size() && (text[i] == '-' || text[i] == '+')) i++;
+    size_t start = i;
+    long value = 0;
+    while (i < text.size() && text[i] >= '0' && text[i] <= '9' && value < 1000000) value = value * 10 + (text[i++] - '0');
+    out = int(negative ? -value : value);
+    return i > start;
+  };
+  if (!integer(x) || i >= text.size() || text[i++] != ',' || !integer(y)) return false;
+  return i == text.size();
+}
+
 Options parseOptions(int argc, char** argv) {
   Options options;
   for (int i = 1; i < argc; i++) {
@@ -545,7 +561,7 @@ Options parseOptions(int argc, char** argv) {
     else if (arg == "--output") options.outputName = value();
     else if (arg == "--output-at") {
       std::string position = value();
-      if (sscanf(position.c_str(), "%d,%d", &options.outputX, &options.outputY) == 2) options.hasPosition = true;
+      options.hasPosition = parsePosition(position, options.outputX, options.outputY);
     } else if (arg == "--compile-check") options.compileCheck = true;
     else throw Fatal{Failed, "Unknown option " + arg};
   }
