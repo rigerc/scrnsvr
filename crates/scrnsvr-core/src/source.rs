@@ -1,4 +1,4 @@
-//! The canonical built-in shader ABI, ported from `src/shared/shader-source.ts`.
+//! The canonical built-in shader ABI, carried over from the TypeScript release (v0.10.0).
 //!
 //! Built-ins are Shadertoy-style `mainImage(out vec4, in vec2)` sources. scrnsvr
 //! adds the GLSL ES 1.00 `main()` entry point and defines `SCRNSVR` so the
@@ -148,7 +148,7 @@ impl Tracked {
     }
 }
 
-/// Wrap a single-pass GLSL ES 1.00 custom shader using the Electron ABI.
+/// Wrap a single-pass GLSL ES 1.00 custom shader using the canonical ABI.
 pub fn custom_fragment_source(source: &str) -> Result<String, CustomSourceError> {
     custom_fragment_source_mapped(source).map(|mapped| mapped.source).map_err(|diagnostic| diagnostic.error)
 }

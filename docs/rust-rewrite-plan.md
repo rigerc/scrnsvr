@@ -1,6 +1,6 @@
 # Native Rust rewrite plan
 
-Status: In progress. The Rust saver renderer is an opt-in drop-in for the C++ renderer, and a GPUI Kit settings spike shows an inline GLES preview through a Wayland subsurface; see [implementation progress](#implementation-progress). Updated: 2026-11-23 (product decisions recorded).
+Status: **Complete, pending the 1.0.0 release.** All milestones are done and the Electron/TypeScript app and the C++ renderer are removed from the tree (see [milestone 6: cutover](#milestone-6-cutover)); the 1.0.0 tag, AppImage and release notes remain for the maintainer. The text below is the plan as it stood during the rewrite, so its present-tense statements about Electron, `npm` and `src/` describe v0.10.0, not the tree. The architecture is recorded in [ADR-0003](decisions/0003-native-rust-app.md). Updated: 2026-11-23.
 
 Dependency evaluation completed for the current source baseline: see [executed checks, source findings, and adoption decisions](research/rust-rewrite-evaluation.md). Hyprsaver is a selective reference, `glsl` is the preferred optional AST tool, and stock GPUI's missing Linux external-surface API makes inline preview integration the first implementation gate.
 
@@ -410,11 +410,34 @@ Known gaps before the Rust renderer can become the default:
 - `scripts/check-appimage.sh` (`npm run check:appimage`) passed all 20 checks: help, `--daemon` exit 2, `--open` layer and screenshot, second `--open`, `--dismiss`, `--install` and re-install, the linked path, 41 thumbnails, a Noctalia dry run against a fake CLI with no `config-set`, and the settings window opening and closing.
 - Open: CI wiring (fmt, Clippy, tests, AppImage smoke), a clean first run with no config, AppStream metadata and a PNG icon if a launcher needs them, and the 1.0.0 release notes.
 
+### Milestone 6: cutover
+
+Done 2026-11-23 on the rewrite branch. Nothing is tagged or published; the maintainer reviews, commits and releases.
+
+**Removed (all from v0.10.0):**
+
+- The Electron/TypeScript app: `src/` (main, preload, renderer, settings, shared and the bundled font), `tests/` (46 Vitest suites), `tsconfig.json`, `vitest.config.ts`, `electron-builder.yml`, `package.json`, `package-lock.json` and `.fallowrc.json` (a JavaScript dead-code tool).
+- The C++ renderer and its vendored protocol XML: `native/`.
+- Node tooling: every `scripts/*.cjs` and `scripts/*.mjs`, `scripts/lib/` (the Electron harness, scene bundler, palette tools, browser checks), the shader-registry and palette generators, `render-thumbnails`, `check-native`, `check-renderer-parity`, `capture-frames` and `export-rust-fixtures`.
+- `packaging/systemd/` and `packaging/post-install.sh` (no daemon, no `.deb`) and `assets/plates/` (Electron settings artwork).
+- Kept deliberately: `assets/icon.svg` and the README gallery media, `packaging/native/`, `reference/` (palette curation source; nothing reads it), `docs/refs/` and `docs/research/`, and the committed local tool config (`.agents`, `.claude`, `.codex`, `.impeccable`, `.pi`, `.qlty`, `.serena`, `.bb`, `AGENTS.md`, `opencode.json`, `skills-lock.json`, `.mcp.json`). The version is 1.0.0 in `Cargo.toml` and `Cargo.lock`.
+
+**Shader and palette sources.** `data/catalog.json` was a generated file, so it was replaced by editable sources: `data/shaders/<id>/{manifest.json,shader.glsl}`, `data/effects/<id>/{manifest.json,effect.glsl,pass-*.glsl}` with `data/effects/order.json`, `data/palettes.json` and `data/color-families.json` (see [data/README.md](../data/README.md)). `crates/scrnsvr-core/build.rs` assembles them into the same `Catalog`; `Catalog::builtin()` deserializes the assembled JSON as before. The last generated file is the frozen fixture `crates/scrnsvr-core/tests/fixtures/catalog.json`, and `tests/catalog_sources.rs` requires the assembled catalog to equal it (41 shaders, 17 effects, 30 palettes, five color families; the GLSL is byte-identical to the TypeScript sources). Changing the data makes that test fail, which was checked. License headers stay inside the `.glsl` files and in `THIRD_PARTY_SHADERS.md`.
+
+**Tests without Node.**
+
+- `crates/scrnsvr-core/tests/fixtures/{messages,scene-parity}.jsonl` and `catalog.json` are frozen references from the last TypeScript release (v0.10.0); their exporter is gone and each test's doc comment says so.
+- `check-native` is replaced by the headless GPU test `every_builtin_shader_and_effect_compiles_and_links` in `crates/scrnsvr-render/tests/headless.rs`: it resolves every built-in scene with default settings and compiles all 41 shader programs, the 17 effects' passes (bloom has four programs) and checks the 61 total. The `--live` compositor checks are now covered by `scripts/check-appimage.sh` (the saver mapped and screenshotted on the real output, a second `--open`, `--dismiss`).
+- `npm run test:rust` became `scripts/check.sh`: `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo fmt --all --check`. `scripts/build-appimage.sh`, `scripts/build-appimage-container.sh` and `scripts/check-appimage.sh` never used Node and are unchanged apart from comments.
+
+**Docs.** `README.md` is rewritten for the native app; `PRODUCT.md` and `DESIGN.md` lose their Electron/WebGL wording; ADR-002 is marked superseded and [ADR-0003](decisions/0003-native-rust-app.md) records the architecture and product decisions; the checklist carries a cutover note; the 1.0.0 release notes are drafted in `release/NOTES-1.0.0.md` (gitignored with the rest of `release/`).
+
+**Still open after the cutover:** the real-session Noctalia setup and a recorded Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead); Orca and IME checks of the settings app; Mesa, multiple outputs, fractional scales and hotplug (untested by decision); baseline performance measurements from milestone 0; CI wiring.
+
 ### Not started
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
-- Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- Orca and IME checks for the settings app. Then the milestone 6 cutover: remove Electron/TypeScript/C++, release notes, version 1.0.0.
+- Keyboard, IME and accessibility checks for the subsurface preview (milestone 5), and the Orca and IME checks of the settings app.
 - Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
 ## Technical references

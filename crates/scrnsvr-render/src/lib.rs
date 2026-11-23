@@ -1,4 +1,4 @@
-//! GLES2 scene renderer, ported from `native/renderer/gl.cc`.
+//! GLES2 scene renderer (a port of the C++ renderer that shipped through v0.10.0).
 //!
 //! One [`Renderer`] owns the GL objects of one context: the scene program,
 //! effect passes with per-layer temporal history, ping-pong targets, the clock

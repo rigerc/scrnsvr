@@ -256,6 +256,10 @@ pub struct ColorFamily {
     pub colors: [String; 3],
 }
 
+/// The catalog `build.rs` assembles from `data/` (shader, effect and palette sources) at compile time.
+#[doc(hidden)]
+pub const BUILTIN_CATALOG_JSON: &str = include_str!(concat!(env!("OUT_DIR"), "/catalog.json"));
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Catalog {
@@ -268,7 +272,7 @@ pub struct Catalog {
 impl Catalog {
     pub fn builtin() -> &'static Self {
         static CATALOG: OnceLock<Catalog> = OnceLock::new();
-        CATALOG.get_or_init(|| serde_json::from_str(include_str!("../../../data/catalog.json")).expect("bundled scrnsvr catalog is valid"))
+        CATALOG.get_or_init(|| serde_json::from_str(BUILTIN_CATALOG_JSON).expect("bundled scrnsvr catalog is valid"))
     }
 
     pub fn shader(&self, id: &str) -> Option<&ShaderDef> {

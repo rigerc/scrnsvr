@@ -1,0 +1,28 @@
+{
+  "id": "dream-blur",
+  "title": "Dream Blur",
+  "description": "A soft spatial haze that gently blends nearby shapes.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "radius",
+      "label": "Radius",
+      "type": "float",
+      "default": 3,
+      "min": 0,
+      "max": 16,
+      "step": 0.25,
+      "description": "Blur radius in drawing-buffer pixels."
+    }
+  ],
+  "source": "effect.glsl"
+}

@@ -1,0 +1,48 @@
+{
+  "id": "chromatic-aberration",
+  "title": "Chromatic Aberration",
+  "description": "Lens-like color separation concentrated toward the image edges.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "amount",
+      "label": "Amount",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Maximum color-channel displacement."
+    },
+    {
+      "name": "direction",
+      "label": "Direction",
+      "type": "float",
+      "default": 0,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Direction of channel separation in degrees."
+    },
+    {
+      "name": "edgeBias",
+      "label": "Edge bias",
+      "type": "float",
+      "default": 0.75,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Concentrate separation at the edges instead of uniformly."
+    }
+  ],
+  "source": "effect.glsl"
+}

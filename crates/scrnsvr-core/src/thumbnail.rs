@@ -116,7 +116,7 @@ pub fn capture_png(renderer: &Path, scene: &SceneSpec, frames: u32, output: &Pat
         writeln!(stdin, "{}", scene_message(scene))
     };
     let result = child.wait_with_output()?;
-    written?;
+    // A renderer that fails early may exit before reading stdin; report its failure, not the broken pipe.
     if !result.status.success() {
         let detail = String::from_utf8_lossy(&result.stderr);
         let detail = detail.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default();
@@ -126,6 +126,7 @@ pub fn capture_png(renderer: &Path, scene: &SceneSpec, frames: u32, output: &Pat
             if detail.is_empty() { String::new() } else { format!(": {detail}") }
         )));
     }
+    written?;
     encode_png(&fs::read(pam.path())?, output)
 }
 

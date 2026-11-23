@@ -4,7 +4,7 @@
 
 ## Platform
 
-web
+Linux desktop (native Rust app, GPUI settings window)
 
 ## Users
 
@@ -16,23 +16,23 @@ scrnsvr runs shader-based screensavers after desktop idle time. The settings win
 
 ## Positioning
 
-The settings window connects a live WebGL shader preview with direct controls for that shader, optional clock overlay, color schemes, saved looks for each visual, and a shuffle list.
+The settings window connects a live OpenGL ES shader preview with direct controls for that shader, optional clock overlay, color schemes, saved looks for each visual, and a shuffle list.
 
 ## Operating Context
 
-The product runs on Linux Wayland desktops with `wlr-layer-shell`. Electron provides the settings window, previews and idle daemon; the screensaver itself is a native renderer that draws into layer-shell overlays. People use the settings window before the screensaver starts, and can open a shader in a windowed preview. The app may import desktop colors from Noctalia and may react to playing audio through PulseAudio or PipeWire-Pulse.
+The product runs on Linux Wayland desktops with `wlr-layer-shell`. A native Rust app provides the settings window (GPUI), previews, thumbnails and the screensaver, which draws into layer-shell overlays. There is no idle daemon: Noctalia or hypridle runs `scrnsvr --open`. People use the settings window before the screensaver starts, and can open a shader in a windowed or fullscreen preview. The app can import desktop colors from Noctalia. Reactive audio was removed in 1.0.0.
 
 ## Capabilities and Constraints
 
-- Keep existing shader selection, live preview, parameter controls, color schemes, Noctalia import, custom shader creation, presets, rotation, clock settings, audio response, and global idle/display controls working.
-- Preserve locally saved configuration and the current shader manifests and terminology.
-- The settings interface is HTML, CSS, and TypeScript rendered by Electron; live previews use WebGL.
+- Keep existing shader selection, live preview, parameter controls, color schemes, Noctalia import, custom shader creation, presets, rotation, clock settings, and global display controls working. Audio response is gone; the three audio visuals render their quiet state.
+- Preserve the current shader manifests and terminology. Configuration is `~/.config/scrnsvr/config.toml`; the 0.x `config.json` is not read.
+- The settings interface is native Rust (GPUI Kit); live previews use the same OpenGL ES renderer as the saver.
 - The current implementation and README are the source for feature behavior. Visual style is open to replacement.
 
 ## Evidence on Hand
 
-- `src/settings/` contains the settings UI and its controls.
-- `src/renderer/shaders/` contains the shader manifests and rendering code.
+- `crates/scrnsvr-settings/` contains the settings UI and its controls.
+- `data/shaders/` contains the shader manifests and GLSL.
 - `assets/screenshots/` contains captures of shader output.
 - `README.md` documents the supported workflows and behavior.
 

@@ -6132,7 +6132,7 @@ dependencies = [
 
 [[package]]
 name = "scrnsvr-app"
-version = "0.10.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "glow 0.18.0",
@@ -6150,7 +6150,7 @@ dependencies = [
 
 [[package]]
 name = "scrnsvr-core"
-version = "0.10.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
@@ -6167,7 +6167,7 @@ dependencies = [
 
 [[package]]
 name = "scrnsvr-platform"
-version = "0.10.0"
+version = "1.0.0"
 dependencies = [
  "khronos-egl",
  "libc",
@@ -6180,7 +6180,7 @@ dependencies = [
 
 [[package]]
 name = "scrnsvr-render"
-version = "0.10.0"
+version = "1.0.0"
 dependencies = [
  "cairo-rs",
  "glow 0.18.0",
@@ -6193,7 +6193,7 @@ dependencies = [
 
 [[package]]
 name = "scrnsvr-settings"
-version = "0.10.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "dirs 6.0.0",

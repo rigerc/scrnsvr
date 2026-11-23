@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Tide",
+    "colors": [
+      "#58b8b5",
+      "#8ca9da",
+      "#d8dfc4"
+    ]
+  },
+  {
+    "name": "Ember",
+    "colors": [
+      "#d99255",
+      "#c26b64",
+      "#efd4a1"
+    ]
+  },
+  {
+    "name": "Moss",
+    "colors": [
+      "#90ad78",
+      "#c2b675",
+      "#d7dfb1"
+    ]
+  },
+  {
+    "name": "Dusk",
+    "colors": [
+      "#a58aba",
+      "#c98998",
+      "#e4c4ac"
+    ]
+  },
+  {
+    "name": "Mineral",
+    "colors": [
+      "#9aaec4",
+      "#81a9a4",
+      "#d8d7cb"
+    ]
+  }
+]

@@ -274,3 +274,34 @@ fn updates_effect_uniforms_live_on_the_mounted_layer_only() {
     assert!(near(frame(&mut renderer, 16.0, 0.0, 1.0), [0, 255, 0, 255]), "the edit shows without remounting the scene");
     assert_eq!(renderer.layer_ids(), ["first", "second"]);
 }
+
+/// Every built-in shader scene and every effect pass compiles and links on this machine's GLES driver.
+/// This replaces the Node-driven `check-native` script: the catalog is the one the app ships.
+#[test]
+fn every_builtin_shader_and_effect_compiles_and_links() {
+    let Some((_lock, headless, _renderer)) = context() else { return };
+    // SAFETY: the headless context is current on this thread.
+    let gl = unsafe { glow::Context::from_loader_function(|name| headless.egl.proc_address(name)) };
+    let catalog = Catalog::builtin();
+    let config = Config::default();
+    let mut programs = 0;
+    let mut failures = Vec::new();
+    for shader in &catalog.shaders {
+        let spec = catalog.build_scene(&config, &SceneTarget::shader(&shader.id)).expect("built-in scene resolves");
+        programs += 1;
+        if let Some(error) = scrnsvr_render::compile_error(&gl, &spec.source) {
+            failures.push(format!("shader:{}: {error}", shader.id));
+        }
+    }
+    for effect in &catalog.effects {
+        for (pass, source) in effect.passes.iter().chain([&effect.source]).enumerate() {
+            programs += 1;
+            if let Some(error) = scrnsvr_render::compile_error(&gl, source) {
+                failures.push(format!("effect:{}#{pass}: {error}", effect.id));
+            }
+        }
+    }
+    assert_eq!(programs, 41 + 17 + 3, "41 shaders, 17 effects and bloom's three extra passes");
+    assert!(failures.is_empty(), "{} programs failed to compile:\n{}", failures.len(), failures.join("\n"));
+    eprintln!("compiled {programs} shader and effect programs");
+}

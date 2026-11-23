@@ -1,6 +1,6 @@
 //! scrnsvr-renderer (Rust): draws the screensaver directly into wlr-layer-shell
-//! surfaces. A drop-in replacement for `native/renderer/` with the same
-//! arguments, JSON-lines protocol and exit codes.
+//! surfaces. It takes
+//! the arguments and speaks the JSON-lines protocol that `scrnsvr` and the settings app use.
 //!
 //! The main process resolves everything a scene needs and streams it on stdin
 //! (see `scrnsvr_core::protocol`). This program owns presentation: EGL

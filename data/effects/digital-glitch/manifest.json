@@ -1,0 +1,58 @@
+{
+  "id": "digital-glitch",
+  "title": "Digital Glitch",
+  "description": "Occasional horizontal block displacement and color misalignment.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "frequency",
+      "label": "Frequency",
+      "type": "float",
+      "default": 0.15,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "How often local glitches appear; zero stops new glitches."
+    },
+    {
+      "name": "displacement",
+      "label": "Displacement",
+      "type": "float",
+      "default": 0.15,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Bounded horizontal displacement of affected blocks."
+    },
+    {
+      "name": "blockSize",
+      "label": "Block size",
+      "type": "int",
+      "default": 24,
+      "min": 4,
+      "max": 96,
+      "step": 1,
+      "description": "Height of each glitch band in physical pixels."
+    },
+    {
+      "name": "colorSplit",
+      "label": "Color split",
+      "type": "float",
+      "default": 0.1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Color-channel misalignment within affected blocks."
+    }
+  ],
+  "source": "effect.glsl"
+}

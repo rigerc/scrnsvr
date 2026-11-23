@@ -1,0 +1,55 @@
+{
+  "id": "vignette",
+  "title": "Vignette",
+  "description": "Softly shade the edges to frame the composition.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "strength",
+      "label": "Strength",
+      "type": "float",
+      "default": 0.35,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend the edges toward the chosen color."
+    },
+    {
+      "name": "radius",
+      "label": "Radius",
+      "type": "float",
+      "default": 0.65,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Size of the clear central area."
+    },
+    {
+      "name": "softness",
+      "label": "Softness",
+      "type": "float",
+      "default": 0.4,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Width of the feathered edge transition."
+    },
+    {
+      "name": "edgeColor",
+      "label": "Edge color",
+      "type": "color",
+      "default": "#000000",
+      "description": "Color used to shade the edges."
+    }
+  ],
+  "source": "effect.glsl"
+}

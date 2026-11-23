@@ -1,0 +1,68 @@
+{
+  "id": "color-grade",
+  "title": "Color Grade",
+  "description": "Shape the finished image mood independently of the visual palette.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "warmth",
+      "label": "Warmth",
+      "type": "float",
+      "default": 0,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blue to amber white-balance shift."
+    },
+    {
+      "name": "tint",
+      "label": "Tint",
+      "type": "float",
+      "default": 0,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "description": "Green to magenta color balance."
+    },
+    {
+      "name": "contrast",
+      "label": "Contrast",
+      "type": "float",
+      "default": 1.08,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "description": "Contrast around mid-gray."
+    },
+    {
+      "name": "saturation",
+      "label": "Saturation",
+      "type": "float",
+      "default": 0.95,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "description": "Grayscale through heightened color."
+    },
+    {
+      "name": "fade",
+      "label": "Faded blacks",
+      "type": "float",
+      "default": 0.05,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Lift shadows without replacing highlights."
+    }
+  ],
+  "source": "effect.glsl"
+}

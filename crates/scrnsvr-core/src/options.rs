@@ -1,6 +1,5 @@
-//! Renderer command-line options, as passed by `nativeArguments` in
-//! `src/main/native-renderer.ts`. Parsed by hand to keep exactly the C++
-//! renderer's accepted forms (no abbreviations, `--flag=value`, or help output).
+//! Renderer command-line options, as passed by `scrnsvr` to `scrnsvr-renderer`. Parsed by hand to keep exactly the
+//! accepted forms of the C++ renderer the 0.x releases shipped (no abbreviations, `--flag=value`, or help output).
 
 use thiserror::Error;
 

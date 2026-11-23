@@ -1,0 +1,68 @@
+{
+  "id": "kaleidoscope",
+  "title": "Kaleidoscope",
+  "description": "Mirror the image into rotating, symmetrical wedges.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "segments",
+      "label": "Segments",
+      "type": "int",
+      "default": 6,
+      "min": 2,
+      "max": 16,
+      "step": 1,
+      "description": "Number of mirrored wedges."
+    },
+    {
+      "name": "rotation",
+      "label": "Rotation",
+      "type": "float",
+      "default": 0,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Rotate the symmetry in degrees."
+    },
+    {
+      "name": "centerX",
+      "label": "Center X",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Horizontal optical center."
+    },
+    {
+      "name": "centerY",
+      "label": "Center Y",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Vertical optical center."
+    },
+    {
+      "name": "zoom",
+      "label": "Zoom",
+      "type": "float",
+      "default": 1,
+      "min": 0.5,
+      "max": 3,
+      "step": 0.01,
+      "description": "Scale the mirrored input."
+    }
+  ],
+  "source": "effect.glsl"
+}

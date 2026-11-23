@@ -1,4 +1,5 @@
-//! Paired settings and TypeScript results from scripts/export-rust-fixtures.cjs.
+//! Scene parity: paired settings and the results the TypeScript main process produced for them.
+//! `fixtures/scene-parity.jsonl` is a frozen reference exported from the last TypeScript release (v0.10.0); it is not regenerated.
 
 use chrono::DateTime;
 use scrnsvr_core::Message;

@@ -1,12 +1,12 @@
-//! JSON-lines protocol between the main process and the renderer.
+//! JSON-lines protocol between `scrnsvr` and `scrnsvr-renderer`.
 //!
 //! stdin:  `{"type":"scene",...}` `{"type":"clock",...}` `{"type":"audio","value":[l,b,m,t]}` `{"type":"dismiss"}`
 //! stdout: `{"type":"ready"}` once every output has presented a frame.
 //!
-//! Field handling deliberately matches the C++ renderer's lenient reader
-//! (`native/renderer/json.hh`): missing or mistyped fields fall back to
+//! Field handling is deliberately lenient, as in the C++ renderer this
+//! replaced: missing or mistyped fields fall back to
 //! defaults, booleans read as numbers and vice versa, and unknown message types
-//! are ignored. The main process (`buildScenePlan`, `clockMessage`) is the
+//! are ignored. `scrnsvr` (scene resolution in `scrnsvr_core::scene`) is the
 //! source of truth for every value, so the renderer never re-validates them.
 
 use serde_json::{Map, Value, json};
@@ -127,7 +127,7 @@ pub enum Message {
     /// Envelope values in order level, bass, mid, treble; at most four.
     Audio(Vec<f32>),
     Dismiss,
-    /// Unknown or missing `type`; ignored like the C++ renderer does.
+    /// Unknown or missing `type`; ignored.
     Other,
 }
 

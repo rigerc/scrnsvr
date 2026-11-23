@@ -1,5 +1,4 @@
-//! Clock overlay text, laid out like the Electron overlay's CSS
-//! (`src/renderer/clock.css`). Ported from `native/renderer/clock.cc`.
+//! Clock overlay text, laid out like the clock overlay of the Electron and C++ releases (through v0.10.0).
 
 use scrnsvr_core::ClockSpec;
 

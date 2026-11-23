@@ -1,5 +1,4 @@
-# Native Rust rewrite (docs/rust-rewrite-plan.md). The Electron app and the C++
-# renderer remain the default until each Rust replacement passes its checks.
+# scrnsvr native app (see docs/decisions/0003-native-rust-app.md).
 [workspace]
 resolver = "3"
 members = ["crates/scrnsvr-core", "crates/scrnsvr-render", "crates/scrnsvr-platform", "crates/scrnsvr-app", "crates/scrnsvr-settings"]
@@ -8,7 +7,7 @@ members = ["crates/scrnsvr-core", "crates/scrnsvr-render", "crates/scrnsvr-platf
 default-members = ["crates/scrnsvr-core", "crates/scrnsvr-render", "crates/scrnsvr-platform", "crates/scrnsvr-app"]
 
 [workspace.package]
-version = "0.10.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/rigerc/scrnsvr"

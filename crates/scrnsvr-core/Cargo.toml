@@ -18,3 +18,6 @@ regex.workspace = true
 libc.workspace = true
 png = "=0.18.1"
 shlex = "=2.0.1"
+
+[build-dependencies]
+serde_json.workspace = true

@@ -70,7 +70,7 @@ The settings screen is an editing desk for shader exploration. Shader images pro
 **Key Characteristics:**
 
 - Three fluid desktop columns: shader bank, live preview, and inspector.
-- Portrait shader tiles and a large live WebGL preview with clock overlay.
+- Portrait shader tiles and a large live OpenGL ES preview with clock overlay.
 - Matte neutral surfaces, fine rules, warm coral interaction signal.
 - Compact Inter Tight typography, with spaced uppercase section labels.
 
@@ -106,7 +106,7 @@ The 54px top bar holds product name, Shaders/Clock/Settings tabs, and save statu
 
 The bank has two tile columns, changing to three at 1700px. The three work areas scroll independently on desktop. At 980px and below, the inspector moves below bank and preview; at 620px and below, the work areas stack. Mobile styling is a fallback, not the primary design target.
 
-After the featured tiles, the bank groups shaders into Ambient (light, fluid surfaces, and landscapes), Geometric (shapes and patterns), and Reactive (audio response), followed by Custom when present. Titles sort alphabetically within each group; featured shaders appear only once.
+After the featured tiles, the bank groups shaders into Ambient (light, fluid surfaces, and landscapes), Geometric (shapes and patterns), and the former audio visuals (Reactive Bass Bloom, Reactive Pulse Rings, Reactive Audio Ribbons), which sit under Ambient in the native app because reactive audio was removed in 1.0.0, followed by Custom when present. Titles sort alphabetically within each group; featured shaders appear only once.
 
 ## Elevation & Depth
 
@@ -119,7 +119,7 @@ Controls and shader images use 4–5px corners; the custom editor uses 8px. The 
 ## Components
 
 - **Visual tile:** portrait live canvas and one-line name. The active canvas gains a coral border and name.
-- **Live preview:** large WebGL canvas with the actual clock overlay, followed by a ruled caption and shader description.
+- **Live preview:** large live preview (the same GLES renderer as the saver, in a Wayland subsurface) with the actual clock overlay, followed by a ruled caption and shader description.
 - **Inspector control:** group label, compact name/reset row, slider or field, and numeric value where useful. Advanced controls collapse below the primary set.
 - **Looks & Shuffle:** the selected visual's saved looks sit beside a compact live preview, with the shuffle list and timing controls in the inspector. Named looks and current edits have separate, explicit add/remove actions.
 - **Effects inspector:** a global Enable effects toggle and Add effect row sit above an ordered stack. The catalog includes analog, pixel/pattern, optical, color, glow, and temporal treatments. Layer summaries disclose manifest-driven sliders/numeric fields, color pickers, checkboxes, and mode/palette selects; explicit move buttons, reset, remove, and enable actions preserve keyboard access. The main preview shows the composed image while gallery thumbnails and the clock stay clean. Effect failures appear beside the preview, separate from save status.

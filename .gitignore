@@ -1,8 +1,8 @@
-node_modules/
-dist/
+# Cargo build output, including the AppImage staging area and cached packaging tools.
+target/
+# Release artifacts: AppImages, checksums and release notes (not committed).
 release/
+# `scrnsvr --thumbnail` default output directory.
 assets/thumbnails/
 *.log
 .code-graph/
-coverage/
-target/

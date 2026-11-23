@@ -1,0 +1,45 @@
+{
+  "id": "halftone-print",
+  "title": "Halftone Print",
+  "description": "Translate brightness into a rotated field of printed dots.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "dotSize",
+      "label": "Dot size",
+      "type": "int",
+      "default": 6,
+      "min": 2,
+      "max": 24,
+      "step": 1,
+      "description": "Distance between dots in drawing-buffer pixels."
+    },
+    {
+      "name": "angle",
+      "label": "Screen angle",
+      "type": "float",
+      "default": 45,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Rotate the dot screen in degrees."
+    },
+    {
+      "name": "invert",
+      "label": "Invert ink",
+      "type": "bool",
+      "default": false,
+      "description": "Switch between dark ink on light paper and light ink on dark paper."
+    }
+  ],
+  "source": "effect.glsl"
+}

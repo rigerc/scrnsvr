@@ -3,7 +3,7 @@
 //! `colors.scheme` applies to every visual. `colors.overrides[visual]` replaces it for one:
 //! absent or empty inherits, `none` opts out to the visual's built-in colors, and a scheme ID
 //! uses that scheme. A scheme shows through only where a visual has no stored color edits, so
-//! choosing one clears those edits, as the Electron app did.
+//! choosing one clears those edits.
 
 use scrnsvr_core::catalog::{Catalog, ColorRoles, UniformKind};
 use scrnsvr_core::scene::shader_color_values;

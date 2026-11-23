@@ -1,0 +1,31 @@
+{
+  "id": "palette-mapping",
+  "title": "Palette Mapping",
+  "description": "Map the finished image brightness onto a selected color ramp.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "palette",
+      "label": "Palette",
+      "type": "select",
+      "default": "Neon",
+      "options": [
+        "Neon",
+        "Ember",
+        "Ocean",
+        "Monochrome"
+      ],
+      "description": "Color ramp applied to image luminance."
+    }
+  ],
+  "source": "effect.glsl"
+}

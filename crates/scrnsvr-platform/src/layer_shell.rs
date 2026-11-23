@@ -1,6 +1,6 @@
 //! wlr-layer-shell overlay surfaces with one EGL window and GLES2 context per output.
 //!
-//! Ported from the Wayland half of `native/renderer/main.cc`; output/seat
+//! Output/seat
 //! binding uses smithay-client-toolkit. The session only exposes mechanism:
 //! which outputs exist, whether each may draw (frame callback received), input
 //! that asks for dismissal, and topology changes that end the screensaver.

@@ -1,0 +1,58 @@
+{
+  "id": "crt-monitor",
+  "title": "CRT Monitor",
+  "description": "Curved glass, a phosphor mask, and softly shaded screen edges.",
+  "uniforms": [
+    {
+      "name": "intensity",
+      "label": "Intensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Blend with the original image. Zero bypasses this layer."
+    },
+    {
+      "name": "curvature",
+      "label": "Curvature",
+      "type": "float",
+      "default": 0.12,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Bow the image like a curved television tube."
+    },
+    {
+      "name": "maskStrength",
+      "label": "Phosphor mask",
+      "type": "float",
+      "default": 0.15,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Fine red, green, and blue phosphor stripes."
+    },
+    {
+      "name": "scanlines",
+      "label": "Scanlines",
+      "type": "float",
+      "default": 0.15,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Horizontal scanline shading."
+    },
+    {
+      "name": "edgeFalloff",
+      "label": "Edge falloff",
+      "type": "float",
+      "default": 0.2,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Darken the rounded screen boundary."
+    }
+  ],
+  "source": "effect.glsl"
+}

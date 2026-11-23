@@ -458,7 +458,7 @@ impl Settings {
 }
 
 /// Read a GLSL file for import: its name without the extension and its text.
-/// Mirrors the Electron limits: under 100 KB, and text a shader can hold.
+/// Limits: under 100 KB, and text a shader can hold.
 pub fn read_import(path: &std::path::Path) -> Result<(String, String), String> {
     const LIMIT: u64 = 100_000;
     let size = std::fs::metadata(path).map_err(|error| format!("Could not read {}: {error}", path.display()))?.len();

@@ -1,6 +1,8 @@
 # scrnsvr
 
-A shader-based idle screensaver for Wayland desktops with `wlr-layer-shell`. After a configurable idle timeout, a native OpenGL ES renderer draws the shaders into overlay surfaces; Electron provides the settings UI, previews and idle daemon. Includes a clock overlay and systemd user service.
+A shader-based idle screensaver for Hyprland and other Wayland desktops with `wlr-layer-shell`. A native Rust app draws GLSL shaders with OpenGL ES straight into overlay surfaces on your monitors, with a clock, a stack of GPU effects and a settings window to browse, preview and tune everything. There is no Electron, Node or web view: one AppImage holds three small programs.
+
+scrnsvr does not watch for idle on its own. Your idle service (Noctalia's, or hypridle) runs `scrnsvr --open` when the desktop has been idle, and any input dismisses it.
 
 ## Gallery
 
@@ -19,110 +21,75 @@ Click a screenshot to watch the 5-second animated preview (H.264 MP4, ~640px).
 | [![Dune Silk](assets/screenshots/dune-silk.png)](assets/videos/dune-silk.mp4) | | |
 | **Dune Silk** · [video](assets/videos/dune-silk.mp4) | | |
 
-Media is captured headlessly at 1280×720 (stills) / 640px 12 fps (video) via `scripts/capture-frames.cjs` + ffmpeg:
-
-```sh
-npx electron scripts/capture-frames.cjs --shader plasma --out /tmp/frames-plasma --frames 61 --fps 12 --width 1280 --height 720
-ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:v libx264 -pix_fmt yuv420p -crf 23 -movflags +faststart assets/videos/plasma.mp4
-```
+The media in `assets/` was captured by the 0.x releases at 1280×720 (stills) and 640px, 12 fps (video).
 
 ## Features
 
-- 41 GLSL shaders, from quiet ambient gradients to reactive audio effects
-- 10–17 controls per shader, grouped into Motion, Shape, and Color, with Advanced adjustments, numeric entry, individual resets, and saved presets
-- Global GPU effect stack: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom, and persistent datamosh/trails; independent layers, reorder and bypass, live preview
-- Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
-- Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
-- Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
-- Primary / all-monitors rendering, configurable FPS (1–240)
-- Native Wayland renderer: shaders draw straight into layer-shell overlays with OpenGL ES, paced by the compositor
-- Settings window by default (argless or `--settings`); screensaver via `--open`; windowed shader preview via `--preview --shader <id>`; headless thumbnail capture (`--thumbnail`)
-- Config at `~/.config/scrnsvr/config.json` (or `$XDG_CONFIG_HOME/scrnsvr/config.json`), Zod-validated with atomic writes
-- Linux packaging: AppImage + deb via electron-builder, ships a systemd user unit (`scrnsvr.service`)
+- 41 GLSL shaders, from quiet ambient gradients to the three audio-themed visuals (see [Fresh start](#fresh-start-coming-from-0x))
+- 10–17 controls per shader, grouped into Motion, Shape and Color, with Advanced adjustments, exact numeric entry, per-control reset, locks, conservative Randomize, Undo and saved looks
+- Global GPU effect stack: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom and persistent datamosh/trails; up to eight independent layers, reorder and bypass, live preview
+- Clock overlay: 12h/24h, seconds and date, nine positions, font/weight/size/color/opacity/margin/shadow, and an optional strftime pattern
+- 30 color schemes and Noctalia color import (`mPrimary`, `mSecondary`, `mTertiary`, `mSurface`, `mOnSurface` onto shader color controls)
+- Custom GLSL shader editor with live compile errors on the offending line
+- Shuffle through a list of visuals and saved looks on a timer
+- Thumbnail tiles rendered on your GPU, and a fullscreen preview that uses the real saver
+- Noctalia idle setup (`--setup-noctalia`) and a single-instance `--open`, with `--dismiss` to close it
+- Primary or all-monitors rendering; frames are drawn only when the compositor asks for one, so a monitor that is off or covered costs nothing
 
 ## Requirements
 
-- Linux with Node 24 + npm, and a Wayland compositor with `wlr-layer-shell` to run the screensaver
-- Electron 44 (devDependency, allowed via `allowScripts`)
-- `busctl` only if you rely on the logind idle fallback (Wayland without Electron idle data)
-- Native renderer build: C/C++ compiler, `pkg-config`, `wayland-scanner`, and development headers for `wayland-client`, `wayland-egl`, EGL, GLESv2 and `pangocairo` (on Debian/Ubuntu: `libwayland-dev libwayland-bin libegl-dev libgles-dev libpango1.0-dev`). Packaged builds include the renderer.
+- **Hyprland** is the supported desktop. Other Wayland compositors with `wlr-layer-shell` (Sway and others) may work but are not promised or tested. GNOME and X11 are unsupported.
+- A Wayland session with `wlr-layer-shell` and a GPU with OpenGL ES 2.0 over EGL for the saver.
+- **Vulkan** for the settings window (GPUI renders through wgpu). The saver itself does not need Vulkan.
+- **glibc 2.35 or newer** for the release AppImage (Ubuntu 22.04 and Debian 12 or newer).
+- Host libraries the AppImage does not bundle: pango, cairo, glib, fontconfig, freetype, harfbuzz, libxkbcommon, libxcb, Wayland, EGL and Vulkan. A desktop install has them.
+- Optional: Noctalia 5.x or `hypridle` to start the saver when idle. Inter Tight is used for the settings window if installed, else Liberation Sans.
 
-## Quick start
+## Install
 
-```sh
-npm install
-npm run build
+1. Download `Scrnsvr-<version>-x86_64.AppImage` and `SHA256SUMS-<version>-native.txt` from the release page, then check and mark it executable:
 
-# Open settings (default, no flags needed)
-npm run settings
+   ```sh
+   sha256sum -c SHA256SUMS-<version>-native.txt
+   chmod +x Scrnsvr-<version>-x86_64.AppImage
+   ```
 
-# Run the screensaver now
-npx electron dist/main/index.js --open
-# Preview a shader in a window
-npm start -- --preview --shader gradient-blobs
+2. Link a stable `scrnsvr` command to it (`~/.local/bin/scrnsvr`, or `$XDG_BIN_HOME/scrnsvr`), so idle commands never name a versioned file:
 
-# Run the idle daemon in the foreground
-npm run daemon
+   ```sh
+   ./Scrnsvr-<version>-x86_64.AppImage --install
+   ```
 
-# Typecheck / tests
-npm run typecheck
-npm test
-# Chromium/WebGL rendering and settings integration checks (desktop or Xvfb)
-npm run check-shaders
-npm run check-effects
-```
+   Make sure `~/.local/bin` is on `PATH`. After you replace the AppImage with a newer version, run `--install` again.
 
-CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+3. Start it when idle. With Noctalia, preview and then apply the setup; otherwise use hypridle or a hot corner:
 
-### Native Wayland renderer
+   ```sh
+   scrnsvr --setup-noctalia            # dry run: shows what would change
+   scrnsvr --setup-noctalia --apply    # writes it through `noctalia msg config-set`
+   ```
 
-On Wayland compositors with `wlr-layer-shell` (Hyprland, Sway, KDE Plasma and others; GNOME does not provide it, see [compatibility](https://github.com/wmww/gtk-layer-shell#supported-desktops)), the screensaver runs as a small native program, `scrnsvr-renderer`. It renders the same shaders, effects and clock with OpenGL ES directly into an overlay surface on each selected monitor, covering panels and fullscreen applications. The Electron main process resolves the scene (presets, color schemes, effects, rotation, clock text, audio) and streams it to the renderer. Settings, previews and thumbnails stay in Electron.
+   hypridle (`~/.config/hypr/hypridle.conf`):
 
-- Activation crossfades from the desktop into the scene over the configured fade time; dismissal fades back.
-- Frames are drawn only when the compositor asks for one, so a monitor that is off or covered costs nothing.
-- Keyboard, click, scroll, touch, or pointer movement beyond 12 logical pixels dismisses the screensaver on all monitors.
-- If an output is added, removed, or changes scale, the screensaver closes; the daemon selects outputs again on its next launch.
+   ```
+   listener {
+       timeout = 600
+       on-timeout = scrnsvr --open
+   }
+   ```
 
-This is the only screensaver backend; there is no fullscreen Electron window fallback. Without a Wayland session or a built renderer, `--open` reports the reason and exits, and `--daemon` exits with status 2, which the systemd unit does not restart. If the renderer fails during a launch, the daemon logs the error and tries the native renderer again on its next idle launch.
+   A Noctalia (or Hyprland) hot corner can run `scrnsvr --open` directly. The desktop entry for launchers comes with the AppImage; start `scrnsvr` with no arguments for the settings window.
 
-```sh
-# Build the renderer on its own
-npm run build:native
-# Package the app (requires a successful native build)
-npm run dist
-# Compile every shader and effect with the native GLES compiler
-npm run check-native
-# Also show the screensaver briefly on the primary output and check fades,
-# transitions, broken-scene recovery and dismissal from real screen pixels (needs grim, hyprctl)
-node scripts/check-native.cjs --live
-# Per-second frame statistics on stderr
-SCRNSVR_RENDERER_DEBUG=1 npx electron dist/main/index.js --open
-```
+### Fresh start (coming from 0.x)
 
-`npm run build` attempts the native build and continues without it if development dependencies are missing; settings and previews still work, but the screensaver cannot run until `npm run build:native` succeeds. See [ADR-002](docs/decisions/0002-native-renderer.md) for the design.
+1.0.0 is a rewrite, and it starts clean:
 
-#### Rust renderer (opt-in)
+- Settings live in `$XDG_CONFIG_HOME/scrnsvr/config.toml` (`~/.config/scrnsvr/config.toml`). The old Electron `config.json` is **not read or migrated**, so shaders, effects and clock start at their defaults and favorites start empty.
+- **Reactive audio was removed.** There is no audio capture and no audio settings. The three audio visuals (Reactive Bass Bloom, Reactive Pulse Rings, Reactive Audio Ribbons) stay but always show their quiet state, and custom shaders that read `uAudio` still compile.
+- There is no built-in idle daemon or systemd user service; `scrnsvr --daemon` exits 2 with a pointer to Noctalia and hypridle. Remove an old `scrnsvr.service` and any Noctalia command that points at an old AppImage.
+- The AppImage is the only package; there is no `.deb`.
 
-The [Rust rewrite](docs/rust-rewrite-plan.md) includes a drop-in replacement for the C++ renderer, built from the Cargo workspace in `crates/`. It accepts the same arguments, JSON-lines messages and exit codes. The C++ renderer remains the default and the rollback path. The Rust build needs a Rust toolchain (`rust-version` in `Cargo.toml`) and the same Wayland, EGL and `pangocairo` development files; `wayland-scanner` and GLES headers are not needed.
-
-```sh
-# Build the app with the Rust renderer in dist/native/scrnsvr-renderer
-npm run build:rust            # same as SCRNSVR_RENDERER=rust npm run build
-# Rust unit tests, headless GPU tests, Clippy and rustfmt
-npm run test:rust
-# Capture every built-in shader, effect and the clock headless with both renderers
-# at a fixed frame delta and compare pixels (both binaries accept --capture PATH --size WxH --frames N --delta MS)
-npm run check-parity
-# Refresh the scene-plan fixtures the Rust protocol tests parse and the settings spike's catalog
-node scripts/export-rust-fixtures.cjs
-# Settings spike (GPUI Kit; needs Vulkan). Build in release: debug GPUI is too slow to judge.
-# SCRNSVR_SETTINGS_SMOKE=steps runs a scripted check and prints each step.
-cargo run --release -p scrnsvr-settings
-```
-
-#### Native app command line (rewrite branch)
-
-The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is `~/.config/scrnsvr/config.toml`; it does not read the Electron `config.json`.
+## Usage
 
 | Command | What it does |
 |---|---|
@@ -130,58 +97,51 @@ The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is
 | `scrnsvr --open [--shader <id>]` | Start the full-screen saver; any key, click or pointer movement dismisses it |
 | `scrnsvr --dismiss` | Fade out a running saver (exits 0 when none runs) |
 | `scrnsvr --preview [--shader <id>]` | Resizable 960×540 preview window, never shuffles |
-| `scrnsvr --thumbnail --output <dir> --frames <n>` | Render a PNG for every built-in shader |
+| `scrnsvr --thumbnail [--output <dir>] [--frames <n>]` | Render a 640×360 PNG for every built-in shader (default `assets/thumbnails`, 3 frames) |
 | `scrnsvr --install [--force]` | Link `~/.local/bin/scrnsvr` (or `$XDG_BIN_HOME/scrnsvr`) to the AppImage or this binary |
 | `scrnsvr --setup-noctalia [--apply] [--timeout N]` | Show, or with `--apply` write, the Noctalia idle setup |
+| `scrnsvr --help` | Print usage |
 
-`--open` is safe to trigger repeatedly: while a saver runs, another `--open` exits 0. There is no built-in daemon; `scrnsvr --daemon` exits 2.
+`--open` is safe to trigger repeatedly: while a saver runs, another `--open` exits 0. If the saver cannot run (no Wayland session or no `wlr-layer-shell`), it reports the reason and exits 1.
 
-**Idle with Noctalia.** Run `scrnsvr --install`, then `scrnsvr --setup-noctalia` to preview the changes and `scrnsvr --setup-noctalia --apply` to write them through `noctalia msg config-set`. It reuses an existing behavior that runs scrnsvr or creates `idle.behavior.scrnsvr` (default timeout 600 s), and sets `idle.pre_action_fade_seconds` to 0 so only scrnsvr fades. A Noctalia hot corner can run `scrnsvr --open` directly.
+The saver:
 
-**Settings.** `scrnsvr --settings` opens a GPUI Kit window with a shader bank (search, favorites, categories), a live preview with your saved effects and clock, and an inspector built from each shader's manifest: sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset shader, Randomize with locks, Undo, and saved looks. Edits save automatically to `~/.config/scrnsvr/config.toml` with a visible status and Retry; favorites live in `~/.local/state/scrnsvr/ui.toml`. It needs Wayland and Vulkan. With reduced animations set on the desktop, the preview starts paused.
+- fades in from the desktop over the configured time, and fades back out when dismissed;
+- is dismissed on every monitor by a key, click, scroll, touch, or pointer movement beyond 12 logical pixels;
+- closes if an output is added, removed or changes scale (the next launch selects outputs again);
+- uses the output at logical position (0,0) as the primary one, else the first, when only the primary monitor is configured.
 
-**Settings tabs.** Left/Right/Home/End move between them.
+Set `SCRNSVR_RENDERER_DEBUG=1` for per-second frame statistics on stderr.
+
+### Idle with Noctalia
+
+`scrnsvr --setup-noctalia` reads `noctalia msg config-get idle`. It reuses an existing behavior that runs scrnsvr, or creates `idle.behavior.scrnsvr` (default timeout 600 s), and sets `idle.pre_action_fade_seconds` to 0 so only scrnsvr fades. It writes only through `noctalia msg config-set`, never by editing Noctalia's files, and only with `--apply`. Noctalia respects Wayland idle inhibitors and `org.freedesktop.ScreenSaver` inhibits, so a video in a browser keeps the saver away.
+
+### Settings
+
+`scrnsvr --settings` opens the settings window. A live preview, a shader bank and an inspector built from each shader's manifest sit in the Visuals tab: thumbnail tiles with search, favorites and categories, sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset shader, Randomize with locks, Undo, and saved looks. Edits save automatically with a visible status and a Retry that keeps your edits after a failed save. It needs Wayland and Vulkan; with reduced animations set on the desktop, the preview starts paused. Tabs move with Left/Right/Home/End.
+
 - **Visuals:** shader bank, inspector, per-visual color scheme, Noctalia color import.
 - **Effects:** one global stack of up to eight layers (add, remove, reorder with buttons or Alt+Up/Down, enable per layer or globally), live in the preview.
 - **Looks & Shuffle:** saved looks, the shuffle list and its timing.
 - **Clock:** every clock option, a placement grid, and an optional strftime pattern with a live example.
-- **Settings:** frame rate, fade, monitors, global color scheme, and the Idle section. It shows whether Noctalia launches scrnsvr, edits Noctalia's timeout, and offers "Set up…", which lists the `noctalia msg config-set` changes and applies them only after you confirm. Without Noctalia it shows hypridle and hot-corner instructions.
+- **Settings:** frame rate, fade, monitors, global color scheme and the Idle section. It shows whether Noctalia launches scrnsvr, edits Noctalia's timeout, and offers "Set up…", which lists the `noctalia msg config-set` changes and applies them only after you confirm. Without Noctalia it shows hypridle and hot-corner instructions.
 
-**Custom shaders.** Select **Add shader** in the shader bank to write a single-pass GLSL ES 1.00 shader (`mainImage` or `main`; `uTime`, `uResolution`, `iTime`, `iResolution`, `iMouse`, `iDate` and `uAudio` are supplied; no textures or `#version`). Edits are checked with a real GLES compile and saved automatically; errors appear on the offending line, and the preview keeps the last valid version. Import a `.glsl`/`.frag` file (up to 100 KB) or delete a shader from the same panel. Custom shaders can be favorited, shuffled and combined with effects. **Fullscreen preview** shows the current visual the way the screensaver does. Thumbnails are rendered in the background with default values and cached in `$XDG_CACHE_HOME/scrnsvr/thumbnails/`.
+Favorites and other interface state live in `$XDG_STATE_HOME/scrnsvr/ui.toml` (`~/.local/state/scrnsvr/ui.toml`). Thumbnails are cached in `$XDG_CACHE_HOME/scrnsvr/thumbnails/`.
 
-**Idle with hypridle.**
+### Custom shaders
 
-```
-listener {
-    timeout = 600
-    on-timeout = scrnsvr --open
-}
-```
+Select **Add shader** in the shader bank to write a single-pass GLSL ES 1.00 shader. Use `mainImage` or `main`; `uTime`, `uResolution`, `iTime`, `iResolution`, `iMouse`, `iDate` and `uAudio` are supplied; textures and `#version` are not allowed. Edits are checked with a real GLES compile and saved automatically; errors appear on the offending line, and the preview keeps the last valid version. Import a `.glsl` or `.frag` file (up to 100 KB) or delete a shader from the same panel. Custom shaders can be favorited, shuffled and combined with effects. **Fullscreen preview** shows the current visual the way the saver does. The editor creates visuals, not post-processing effects.
 
-#### Building the native AppImage (rewrite branch)
+### Shader controls
 
-Requires Rust 1.88+, `curl`, `sha256sum` and the pango/cairo/wayland development packages.
+Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
 
-```sh
-npm run dist:native        # or: scripts/build-appimage.sh [--skip-build] [--out dir]
-npm run check:appimage     # smoke test on a live Hyprland session (needs jq, hyprctl, grim)
-```
-
-This writes `release/native/Scrnsvr-<version>-x86_64.AppImage` and `SHA256SUMS-<version>-native.txt`. Packaging uses a pinned `appimagetool` and type2 runtime, cached in `target/appimage-cache` and checked by SHA-256. The AppImage contains only `scrnsvr`, `scrnsvr-renderer`, `scrnsvr-settings`, the desktop entry and the icon; glibc, pango, cairo, glib, fontconfig, freetype, harfbuzz, libxkbcommon, libxcb, Wayland, EGL and Vulkan come from the host. Build releases in an older-glibc environment (for example Ubuntu 22.04) with `SCRNSVR_MAX_GLIBC=2.35`, which fails the build if a binary needs a newer glibc.
-
-For a release, build in an Ubuntu 22.04 container instead so the AppImage starts on glibc 2.35 and newer: `npm run dist:native:container` (or `bash scripts/build-appimage-container.sh [--out <dir>]`). It needs podman or docker and git, builds a reusable builder image from `packaging/native/Containerfile.builder` (Ubuntu 22.04 pinned by digest, Rust 1.99.1 via rustup), exports the committed `HEAD` with `git archive` (uncommitted changes are not built), keeps the cargo cache and build output under `target/` so reruns take seconds, and fails if any binary needs a glibc symbol newer than 2.35. Verify the result with `bash scripts/check-appimage.sh <AppImage>`.
-
-Run `./Scrnsvr-<version>-x86_64.AppImage --install` once to link `~/.local/bin/scrnsvr` to it, then `scrnsvr --setup-noctalia`. After replacing the AppImage with a new version, run `--install` again.
-
-## Shader controls
-
-Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
-
-Every shader supports speed, brightness, and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color. Existing settings and presets retain their values, with newly added parameters taking their defaults.
+Every shader supports speed, brightness and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color.
 
 ### Global effects
 
-Open **Effects**, choose an effect, and click **Add effect** to process any built-in or custom visual. Every effect has an **Intensity** control to blend with the original image; zero bypasses that layer. Effects start empty, so existing configurations look unchanged.
+Open **Effects**, choose an effect and click **Add effect** to process any built-in or custom visual. Every effect has an **Intensity** control to blend with the original image; zero bypasses that layer. Effects start empty.
 
 | Effect | Treatment and adjustments |
 | --- | --- |
@@ -203,67 +163,99 @@ Open **Effects**, choose an effect, and click **Add effect** to process any buil
 | Datamosh / Trails | Persistent frame feedback with smooth-trail/block-displacement modes, persistence, decay, and displacement |
 | Palette Mapping | Luminance mapped to Neon, Ember, Ocean, or Monochrome ramps |
 
-Stack up to eight layers, including multiple independently adjusted instances of the same effect. They run top to bottom; use Move up/down to change the order. Each layer can be disabled, reset, or removed. **Enable effects** bypasses the whole stack without deleting your adjustments.
+Stack up to eight layers, including several independently adjusted instances of the same effect. They run top to bottom; order matters (blur before pixelation differs from pixelation before blur). Each layer can be disabled, reset or removed, and **Enable effects** bypasses the whole stack without deleting your adjustments.
 
-Try **Pixelate → Ordered Dither → CRT Monitor** for a retro display, **Kaleidoscope → VHS Distortion** for analog video art, or **Color Grade → Analog Film → Vignette** for a faded cinematic treatment. Order matters: blur before pixelation produces a different result from pixelation before blur.
+The stack is global: changing visuals, applying saved looks, randomizing, changing color schemes or shuffling keeps the same effects. The live preview, fullscreen preview and saver show the result; thumbnails stay clean. The clock stays crisp above the processed image. Animated effects use their own timeline, so VHS, film, glitch and refraction continue when a visual's Speed is zero; **Pause animation** freezes both, including temporal history. Unavailable or failed effects are skipped rather than blanking the visual.
 
-The stack is global: changing visuals, applying saved looks, randomizing, changing color schemes, or shuffling keeps the same effects. The main live preview, fullscreen preview, and screensaver show the result; gallery thumbnails stay clean. The clock stays crisp above the processed image, and fade transitions are unchanged.
-
-Animated effects use their own timeline, so VHS, film, glitch, and refraction can continue when a visual's Speed is zero. **Pause animation** freezes both the visual and effects, including temporal history, while adjustments still redraw. Changes save locally using the normal autosave/retry flow and take effect in saver windows on their next launch or shader cycle. Unavailable or failed effects are skipped or bypassed rather than blanking the visual. The custom shader editor creates visuals, not post-processing effects.
-
-Bloom uses multiple GPU passes; Datamosh / Trails retains previous-frame textures separately for each instance. They cost more GPU time and memory than single-pass treatments, especially at high resolutions or across several monitors. History is reset when its input stack/settings or dimensions change, so reordering, disabling/re-enabling, or switching visuals does not leave old frames behind. Disabling effects or setting Intensity to zero releases unused render/history targets.
+Bloom uses multiple GPU passes, and Datamosh / Trails keeps previous-frame textures for each instance, so they cost more GPU time and memory than single-pass effects, especially at high resolutions. History resets when its input stack, settings or dimensions change, and disabling effects or setting Intensity to zero releases unused targets.
 
 ### Color schemes
 
-Pick one of 30 well-known color schemes (Dracula, Nord, Gruvbox, Solarized, Monokai, One Dark, Tokyo Night, Night Owl, Palenight, Zenburn, Ayu, Rosé Pine, Kanagawa, GitHub, Material, Everforest, and Iceberg) under **Global settings → Color scheme**. The scheme supplies background, text, and accent colors to every shader that exposes color controls, using the same role mapping as the Noctalia import. Each shader can override the global choice or opt out with **Built-in colors** in its Colors section; adjusting an individual color afterwards keeps that change until you pick another scheme. Randomize leaves scheme colors alone. Scheme data is generated from the Ghostty/iTerm2 color-scheme YAMLs in `reference/` by `scripts/generate-palettes.mjs`.
+Pick one of 30 well-known color schemes (Dracula, Nord, Gruvbox, Solarized, Monokai, One Dark, Tokyo Night, Night Owl, Palenight, Zenburn, Ayu, Rosé Pine, Kanagawa, GitHub, Material, Everforest, Iceberg and more) under **Settings → Color scheme**. The scheme supplies background, text and accent colors to every shader that exposes color controls, using the same role mapping as the Noctalia import. Each visual can override the global choice or opt out with **Built-in colors** in its Colors section; choosing a scheme clears that visual's color edits, and Randomize leaves scheme colors alone.
 
-Every built-in shader lives in `src/renderer/shaders/<id>/` as a `manifest.ts` (id, name, category, description, controls) plus a `shader.glsl` that exports `mainImage`. Run `node scripts/generate-shader-registry.mjs` after adding one to refresh the registry in `src/renderer/shaders/generated.ts`.
+### Configuration
 
-## Config
+`config.toml` uses snake_case keys. Invalid or unknown values fall back to defaults with a warning rather than discarding the file; a malformed file is reported and left untouched. Saves are debounced, atomic (temp file, sync, rename) and retried without losing edits. Example:
 
-Resolved by `configPath()` in `src/main/config-store.ts` and validated by `ConfigSchema` in `src/shared/config.ts`:
+```toml
+shader = "gradient-blobs"
 
-- active shader, global FPS / idle threshold / monitor scope, clock block, `colors` scheme and per-shader overrides, `effects` global ordered stack, `shaders` values, `presets`
-- legacy top-level `fps`/`monitor` keys are migrated into `global` on load
+[global]
+fps = 60
+fade_seconds = 1.0
+monitors = "primary"          # or "all"
 
-Example (`~/.config/scrnsvr/config.json`):
+[clock]
+enabled = true
+position = "center"           # top-left … bottom-right
+format = "24h"                # or "12h"
+show_date = true
+pattern = "%H:%M"             # optional strftime pattern for the time line
 
-```json
-{
-  "shader": "gradient-blobs",
-  "global": { "idleThresholdSeconds": 300, "fps": 60, "monitors": "primary" },
-  "clock": { "enabled": true, "position": "center", "format": "24h", "showSeconds": false, "showDate": true },
-  "effects": {
-    "enabled": true,
-    "layers": [{ "id": "tape-1", "effectId": "vhs-distortion", "enabled": true, "values": { "intensity": 0.5, "grain": 0.2 } }]
-  },
-  "shaders": { "plasma": { "speed": 0.65 } },
-  "presets": {}
-}
+[colors]
+scheme = "nord"               # "none" keeps each shader's own colors
+
+[rotation]                    # the shuffle list
+enabled = true
+interval_minutes = 10.0
+[[rotation.entries]]
+shader = "plasma"
+preset = "Evening"            # optional saved look
+
+[[effects.layers]]
+id = "tape-1"
+effect_id = "vhs-distortion"
+enabled = true
+values = { intensity = 0.5, grain = 0.2 }
+
+[shaders.plasma]
+speed = 0.65
+
+[presets.plasma.Evening]      # saved looks
+speed = 0.25
+color1 = "#1122ff"
 ```
 
-## Packaging
+## Building
+
+You need Rust 1.88 or newer and the development packages for pango, cairo, glib, Wayland, EGL/GLES, xkbcommon, xcb, fontconfig, freetype and Vulkan (on Debian/Ubuntu see `packaging/native/Containerfile.builder` for the exact list). No Node, npm or C++ is involved.
 
 ```sh
-npm run dist
+scripts/check.sh                       # cargo test --workspace --locked, clippy -D warnings, fmt --check
+cargo run --release -p scrnsvr-settings   # settings; judge responsiveness in release, debug GPUI is slow
+cargo build --release --locked -p scrnsvr-app -p scrnsvr-settings   # target/release/{scrnsvr,scrnsvr-renderer,scrnsvr-settings}
+scripts/build-appimage.sh              # release/native/Scrnsvr-<version>-x86_64.AppImage + SHA256SUMS-<version>-native.txt
+scripts/build-appimage-container.sh    # the same in an Ubuntu 22.04 container (glibc 2.35): use this for releases
+scripts/check-appimage.sh <AppImage>   # smoke test on a live Hyprland session (needs hyprctl, grim, jq)
 ```
 
-Outputs to `release/` (AppImage, deb). The deb `afterInstall` hook installs the user unit to `/usr/lib/systemd/user/scrnsvr.service`; enable with:
+- Plain `cargo build` and `cargo test` cover the saver crates only; `scrnsvr-settings` pulls in GPUI (wgpu/Vulkan), so name it with `-p scrnsvr-settings` or `--workspace`. `cargo tree -p scrnsvr-app` has no GPUI crates, so the saver never depends on Vulkan.
+- The tests include headless GPU tests that compile every built-in shader and effect on your GLES driver and render representative frames. They skip with a note on a machine without EGL.
+- `scripts/build-appimage.sh` packages the three binaries with a pinned, checksum-verified `appimagetool` and type2 runtime (cached in `target/appimage-cache`) and a reproducible timestamp. `SCRNSVR_MAX_GLIBC=2.35` fails the build if a binary needs a newer glibc.
+- `scripts/build-appimage-container.sh` needs podman or docker and git. It builds the **committed `HEAD`** (`git archive`; uncommitted changes are not built) in a pinned Ubuntu 22.04 image with Rust 1.99.1, and keeps its caches under `target/`, so reruns take seconds.
+- `scripts/check-appimage.sh` runs against a temporary XDG tree and never touches your real configuration, Noctalia or `~/.local/bin`.
 
-```sh
-systemctl --user daemon-reload
-systemctl --user enable --now scrnsvr.service
-```
+### Shader and palette sources
+
+The built-in catalog is plain files under `data/`, assembled at compile time by `crates/scrnsvr-core/build.rs`:
+
+- `data/shaders/<id>/manifest.json` (id, title, category, description, controls) and `shader.glsl` (exports `mainImage`)
+- `data/effects/<id>/manifest.json` with `effect.glsl` (and `pass-*.glsl` for multipass effects); `data/effects/order.json` sets the effect order
+- `data/palettes.json` and `data/color-families.json` for the color schemes
+
+To add a shader, create its directory with those two files and rebuild. `crates/scrnsvr-core/tests/catalog_sources.rs` compares the assembled catalog with a frozen copy from the last TypeScript release (`tests/fixtures/catalog.json`), so intentional changes to the built-ins update that fixture too. See [data/README.md](data/README.md) for manifest fields. Shader provenance and licenses are in [THIRD_PARTY_SHADERS.md](THIRD_PARTY_SHADERS.md).
 
 ## Project layout
 
-- `src/main/` — Electron entry, CLI, idle daemon, Noctalia loader, IPC (`config:get/set`, `colors:import-noctalia`)
-- `src/renderer/` — OGL runtime (`core/runtime.ts`), post-processing effects (`effects/`), clock overlay (`core/clock.ts`), shader set (`shaders/*/manifest.ts` + `shader.glsl`)
-- `src/settings/` — settings window UI + clock controls
-- `src/shared/` — browser-safe Zod config and defaults, clock/Noctalia helpers, typed preload contracts and IPC keys, shader manifest schema; filesystem persistence lives in `src/main/config-store.ts`
-- `scripts/build.mjs` — esbuild bundles for main/preload/renderer/settings + static copies
-- `scripts/generate-shader-registry.mjs` — generates `src/renderer/shaders/generated.ts`
-- `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and the shader manifest and canonical-ABI contracts
-- `packaging/` — systemd unit + deb post-install script
-- `native/renderer/` — C++ layer-shell renderer (default)
-- `crates/` — Rust rewrite: `scrnsvr-core` (protocol, fades, timing), `scrnsvr-render` (GLES renderer, clock), `scrnsvr-platform` (EGL, layer-shell), `scrnsvr-app` (the `scrnsvr-renderer` executable), `scrnsvr-settings` (GPUI Kit settings spike with an inline preview; not part of the default build)
+- `crates/scrnsvr-core/` — configuration (TOML), catalog, scene resolution, presets and rotation, clock formatting, the renderer protocol, Noctalia client, thumbnails; `build.rs` assembles the catalog from `data/`. No windowing or GL.
+- `crates/scrnsvr-render/` — the GLES2 renderer: shader programs, uniforms, effect passes and history, fades, the Pango/Cairo clock
+- `crates/scrnsvr-platform/` — dynamically loaded EGL, wlr-layer-shell outputs, seats and frame callbacks, the preview window
+- `crates/scrnsvr-app/` — `scrnsvr` (CLI, saver supervision, install, Noctalia setup, preview, thumbnails) and `scrnsvr-renderer` (the saver process)
+- `crates/scrnsvr-settings/` — `scrnsvr-settings`, the GPUI Kit settings app with an inline GLES preview
+- `data/` — the built-in shader, effect and palette sources (see above)
+- `reference/` — the Ghostty/iTerm2 color-scheme YAMLs that `data/palettes.json` was curated from (not read at build or run time)
+- `packaging/native/` — desktop entry and the Ubuntu 22.04 builder image
+- `scripts/` — `check.sh`, `build-appimage.sh`, `build-appimage-container.sh`, `check-appimage.sh`
+- `docs/` — [architecture decisions](docs/decisions/), the [rewrite plan](docs/rust-rewrite-plan.md) and [checklist](docs/rust-rewrite-checklist.md), and research notes
+
+See [ADR-0003](docs/decisions/0003-native-rust-app.md) for the architecture.

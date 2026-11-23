@@ -1,5 +1,5 @@
-//! Animation time and audio smoothing, matching `src/renderer/core/animation-clock.ts`
-//! and the C++ renderer.
+//! Animation time and audio smoothing, matching the animation clock of the
+//! TypeScript and C++ releases (through v0.10.0).
 
 /// Gaps longer than this (seconds) are treated as suspension and skipped.
 pub const SUSPEND_GAP_SECONDS: f64 = 1.05;

@@ -1,5 +1,7 @@
 # ADR-002: Render the screensaver natively into layer-shell surfaces
 
+> **Superseded by the native Rust app in 1.0.0** ([ADR-0003](0003-native-rust-app.md)). This record describes the C++ renderer and the Electron main process of the 0.x releases, which were removed at the 1.0.0 cutover. The presentation design below (layer-shell surfaces, EGL/GLES2, compositor-paced frames, one crossfade, input dismissal) carried over unchanged into `scrnsvr-renderer`, written in Rust. Paths and `npm` commands in this record refer to the removed code.
+
 Status: Accepted. Date: 2026-11-13. Supersedes the presentation design in [ADR-001](0001-wlr-layer-shell.md).
 
 ## Context

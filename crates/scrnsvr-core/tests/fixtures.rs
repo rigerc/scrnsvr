@@ -1,5 +1,5 @@
-//! Every message the TypeScript main process currently produces parses as the C++ renderer read it.
-//! Regenerate with `node scripts/export-rust-fixtures.cjs`.
+//! Every message the TypeScript main process produced parses as the C++ renderer read it.
+//! `fixtures/messages.jsonl` is a frozen reference exported from the last TypeScript release (v0.10.0); it is not regenerated.
 
 use scrnsvr_core::{Message, UniformValue};
 
