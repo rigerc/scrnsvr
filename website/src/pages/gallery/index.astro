@@ -1,0 +1,161 @@
+---
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import PreviewVideo from '@/components/project/PreviewVideo.astro';
+import { withBase } from '@/lib/base';
+import { shaderCategories, shaders } from '@/lib/shader-gallery';
+import '@/styles/project.css';
+---
+
+<LandingLayout title="Shader gallery" description="Browse the built-in scrnsvr shader collection and watch short previews from the native renderer.">
+  <main id="main-content" class="project-site gallery">
+    <div class="project-shell">
+      <header class="gallery-header">
+        <h1>Shader gallery</h1>
+        <p>Explore {shaders.length} built-in visuals. Watch a short motion preview on selected shaders.</p>
+      </header>
+
+      <form class="gallery-filters" role="search" aria-label="Filter shaders" hidden>
+        <label>Search shaders <input type="search" name="query" placeholder="Aurora Veil" /></label>
+        <label>
+          Category
+          <select name="category">
+            <option value="">All categories</option>
+            {shaderCategories.map((category) => <option>{category}</option>)}
+          </select>
+        </label>
+        <output aria-live="polite">{shaders.length} shaders</output>
+      </form>
+
+      <p class="gallery-empty" hidden>No shaders match these filters. <button type="button">Clear filters</button></p>
+      <ul class="shader-grid">
+        {shaders.map((shader) => (
+          <li id={shader.id} data-title={shader.title} data-category={shader.category}>
+            {shader.video ? (
+              <PreviewVideo action="Play preview" label={`Play ${shader.title} preview`} src={shader.video} poster={shader.image} />
+            ) : (
+              <img src={withBase(shader.image)} alt={`${shader.title} shader preview`} width="640" height="360" loading="lazy" decoding="async" />
+            )}
+            <div class="shader-copy">
+              <div class="shader-heading">
+                <h2><a href={`#${shader.id}`}>{shader.title}</a></h2>
+                <span>{shader.category}</span>
+              </div>
+              {shader.description && <p>{shader.description}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </main>
+</LandingLayout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('.gallery-filters')!;
+  const search = form.querySelector('input')!;
+  const category = form.querySelector('select')!;
+  const count = form.querySelector('output')!;
+  const empty = document.querySelector<HTMLElement>('.gallery-empty')!;
+  const cards = [...document.querySelectorAll<HTMLLIElement>('.shader-grid > li')];
+
+  function filter() {
+    const query = search.value.trim().toLowerCase();
+    let visible = 0;
+    for (const card of cards) {
+      const matchesName = card.dataset.title!.toLowerCase().includes(query);
+      const matchesCategory = !category.value || category.value === card.dataset.category;
+      card.hidden = !(matchesName && matchesCategory);
+      if (card.hidden) card.querySelector('video')?.pause();
+      else visible += 1;
+    }
+    count.value = `${visible} ${visible === 1 ? 'shader' : 'shaders'}`;
+    empty.hidden = visible > 0;
+  }
+
+  form.hidden = false;
+  form.addEventListener('input', filter);
+  form.addEventListener('submit', (event) => event.preventDefault());
+  empty.querySelector('button')!.addEventListener('click', () => {
+    form.reset();
+    filter();
+    search.focus();
+  });
+  window.addEventListener('hashchange', () => {
+    const target = document.getElementById(location.hash.slice(1));
+    if (target?.matches('.shader-grid > li[hidden]')) {
+      form.reset();
+      filter();
+      target.scrollIntoView();
+    }
+  });
+</script>
+
+<style>
+  .gallery { padding: 8.5rem 0 5rem; min-height: 65vh; }
+  .gallery-header { margin-bottom: 2.25rem; }
+  .gallery-header h1 {
+    color: var(--heading);
+    font: 650 clamp(2.9rem, 7vw, 5.5rem)/1.05 Outfit, sans-serif;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.85rem;
+  }
+  .gallery-header p, .shader-copy p { color: var(--body); line-height: 1.6; }
+  .gallery-filters {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-bottom: 1.45rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .gallery-filters[hidden] { display: none; }
+  .gallery-filters label { display: grid; gap: 0.4rem; font-size: 0.9rem; }
+  input, select {
+    min-height: 2.65rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.35rem;
+    background: var(--surface);
+    color: var(--text);
+    color-scheme: dark;
+  }
+  input { width: min(24rem, 100%); }
+  input::placeholder { color: var(--muted); }
+  output { margin: 0 0 0.55rem auto; color: var(--muted); }
+  .shader-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+    gap: 2.25rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .shader-grid li {
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+    scroll-margin-top: 7rem;
+  }
+  .shader-grid li:target {
+    outline: 2px solid var(--pa);
+    outline-offset: 0.35rem;
+    border-radius: 0.3rem;
+  }
+  .shader-grid img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0.3rem;
+  }
+  .shader-copy { padding: 0.85rem 0 1.15rem; }
+  .shader-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.2rem 0.75rem; }
+  h2 { color: var(--heading); font: 600 1.35rem/1.18 Outfit, sans-serif; margin: 0; }
+  h2 a { color: inherit; text-decoration: none; }
+  h2 a:hover { text-decoration: underline; }
+  .shader-heading span { color: var(--muted); font-size: 0.85rem; }
+  .shader-copy p { margin: 0.45rem 0 0; font-size: 0.95rem; }
+  .gallery-empty button { color: var(--accent-text); text-decoration: underline; text-underline-offset: 0.18em; }
+  @media (max-width: 560px) {
+    .gallery { padding-top: 7rem; }
+    .gallery-filters label:first-child { width: 100%; }
+  }
+</style>

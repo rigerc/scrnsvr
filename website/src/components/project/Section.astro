@@ -1,0 +1,31 @@
+---
+import Features from './Features.astro';
+import Steps from './Steps.astro';
+import Media from './Media.astro';
+import Faq from './Faq.astro';
+import Cta from './Cta.astro';
+import { hasSectionContent, type ProjectSection } from '@/config/project.config';
+
+/** Renders one entry of `project.sections`, chosen by its `type`. */
+interface Props {
+  section: ProjectSection;
+}
+const { section } = Astro.props;
+const isCta = section.type === 'cta';
+---
+
+{hasSectionContent(section) && (
+  <section
+    id={section.id}
+    class:list={[isCta ? 'project-final-cta' : 'project-section', { 'section-alt': section.alt && !isCta }]}
+    aria-labelledby={`${section.id}-title`}
+  >
+    <div class="project-shell">
+      {section.type === 'features' && <Features section={section} />}
+      {section.type === 'steps' && <Steps section={section} />}
+      {section.type === 'media' && <Media section={section} />}
+      {section.type === 'faq' && <Faq section={section} />}
+      {section.type === 'cta' && <Cta section={section} />}
+    </div>
+  </section>
+)}

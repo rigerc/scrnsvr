@@ -1,0 +1,25 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import SectionIntro from './SectionIntro.astro';
+import TextLink from './TextLink.astro';
+import type { StepsSection } from '@/config/project.config';
+
+interface Props {
+  section: StepsSection;
+}
+const { section } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<div class="workflow-grid">
+  <div>
+    <SectionIntro id={section.id} kicker={section.kicker} heading={section.heading} lead={section.lead}>
+      <TextLink link={section.link} />
+    </SectionIntro>
+  </div>
+  <ol class="workflow-steps">
+    {section.items.map((step, index) => (
+      <li class="workflow-step"><span class="step-number">{pad(index + 1)}</span><div><h3>{step.label}</h3><p>{step.detail}</p></div><Icon name="arrow-up-right" size="lg" /></li>
+    ))}
+  </ol>
+</div>

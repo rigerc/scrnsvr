@@ -1,0 +1,61 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import Heading from './Heading.astro';
+import Actions from './Actions.astro';
+import type { ProjectConfig } from '@/config/project.config';
+import { resolveHref } from './links';
+
+interface Props {
+  hero: ProjectConfig['hero'];
+}
+const { hero } = Astro.props;
+const visual = hero.visual;
+const backgroundColor = '#171819';
+---
+
+<section
+  class="project-hero"
+  aria-labelledby="project-title"
+  data-bar-color={backgroundColor}
+  style={`--bg-hero: ${backgroundColor}`}
+>
+  <div class="project-glow" aria-hidden="true"></div>
+  <div class:list={['project-shell', visual ? 'hero-grid' : 'hero-single']}>
+    <div class="hero-content">
+      {hero.eyebrow && <div class="project-eyebrow"><span class="eyebrow-dot"></span>{hero.eyebrow}</div>}
+      <Heading id="project-title" level="h1" text={hero.headline} />
+      <p class="hero-summary">{hero.summary}</p>
+      <Actions actions={hero.actions} />
+      {hero.meta && hero.meta.length > 0 && (
+        <div class="hero-meta">
+          <span class="status-dot"></span>
+          {hero.meta.map((item, index) => (
+            <Fragment>{index > 0 && <span aria-hidden="true">/</span>} {item}</Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {visual?.type === 'terminal' && (
+      <div class="product-preview" role="img" aria-label={`Terminal: ${visual.commands.join('; ')}`}>
+        <div class="window-top" aria-hidden="true"><div class="window-dots"><i></i><i></i><i></i></div><span>{visual.title}</span><Icon name="terminal" size="sm" /></div>
+        <div class="window-body" aria-hidden="true">
+          {visual.commands.map((command) => <div class="terminal-row"><span class="prompt">$</span><span>{command}</span></div>)}
+          {(visual.status || visual.lines?.length) && <div class="terminal-rule"></div>}
+          {visual.status && <div class="terminal-success"><span class="terminal-pulse"></span> {visual.status}</div>}
+          {visual.lines?.map((line) => <div class="terminal-muted">{line}</div>)}
+        </div>
+        {visual.footer && <div class="preview-footer" aria-hidden="true"><span>{visual.footer[0]}</span><span>{visual.footer[1]}</span></div>}
+      </div>
+    )}
+    {visual?.type === 'image' && (
+      <img class="product-preview hero-media" src={resolveHref(visual.src)} alt={visual.alt} width={visual.width} height={visual.height} loading="eager" decoding="async" />
+    )}
+    {visual?.type === 'video' && (
+      <video class="product-preview hero-media" src={resolveHref(visual.src)} poster={visual.poster && resolveHref(visual.poster)} aria-label={visual.alt} controls muted loop playsinline preload="metadata"></video>
+    )}
+  </div>
+  {hero.footer && hero.footer.length > 0 && (
+    <div class="project-shell hero-bottom">{hero.footer.map((item) => <span>{item}</span>)}</div>
+  )}
+</section>

@@ -1,0 +1,19 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import SectionIntro from './SectionIntro.astro';
+import type { FaqSection } from '@/config/project.config';
+
+interface Props {
+  section: FaqSection;
+}
+const { section } = Astro.props;
+---
+
+<div class="faq-grid">
+  <div><SectionIntro id={section.id} kicker={section.kicker} heading={section.heading} lead={section.lead} /></div>
+  <div class="faq-list">
+    {section.items.map((item) => (
+      <details><summary>{item.question}<Icon name="plus" size="sm" /></summary><p>{item.answer}</p></details>
+    ))}
+  </div>
+</div>

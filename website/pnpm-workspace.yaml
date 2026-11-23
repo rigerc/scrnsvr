@@ -1,0 +1,5 @@
+# Packages whose install scripts pnpm may run. pnpm 10 reads this from here,
+# not from a "pnpm" field in package.json.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp

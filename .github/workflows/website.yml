@@ -1,0 +1,45 @@
+name: Check website
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'data/shaders/**'
+      - '.github/workflows/website*.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'data/shaders/**'
+      - '.github/workflows/website*.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: website
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_TARGET: static
+      SITE_URL: https://rigerc.github.io
+      BASE_PATH: /scrnsvr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: website/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: website/.nvmrc
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm test:run
+      - run: pnpm build
+      - run: pnpm check:site --strict

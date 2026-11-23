@@ -1,0 +1,42 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import SectionIntro from './SectionIntro.astro';
+import type { MediaSection } from '@/config/project.config';
+import { resolveHref, isExternal } from './links';
+
+interface Props {
+  section: MediaSection;
+}
+const { section } = Astro.props;
+---
+
+<SectionIntro id={section.id} kicker={section.kicker} heading={section.heading} lead={section.lead} split>
+  <div class:list={['media-grid', `media-count-${Math.min(section.items.length, 3)}`]}>
+    {section.items.map((item, index) => (
+      <figure class:list={['media-tile', { large: index === 0 && section.items.length > 1 }]}>
+        <figcaption class="media-tile-header">
+          {item.icon && <Icon name={item.icon} size="sm" />} {item.label} {item.meta && <span>{item.meta}</span>}
+        </figcaption>
+        {item.image ? (
+          <img class="media-asset" src={resolveHref(item.image.src)} alt={item.image.alt} width={item.image.width} height={item.image.height} loading="lazy" decoding="async" />
+        ) : item.video ? (
+          <video class="media-asset" src={resolveHref(item.video.src)} poster={item.video.poster && resolveHref(item.video.poster)} aria-label={item.video.alt} controls muted playsinline preload="metadata"></video>
+        ) : item.placeholder === 'mobile' ? (
+          <div class="media-art mobile-art" aria-hidden="true"><div class="phone-outer"><div class="phone-header"></div><div class="phone-line"></div><div class="phone-line short"></div><div class="phone-button"></div></div></div>
+        ) : item.placeholder === 'video' ? (
+          <div class="media-art video-art" aria-hidden="true"><div class="play-orb"><Icon name="play" size="xl" /></div><div class="timeline"><span></span></div></div>
+        ) : (
+          <div class="media-art screen-art" aria-hidden="true"><div class="art-top"></div><div class="art-line thick"></div><div class="art-line"></div><div class="art-panels"><i></i><i></i><i></i></div></div>
+        )}
+      </figure>
+    ))}
+  </div>
+  {(section.caption || section.link?.href) && (
+    <p class="media-caption">
+      {section.caption}
+      {section.link?.href && (
+        <Fragment> <a href={resolveHref(section.link.href)} {...(isExternal(section.link.href) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>{section.link.label}</a>.</Fragment>
+      )}
+    </p>
+  )}
+</SectionIntro>

@@ -1,0 +1,27 @@
+---
+/**
+ * A section heading from config: `\n` breaks the line, and `*text*` renders
+ * that part in the accent colour.
+ */
+interface Props {
+  text: string;
+  id?: string;
+  level?: 'h1' | 'h2';
+}
+const { text, id, level = 'h2' } = Astro.props;
+const Tag = level;
+const lines = text.split('\n').map((line) =>
+  line.split(/(\*[^*]+\*)/).filter(Boolean).map((part) =>
+    part.startsWith('*') && part.endsWith('*') ? { em: true, text: part.slice(1, -1) } : { em: false, text: part }
+  )
+);
+---
+
+<Tag id={id}>
+  {lines.map((parts, index) => (
+    <Fragment>
+      {index > 0 && <br />}
+      {parts.map((part) => (part.em ? <em>{part.text}</em> : part.text))}
+    </Fragment>
+  ))}
+</Tag>

@@ -1,0 +1,30 @@
+---
+import Heading from './Heading.astro';
+
+/**
+ * Kicker, heading and lead. `split` lays the heading and lead side by side
+ * (feature and media sections); otherwise they stack.
+ */
+interface Props {
+  id: string;
+  kicker?: string;
+  heading: string;
+  lead?: string;
+  split?: boolean;
+}
+const { id, kicker, heading, lead, split = false } = Astro.props;
+---
+
+{kicker && <div class="section-kicker">{kicker}</div>}
+{split ? (
+  <div class="section-heading">
+    <Heading id={`${id}-title`} text={heading} />
+    {lead && <p>{lead}</p>}
+  </div>
+) : (
+  <Fragment>
+    <Heading id={`${id}-title`} text={heading} />
+    {lead && <p class="section-lead">{lead}</p>}
+  </Fragment>
+)}
+<slot />

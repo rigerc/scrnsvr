@@ -1,0 +1,20 @@
+---
+/**
+ * The homepage. Everything on it comes from `src/config/project.config.ts`:
+ * the hero, then each entry of `project.sections` in order.
+ */
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import Hero from '@/components/project/Hero.astro';
+import Showcase from '@/components/project/Showcase.astro';
+import Section from '@/components/project/Section.astro';
+import { project } from '@/config/project.config';
+import '@/styles/project.css';
+---
+
+<LandingLayout title={project.name} description={project.description}>
+  <main id="main-content" class="project-site">
+    <Hero hero={project.hero} />
+    <Showcase />
+    {project.sections.map((section) => <Section section={section} />)}
+  </main>
+</LandingLayout>

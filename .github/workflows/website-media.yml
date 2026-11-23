@@ -1,0 +1,52 @@
+name: Capture website media
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: website
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEPLOY_TARGET: static
+      SITE_URL: https://rigerc.github.io
+      BASE_PATH: /scrnsvr
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:4321/scrnsvr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: website/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: website/.nvmrc
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pnpm build
+      - run: pnpm check:site --strict
+      - name: Capture the production preview
+        run: |
+          pnpm preview --host 127.0.0.1 --port 4321 --strictPort > /tmp/scrnsvr-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 1 "$PLAYWRIGHT_BASE_URL/" -o /dev/null
+          pnpm media:capture
+          pnpm media:video
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: scrnsvr-website-media
+          path: website/media-output/
+          if-no-files-found: warn

@@ -1,0 +1,93 @@
+---
+import { withBase } from '@/lib/base';
+import { getLocaleFromPath, t } from '@/i18n';
+import { featuredShaders, shaders } from '@/lib/shader-gallery';
+import PreviewVideo from './PreviewVideo.astro';
+
+const locale = getLocaleFromPath(Astro.url.pathname);
+const featured = featuredShaders.slice(0, 3).flatMap((id) => shaders.filter((shader) => shader.id === id));
+---
+
+<section class="project-section" id="shaders" aria-labelledby="showcase-title">
+  <div class="project-shell">
+    <div class="showcase-heading">
+      <h2 id="showcase-title">Explore the shaders</h2>
+      <a class="project-text-link" href={withBase('/gallery/')}>Browse all {shaders.length} shaders</a>
+    </div>
+    <div class="showcase-shaders">
+      {featured.map((shader) => (
+        <a href={withBase(`/gallery/#${shader.id}`)}>
+          <img src={withBase(shader.image)} alt="" width="640" height="360" loading="lazy" decoding="async" />
+          <span>{shader.title}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+</section>
+
+<section class="project-section section-alt" id="media" aria-labelledby="media-title">
+  <div class="project-shell">
+    <div class="showcase-heading">
+      <h2 id="media-title">Inside scrnsvr</h2>
+    </div>
+    <div class="app-media">
+      <figure class="walkthrough">
+        <PreviewVideo
+          action="Watch walkthrough"
+          label="Watch the scrnsvr app walkthrough"
+          src="/media/app/walkthrough.mp4"
+          poster="/media/app/visuals.webp"
+        />
+        <figcaption>
+          <strong>App walkthrough</strong>
+          <span>Choose a shader in Visuals, adjust its speed, add Bloom, and open the fullscreen preview.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src={withBase('/media/app/visuals.webp')} alt={t('showcase.visualsAlt', locale)} width="1600" height="900" loading="lazy" decoding="async" />
+        <figcaption><strong>Visuals</strong><span>Tune shaders while the preview runs.</span></figcaption>
+      </figure>
+      <figure>
+        <img src={withBase('/media/app/effects.webp')} alt={t('showcase.effectsAlt', locale)} width="1600" height="900" loading="lazy" decoding="async" />
+        <figcaption><strong>Effects</strong><span>Layer and adjust effects in the live preview.</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<style>
+  .showcase-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1.75rem;
+  }
+  .showcase-heading a { margin: 0; }
+  .showcase-shaders, .app-media {
+    display: grid;
+    gap: 1.25rem;
+  }
+  .showcase-shaders { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .app-media { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .walkthrough { grid-column: 1 / -1; }
+  a, figure { margin: 0; }
+  .showcase-shaders a { text-decoration: none; color: var(--heading); }
+  .showcase-shaders a:hover { color: var(--accent-text); }
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0.4rem;
+  }
+  .showcase-shaders span, figcaption {
+    display: block;
+    padding-block: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  figcaption span { display: block; color: var(--muted); margin-top: 0.25rem; }
+  @media (max-width: 620px) {
+    .showcase-shaders, .app-media { grid-template-columns: 1fr; }
+  }
+</style>

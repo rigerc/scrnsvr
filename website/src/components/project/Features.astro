@@ -1,0 +1,23 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import SectionIntro from './SectionIntro.astro';
+import type { FeaturesSection } from '@/config/project.config';
+
+interface Props {
+  section: FeaturesSection;
+}
+const { section } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<SectionIntro id={section.id} kicker={section.kicker} heading={section.heading} lead={section.lead} split>
+  <div class="feature-grid" style={`--feature-cols:${Math.min(section.items.length, 3) || 1}`}>
+    {section.items.map((item, index) => (
+      <article class="feature-card">
+        <div class="feature-top"><span>{pad(index + 1)}</span><span class="feature-icon"><Icon name={item.icon} size="lg" /></span></div>
+        <h3>{item.title}</h3>
+        <p>{item.description}</p>
+      </article>
+    ))}
+  </div>
+</SectionIntro>

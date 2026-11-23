@@ -1,0 +1,77 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import { withBase } from '@/lib/base';
+
+interface Props {
+  action: string;
+  label: string;
+  src: string;
+  poster: string;
+}
+const { action, label, src, poster } = Astro.props;
+const videoUrl = withBase(src);
+const posterUrl = withBase(poster);
+---
+
+<scrnsvr-video>
+  <button type="button" aria-label={label} hidden>
+    <img src={posterUrl} alt="" loading="lazy" decoding="async" width="640" height="360" />
+    <span><Icon name="play" size="sm" />{action}</span>
+  </button>
+  <video src={videoUrl} poster={posterUrl} aria-label={label} controls muted playsinline preload="none" width="640" height="360">
+    <a href={videoUrl}>{label} (MP4)</a>
+  </video>
+</scrnsvr-video>
+
+<script>
+  class ScrnsvrVideo extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector('button')!;
+      const video = this.querySelector('video')!;
+      video.hidden = true;
+      button.hidden = false;
+      button.addEventListener('click', () => {
+        button.hidden = true;
+        video.hidden = false;
+        video.focus();
+        // Native controls stay available if the browser declines playback.
+        void video.play().catch(() => {});
+      }, { once: true });
+    }
+  }
+  customElements.define('scrnsvr-video', ScrnsvrVideo);
+</script>
+
+<style>
+  scrnsvr-video { display: block; }
+  video, img, button {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 0.4rem;
+    background: var(--surface);
+  }
+  [hidden] { display: none; }
+  button {
+    position: relative;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+  }
+  button span {
+    position: absolute;
+    inset: auto auto 0.75rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #fff3;
+    border-radius: 0.3rem;
+    background: #171819;
+    color: #ebe9e2;
+    font-size: 0.88rem;
+    font-weight: 650;
+  }
+  button:hover span { border-color: var(--pa); color: var(--accent-text); }
+</style>

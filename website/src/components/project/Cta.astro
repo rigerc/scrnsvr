@@ -1,0 +1,17 @@
+---
+import Heading from './Heading.astro';
+import Actions from './Actions.astro';
+import type { CtaSection } from '@/config/project.config';
+
+interface Props {
+  section: CtaSection;
+}
+const { section } = Astro.props;
+---
+
+<div class="final-inner">
+  {section.kicker && <span class="section-kicker">{section.kicker}</span>}
+  <Heading id={`${section.id}-title`} text={section.heading} />
+  {section.lead && <p>{section.lead}</p>}
+  <Actions actions={section.actions} />
+</div>

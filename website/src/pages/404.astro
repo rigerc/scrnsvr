@@ -1,0 +1,26 @@
+---
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import { withBase } from '@/lib/base';
+import '@/styles/project.css';
+---
+
+<LandingLayout title="Page not found" description="This page could not be found." noindex>
+  <main id="main-content" class="project-site missing">
+    <div class="project-shell">
+      <h1>Page not found</h1>
+      <p>Return to the homepage or find a guide in the documentation.</p>
+      <nav aria-label="Site links">
+        <a class="project-text-link" href={withBase('/')}>Homepage</a>
+        <a class="project-text-link" href={withBase('/gallery/')}>Shader gallery</a>
+        <a class="project-text-link" href={withBase('/docs/')}>Documentation</a>
+      </nav>
+    </div>
+  </main>
+</LandingLayout>
+
+<style>
+  .missing { padding: 10rem 0 5rem; min-height: 65vh; }
+  h1 { color: var(--heading); font: 650 clamp(2.6rem, 7vw, 5rem)/1.1 Outfit, sans-serif; letter-spacing: -0.04em; }
+  p { color: var(--body); margin-top: 1rem; }
+  nav { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
+</style>

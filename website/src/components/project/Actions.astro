@@ -1,0 +1,26 @@
+---
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import type { ProjectAction } from '@/config/project.config';
+import { resolveHref, isExternal } from './links';
+
+interface Props {
+  actions: readonly ProjectAction[];
+}
+// Actions with an empty href (e.g. an unset demoUrl) are hidden.
+const actions = Astro.props.actions.filter((action) => action.href);
+---
+
+{actions.length > 0 && (
+  <div class="hero-actions">
+    {actions.map((action) => (
+      <a
+        class:list={['project-button', action.variant ?? 'secondary']}
+        href={resolveHref(action.href)}
+        {...(isExternal(action.href) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
+        {action.label}
+        {action.icon && <Icon name={action.icon} size="sm" />}
+      </a>
+    ))}
+  </div>
+)}
