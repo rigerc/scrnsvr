@@ -6,6 +6,8 @@
 //! that asks for dismissal, and topology changes that end the screensaver.
 //! Pacing, fades and scene policy live in the application.
 
+mod preview;
+
 use std::ffi::c_void;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
 
@@ -75,6 +77,7 @@ struct State {
     seat_state: SeatState,
     compositor: CompositorState,
     layer_shell: Option<LayerShell>,
+    preview: Option<preview::Preview>,
     egl: Option<Egl>,
     outputs: Vec<OutputSurface>,
     initializing: bool,
@@ -107,6 +110,10 @@ fn failed(message: impl Into<String>) -> PlatformError {
 impl LayerShellSession {
     /// Connect, bind globals and learn about outputs (two roundtrips).
     pub fn connect() -> Result<Self, PlatformError> {
+        Self::connect_with_role(false)
+    }
+
+    fn connect_with_role(preview: bool) -> Result<Self, PlatformError> {
         let connection = Connection::connect_to_env().map_err(|_| PlatformError::Unavailable("Cannot connect to Wayland".into()))?;
         let (globals, mut queue) =
             registry_queue_init::<State>(&connection).map_err(|_| PlatformError::Unavailable("Cannot connect to Wayland".into()))?;
@@ -117,8 +124,9 @@ impl LayerShellSession {
             registry_state: RegistryState::new(&globals),
             output_state: OutputState::new(&globals, &handle),
             seat_state: SeatState::new(&globals, &handle),
+            layer_shell: if preview { None } else { LayerShell::bind(&globals, &handle).ok() },
+            preview: if preview { Some(preview::Preview::bind(&globals, &handle)?) } else { None },
             compositor,
-            layer_shell: LayerShell::bind(&globals, &handle).ok(),
             egl: None,
             outputs: Vec::new(),
             initializing: true,
@@ -255,9 +263,8 @@ impl LayerShellSession {
 
     /// Update the opaque region, request the next frame callback and swap.
     pub fn present(&mut self, index: usize, opaque: bool) -> Result<(), PlatformError> {
+        let surface = self.state.surface(index).cloned().ok_or_else(|| failed("Output has no surface"))?;
         let output = &mut self.state.outputs[index];
-        let Some(layer) = &output.layer else { return Err(failed("Output has no surface")) };
-        let surface = layer.wl_surface();
         // An opaque region lets the compositor skip what is underneath once the fade completes.
         if opaque && !output.opaque {
             if let Ok(region) = Region::new(&self.state.compositor) {
@@ -294,12 +301,21 @@ impl Drop for LayerShellSession {
             output.window = None;
             output.layer = None;
         }
+        state.preview = None;
         state.egl = None;
         let _ = self.connection.flush();
     }
 }
 
 impl State {
+    fn surface(&self, index: usize) -> Option<&wl_surface::WlSurface> {
+        self.outputs[index]
+            .layer
+            .as_ref()
+            .map(WaylandSurface::wl_surface)
+            .or_else(|| self.preview.as_ref().filter(|_| self.outputs[index].selected)?.surface())
+    }
+
     fn index_of(&self, output: &wl_output::WlOutput) -> Option<usize> {
         self.outputs.iter().position(|entry| &entry.wl_output == output)
     }
@@ -332,16 +348,16 @@ impl State {
         };
         entry.name = info.name.unwrap_or_default();
         entry.description = info.description.unwrap_or_default();
-        entry.location = info.location;
+        entry.location = info.logical_position.unwrap_or(info.location);
         entry.scale = info.scale_factor.max(1);
     }
 
     fn create_surface_resources(&mut self, index: usize) -> Result<(), PlatformError> {
         let egl = self.egl.as_ref().ok_or_else(|| PlatformError::Unavailable("EGL is not initialized".into()))?;
+        let surface = self.surface(index).ok_or_else(|| failed("Output has no surface"))?.id();
         let output = &mut self.outputs[index];
-        let layer = output.layer.as_ref().ok_or_else(|| failed("Output has no surface"))?;
         let (width, height) = output.buffer_size();
-        let window = WlEglSurface::new(layer.wl_surface().id(), width, height)
+        let window = WlEglSurface::new(surface, width, height)
             .map_err(|_| PlatformError::Unavailable("Could not create a Wayland EGL window".into()))?;
         // SAFETY: `window` is stored next to the surface and destroyed after it.
         let surface = unsafe { egl.create_window_surface(window.ptr() as *mut c_void) }?;
@@ -353,10 +369,51 @@ impl State {
         egl.disable_vsync();
         Ok(())
     }
+
+    fn configure_size(&mut self, index: usize, width: i32, height: i32) -> Result<(), PlatformError> {
+        let output = &mut self.outputs[index];
+        let resized = width != output.width || height != output.height;
+        output.width = width;
+        output.height = height;
+        if output.window.is_none() {
+            self.create_surface_resources(index)?;
+            let output = &mut self.outputs[index];
+            output.frame_ready = true;
+            output.resized = true;
+        } else if resized {
+            let (buffer_width, buffer_height) = output.buffer_size();
+            if let Some(window) = &output.window {
+                window.resize(buffer_width, buffer_height, 0, 0);
+            }
+            output.resized = true;
+            if std::mem::take(&mut output.opaque)
+                && let Some(surface) = self.surface(index)
+            {
+                surface.set_opaque_region(None);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl CompositorHandler for State {
-    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: i32) {}
+    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, surface: &wl_surface::WlSurface, scale: i32) {
+        let Some(preview) = &self.preview else { return };
+        if preview.surface() != Some(surface) {
+            return;
+        }
+        let Some(output) = self.outputs.iter_mut().find(|output| output.selected) else { return };
+        let scale = scale.max(1);
+        if output.scale != scale {
+            surface.set_buffer_scale(scale);
+            output.scale = scale;
+            if let Some(window) = &output.window {
+                let (width, height) = output.buffer_size();
+                window.resize(width, height, 0, 0);
+            }
+            output.resized = true;
+        }
+    }
     fn transform_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: wl_output::Transform) {}
     fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {}
     fn surface_enter(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: &wl_output::WlOutput) {}
@@ -380,8 +437,8 @@ impl OutputHandler for State {
 
     fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, output: wl_output::WlOutput) {
         self.refresh(&output);
-        // A new output after startup closes the screensaver; the daemon reselects next launch.
-        if !self.initializing && self.surfaces_open {
+        // A new output ends the current screensaver. The next launch selects outputs afresh.
+        if self.preview.is_none() && !self.initializing && self.surfaces_open {
             self.closed = true;
         }
     }
@@ -391,7 +448,7 @@ impl OutputHandler for State {
         self.refresh(&output);
         if let Some(index) = index {
             let entry = &self.outputs[index];
-            if !self.initializing && self.surfaces_open && entry.selected && entry.window.is_some() {
+            if self.preview.is_none() && !self.initializing && self.surfaces_open && entry.selected && entry.window.is_some() {
                 self.closed = true;
             }
         }
@@ -423,25 +480,7 @@ impl LayerShellHandler for State {
             self.fatal = Some(failed("Invalid layer-shell output size"));
             return;
         }
-        let output = &mut self.outputs[index];
-        let resized = width as i32 != output.width || height as i32 != output.height;
-        output.width = width as i32;
-        output.height = height as i32;
-        if output.window.is_none() {
-            if let Err(error) = self.create_surface_resources(index) {
-                self.fatal = Some(error);
-                return;
-            }
-            let output = &mut self.outputs[index];
-            output.frame_ready = true;
-            output.resized = true;
-        } else if resized {
-            let (buffer_width, buffer_height) = output.buffer_size();
-            if let Some(window) = &output.window {
-                window.resize(buffer_width, buffer_height, 0, 0);
-            }
-            output.resized = true;
-        }
+        self.fatal = self.configure_size(index, width as i32, height as i32).err();
     }
 }
 
@@ -495,8 +534,10 @@ impl Dispatch2<wl_pointer::WlPointer, State> for InputData {
     fn event(&self, state: &mut State, pointer: &wl_pointer::WlPointer, event: wl_pointer::Event, _: &Connection, _: &QueueHandle<State>) {
         match event {
             wl_pointer::Event::Enter { serial, surface_x, surface_y, .. } => {
-                // Hide the cursor over the screensaver.
-                pointer.set_cursor(serial, None, 0, 0);
+                if state.preview.is_none() {
+                    // Hide the cursor over the screensaver.
+                    pointer.set_cursor(serial, None, 0, 0);
+                }
                 state.pointer_dismissal.enter(surface_x, surface_y);
             }
             wl_pointer::Event::Leave { .. } => state.pointer_dismissal.leave(),

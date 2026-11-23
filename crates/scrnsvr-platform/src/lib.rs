@@ -19,3 +19,37 @@ pub enum PlatformError {
     #[error("{0}")]
     Failed(String),
 }
+
+/// Flush outgoing requests, then read Wayland events with a bounded wait.
+pub(crate) fn wait_for_events(
+    connection: &wayland_client::Connection,
+    guard: wayland_client::backend::ReadEventsGuard,
+    timeout: std::time::Duration,
+) -> Result<(), PlatformError> {
+    use std::os::fd::AsRawFd;
+    use wayland_client::backend::WaylandError;
+
+    let mut fd = libc::pollfd { fd: guard.connection_fd().as_raw_fd(), events: libc::POLLIN, revents: 0 };
+    match connection.flush() {
+        Ok(()) => {}
+        Err(WaylandError::Io(error)) if error.kind() == std::io::ErrorKind::WouldBlock => fd.events |= libc::POLLOUT,
+        Err(error) => return Err(PlatformError::Failed(format!("Wayland flush: {error}"))),
+    }
+    // SAFETY: fd points to one initialized pollfd for the duration of the call.
+    let ready = unsafe { libc::poll(&mut fd, 1, timeout.as_millis().min(i32::MAX as u128) as i32) };
+    if ready < 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() != std::io::ErrorKind::Interrupted {
+            return Err(PlatformError::Failed(format!("Wayland poll: {error}")));
+        }
+    } else if ready > 0 && fd.revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR) != 0 {
+        match guard.read() {
+            Ok(_) => {}
+            Err(WaylandError::Io(error)) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(error) => return Err(PlatformError::Failed(format!("Wayland read: {error}"))),
+        }
+    } else if fd.revents & libc::POLLNVAL != 0 {
+        return Err(PlatformError::Failed("Wayland connection is closed".into()));
+    }
+    Ok(())
+}

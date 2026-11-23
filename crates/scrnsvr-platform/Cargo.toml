@@ -13,3 +13,4 @@ smithay-client-toolkit.workspace = true
 wayland-client.workspace = true
 thiserror.workspace = true
 scrnsvr-core.workspace = true
+libc = "=0.2.191"

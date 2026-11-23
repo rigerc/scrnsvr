@@ -6134,11 +6134,18 @@ dependencies = [
 name = "scrnsvr-app"
 version = "0.10.0"
 dependencies = [
+ "chrono",
  "glow 0.18.0",
  "libc",
+ "png 0.18.1",
+ "rand 0.9.5",
  "scrnsvr-core",
  "scrnsvr-platform",
  "scrnsvr-render",
+ "serde_json",
+ "shlex",
+ "tempfile",
+ "toml 0.8.23",
  "wayland-client",
 ]
 
@@ -6161,6 +6168,7 @@ name = "scrnsvr-platform"
 version = "0.10.0"
 dependencies = [
  "khronos-egl",
+ "libc",
  "scrnsvr-core",
  "smithay-client-toolkit",
  "thiserror 2.0.21",
@@ -6185,13 +6193,19 @@ dependencies = [
 name = "scrnsvr-settings"
 version = "0.10.0"
 dependencies = [
+ "chrono",
+ "dirs 6.0.0",
  "glow 0.18.0",
  "gpui-kit",
  "gpui-pre",
+ "rand 0.9.5",
  "raw-window-handle",
  "scrnsvr-core",
  "scrnsvr-platform",
  "scrnsvr-render",
+ "serde",
+ "tempfile",
+ "toml 0.8.23",
  "wayland-client",
  "wayland-egl",
 ]

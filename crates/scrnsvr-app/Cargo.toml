@@ -1,6 +1,7 @@
 [package]
 name = "scrnsvr-app"
-description = "scrnsvr native executables; currently the drop-in layer-shell renderer"
+description = "Scrnsvr command line and layer-shell renderer"
+default-run = "scrnsvr"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,3 +18,14 @@ scrnsvr-platform.workspace = true
 glow.workspace = true
 libc.workspace = true
 wayland-client.workspace = true
+chrono = { version = "=0.4.45", features = ["clock"], default-features = false }
+png = "=0.18.1"
+rand = "=0.9.5"
+serde_json = { version = "=1.0.154", features = ["preserve_order", "float_roundtrip"] }
+shlex = "=2.0.1"
+toml = "=0.8.23"
+tempfile = "=3.27.0"
+
+[[bin]]
+name = "scrnsvr"
+path = "src/cli.rs"

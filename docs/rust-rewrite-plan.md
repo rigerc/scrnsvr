@@ -366,11 +366,22 @@ Known gaps before the Rust renderer can become the default:
 - Verification passed for `npm run test:rust` (48 tests, Clippy and rustfmt), `npm run typecheck`, `npx vitest run` (376 tests), and `npm run build:rust`.
 - The native daemon and full settings editor still need to adopt the core API for startup, reload, debounced saves, and desktop color import.
 
+### Milestone 4: launch orchestration and command line
+
+- `scrnsvr` (`crates/scrnsvr-app/src/cli.rs`) dispatches settings, `--open`, `--dismiss`, `--preview`, `--thumbnail`, `--install` and `--setup-noctalia`. `--backend` is gone, and `--daemon` exits 2 pointing at Noctalia and hypridle. The `scrnsvr-renderer` binary and its protocol are unchanged.
+- `--open` holds an exclusive `flock` on `$XDG_RUNTIME_DIR/scrnsvr/saver.lock`, with the PID in `saver.pid` (written atomically under the lock); a second launch exits 0. `--dismiss` sends SIGUSR1 to the lock holder, and SIGTERM and SIGINT take the same path, which forwards `dismiss` to the renderer and waits for its fade-out. A Unix socket was tried first and dropped because long runtime paths exceed the `sun_path` limit.
+- The controller sends scene and clock updates, rotation with a config re-read, the 8 s readiness timeout, and the renderer's last stderr line on early exit. "Primary" is the output at logical (0,0), else the first, and is logged. No audio messages.
+- `--install` links `~/.local/bin/scrnsvr` (or `$XDG_BIN_HOME`) to `$APPIMAGE` or the current executable and refuses unrelated files without `--force`. `--setup-noctalia` uses only `noctalia msg config-get`/`config-set`, defaults to a dry run, and sets `pre_action_fade_seconds = 0.0`. Against the real session the dry run planned updating the existing `screensaver` behavior's command and the fade; it has not been applied.
+- `--preview` is a 960×540 xdg toplevel paced by frame callbacks, with an in-surface close control (Hyprland did not route clicks to SCTK's fallback title bar). `--thumbnail` renders the 41 built-ins headlessly at 640×360 (two runs gave byte-identical PNGs) and exits non-zero on any failure.
+- Evidence: 17 unit and 10 integration tests (fake renderer, fake `noctalia`), plus core tests, 61 in all; workspace Clippy and rustfmt clean; `cargo tree -p scrnsvr-app` has no GPUI crates. Live on Hyprland: the saver from a TOML config (plasma with the clock), a second `--open` refused with exit 0, `--dismiss` fade-out with exit 0, pointer and SIGTERM dismissal, the preview, 41 thumbnails, and the real-Noctalia dry run.
+- Left for cutover: `packaging/systemd/` and `packaging/post-install.sh` stay until the Electron build is removed.
+
 ### Not started
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- Milestones 4–6: the daemon, native settings, and packaging cutover.
+- The rest of milestone 5 (effects, shuffle, clock, global settings, colors, the Noctalia Idle section, the custom shader editor, the thumbnail gallery) and milestone 6 (packaging cutover).
+- Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
 ## Technical references
 

@@ -72,6 +72,11 @@ impl UniformDef {
         self.label.as_deref().unwrap_or(&self.name)
     }
 
+    /// Resolve an override or inherited value using the shader's binding rules.
+    pub fn resolve_shader_value(&self, value: Option<&SettingValue>) -> SettingValue {
+        self.normalize(value, false)
+    }
+
     pub(crate) fn normalize(&self, value: Option<&SettingValue>, effect: bool) -> SettingValue {
         use SettingValue::{Bool, Number, Text};
         match (self.kind, value) {

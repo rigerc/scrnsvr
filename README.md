@@ -120,6 +120,33 @@ node scripts/export-rust-fixtures.cjs
 cargo run --release -p scrnsvr-settings
 ```
 
+#### Native app command line (rewrite branch)
+
+The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is `~/.config/scrnsvr/config.toml`; it does not read the Electron `config.json`.
+
+| Command | What it does |
+|---|---|
+| `scrnsvr` / `scrnsvr --settings` | Open the settings app |
+| `scrnsvr --open [--shader <id>]` | Start the full-screen saver; any key, click or pointer movement dismisses it |
+| `scrnsvr --dismiss` | Fade out a running saver (exits 0 when none runs) |
+| `scrnsvr --preview [--shader <id>]` | Resizable 960×540 preview window, never shuffles |
+| `scrnsvr --thumbnail --output <dir> --frames <n>` | Render a PNG for every built-in shader |
+| `scrnsvr --install [--force]` | Link `~/.local/bin/scrnsvr` (or `$XDG_BIN_HOME/scrnsvr`) to the AppImage or this binary |
+| `scrnsvr --setup-noctalia [--apply] [--timeout N]` | Show, or with `--apply` write, the Noctalia idle setup |
+
+`--open` is safe to trigger repeatedly: while a saver runs, another `--open` exits 0. There is no built-in daemon; `scrnsvr --daemon` exits 2.
+
+**Idle with Noctalia.** Run `scrnsvr --install`, then `scrnsvr --setup-noctalia` to preview the changes and `scrnsvr --setup-noctalia --apply` to write them through `noctalia msg config-set`. It reuses an existing behavior that runs scrnsvr or creates `idle.behavior.scrnsvr` (default timeout 600 s), and sets `idle.pre_action_fade_seconds` to 0 so only scrnsvr fades. A Noctalia hot corner can run `scrnsvr --open` directly.
+
+**Idle with hypridle.**
+
+```
+listener {
+    timeout = 600
+    on-timeout = scrnsvr --open
+}
+```
+
 ## Shader controls
 
 Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
