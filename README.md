@@ -1,6 +1,6 @@
 # scrnsvr
 
-A shader-based idle screensaver for Linux desktops. Electron + WebGL (OGL) renderers launch fullscreen after a configurable idle timeout, with a settings UI, clock overlay, and systemd user service.
+A shader-based idle screensaver for Wayland desktops with `wlr-layer-shell`. After a configurable idle timeout, a native OpenGL ES renderer draws the shaders into overlay surfaces; Electron provides the settings UI, previews and idle daemon. Includes a clock overlay and systemd user service.
 
 ## Gallery
 
@@ -34,18 +34,18 @@ ffmpeg -framerate 12 -i /tmp/frames-plasma/frame-%03d.png -vf "scale=640:-2" -c:
 - Clock overlay: 12h/24h, seconds/date toggles, 9 positions, font/weight/size/color/opacity/margin/shadow
 - Noctalia colors import: maps `mPrimary/mSecondary/mTertiary/mSurface/mOnSurface` onto shader color uniforms
 - Idle daemon: polls `powerMonitor.getSystemIdleTime()` with a `logind` (`busctl`) fallback; suppresses relaunch for one poll after resume
-- Primary / all-monitors rendering, kiosk mode, configurable FPS (1–240)
-- Native Wayland renderer: shaders draw straight into layer-shell overlays with OpenGL ES, paced by the compositor; fullscreen Electron windows elsewhere
-- Settings window by default (argless or `--settings`); screensaver via `--open` (fullscreen) or `--preview --shader <id>` (windowed); headless thumbnail capture (`--thumbnail`)
+- Primary / all-monitors rendering, configurable FPS (1–240)
+- Native Wayland renderer: shaders draw straight into layer-shell overlays with OpenGL ES, paced by the compositor
+- Settings window by default (argless or `--settings`); screensaver via `--open`; windowed shader preview via `--preview --shader <id>`; headless thumbnail capture (`--thumbnail`)
 - Config at `~/.config/scrnsvr/config.json` (or `$XDG_CONFIG_HOME/scrnsvr/config.json`), Zod-validated with atomic writes
 - Linux packaging: AppImage + deb via electron-builder, ships a systemd user unit (`scrnsvr.service`)
 
 ## Requirements
 
-- Linux with Node 24 + npm
+- Linux with Node 24 + npm, and a Wayland compositor with `wlr-layer-shell` to run the screensaver
 - Electron 44 (devDependency, allowed via `allowScripts`)
 - `busctl` only if you rely on the logind idle fallback (Wayland without Electron idle data)
-- Optional native renderer build: C/C++ compiler, `pkg-config`, `wayland-scanner`, and development headers for `wayland-client`, `wayland-egl`, EGL, GLESv2 and `pangocairo` (on Debian/Ubuntu: `libwayland-dev libwayland-bin libegl-dev libgles-dev libpango1.0-dev`). Packaged builds include the renderer.
+- Native renderer build: C/C++ compiler, `pkg-config`, `wayland-scanner`, and development headers for `wayland-client`, `wayland-egl`, EGL, GLESv2 and `pangocairo` (on Debian/Ubuntu: `libwayland-dev libwayland-bin libegl-dev libgles-dev libpango1.0-dev`). Packaged builds include the renderer.
 
 ## Quick start
 
@@ -56,7 +56,7 @@ npm run build
 # Open settings (default, no flags needed)
 npm run settings
 
-# Run the screensaver fullscreen
+# Run the screensaver now
 npx electron dist/main/index.js --open
 # Preview a shader in a window
 npm start -- --preview --shader gradient-blobs
@@ -72,7 +72,7 @@ npm run check-shaders
 npm run check-effects
 ```
 
-CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--backend auto|layer-shell|fullscreen`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
+CLI flags (`src/main/cli.ts`): `--settings|-s`, `--open`, `--daemon`, `--preview`, `--shader <id>`, `--thumbnail`, `--output <dir>`, `--frames <n>`.
 
 ### Native Wayland renderer
 
@@ -83,13 +83,9 @@ On Wayland compositors with `wlr-layer-shell` (Hyprland, Sway, KDE Plasma and ot
 - Keyboard, click, scroll, touch, or pointer movement beyond 12 logical pixels dismisses the screensaver on all monitors.
 - If an output is added, removed, or changes scale, the screensaver closes; the daemon selects outputs again on its next launch.
 
-The default `auto` backend falls back to fullscreen Electron windows when there is no Wayland layer-shell, the renderer is not built, or it fails to start; later idle launches then keep using the fallback until the daemon restarts.
+This is the only screensaver backend; there is no fullscreen Electron window fallback. Without a Wayland session or a built renderer, `--open` reports the reason and exits, and `--daemon` exits with status 2, which the systemd unit does not restart. If the renderer fails during a launch, the daemon logs the error and tries the native renderer again on its next idle launch.
 
 ```sh
-# Require the native renderer, or report its startup error
-npx electron dist/main/index.js --open --backend layer-shell
-# Use fullscreen Electron windows
-npx electron dist/main/index.js --open --backend fullscreen
 # Build the renderer on its own
 npm run build:native
 # Package the app (requires a successful native build)
@@ -103,7 +99,7 @@ node scripts/check-native.cjs --live
 SCRNSVR_RENDERER_DEBUG=1 npx electron dist/main/index.js --open
 ```
 
-`npm run build` attempts the native build and continues with fullscreen support if development dependencies are missing. See [ADR-002](docs/decisions/0002-native-renderer.md) for the design.
+`npm run build` attempts the native build and continues without it if development dependencies are missing; settings and previews still work, but the screensaver cannot run until `npm run build:native` succeeds. See [ADR-002](docs/decisions/0002-native-renderer.md) for the design.
 
 ## Shader controls
 
@@ -164,7 +160,6 @@ Example (`~/.config/scrnsvr/config.json`):
 {
   "shader": "gradient-blobs",
   "global": { "idleThresholdSeconds": 300, "fps": 60, "monitors": "primary" },
-  "kiosk": true,
   "clock": { "enabled": true, "position": "center", "format": "24h", "showSeconds": false, "showDate": true },
   "effects": {
     "enabled": true,

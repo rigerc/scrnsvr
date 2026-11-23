@@ -1,5 +1,3 @@
-import type { WindowBackend } from './native-renderer';
-
 export interface CliOptions {
   settings: boolean;
   daemon: boolean;
@@ -9,7 +7,6 @@ export interface CliOptions {
   thumbnail: boolean;
   output?: string;
   frames: number;
-  backend: WindowBackend;
 }
 
 export type LaunchMode = 'thumbnail' | 'daemon' | 'screensaver' | 'settings';
@@ -24,10 +21,6 @@ const flagHandlers: Record<string, (out: CliOptions) => void> = {
 };
 
 const valueHandlers: Record<string, (out: CliOptions, value: string) => void> = {
-  '--backend': (out, value) => {
-    if (value !== 'auto' && value !== 'layer-shell' && value !== 'fullscreen') throw new Error(`Invalid backend: ${value}`);
-    out.backend = value;
-  },
   '--shader': (out, value) => { out.shader = value; },
   '--output': (out, value) => { out.output = value; },
   '--frames': (out, value) => {
@@ -37,14 +30,13 @@ const valueHandlers: Record<string, (out: CliOptions, value: string) => void> = 
 };
 
 export function parseArgs(args: string[]): CliOptions {
-  const out: CliOptions = { settings: false, daemon: false, open: false, preview: false, thumbnail: false, frames: 3, backend: 'auto' };
+  const out: CliOptions = { settings: false, daemon: false, open: false, preview: false, thumbnail: false, frames: 3 };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     const flag = flagHandlers[argument];
     if (flag) { flag(out); continue; }
     const takeValue = valueHandlers[argument];
     const value = args[index + 1];
-    if (argument === '--backend' && (!value || value.startsWith('--'))) throw new Error('--backend requires auto, layer-shell, or fullscreen');
     if (takeValue && value) { takeValue(out, value); index += 1; }
   }
   return out;

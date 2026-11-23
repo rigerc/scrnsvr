@@ -37,157 +37,41 @@ afterEach(() => {
   window.history.replaceState({}, '', '/');
 });
 
-describe('screensaver cycling and effects integration', () => {
-  it('defers in-flight and subsequent shader picks while the output is inactive', async () => {
+describe('preview renderer and effects integration', () => {
+  it('passes the global stack on launch, keeps the clock, and releases everything on pagehide', async () => {
     document.body.innerHTML = '<canvas></canvas>';
-    const config = ConfigSchema.parse({ shader: 'flow-field', global: { fadeSeconds: 1 } });
-    let cycle!: (pick: { shader: string }) => unknown;
-    let activity!: (active: boolean) => void;
-    window.scrnsvr = {
-      getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
-      onCycle: listener => { cycle = listener; return vi.fn(); },
-      onRenderingActive: listener => { activity = listener; listener(true); return vi.fn(); },
-    };
-    await import('../src/renderer/index');
-    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
-    advance(1000);
-    await cycle({ shader: 'plasma' });
-    advance(200);
-    activity(false);
-    advance(30000);
-    expect(state.mount).toHaveBeenCalledOnce();
-    await cycle({ shader: 'silk-ribbons' });
-    expect(state.mount).toHaveBeenCalledOnce();
-    activity(true);
-    await vi.waitFor(() => expect(window.scrnsvr.getConfig).toHaveBeenCalledTimes(3));
-    advance(500);
-    expect(state.mount).toHaveBeenCalledTimes(2);
-    expect((state.mount.mock.calls[1] as unknown as [unknown, { manifest: { id: string } }])[1].manifest.id).toBe('silk-ribbons');
-  });
-  async function start(seconds = 1) {
-    document.body.innerHTML = '<canvas></canvas>';
-    const config = ConfigSchema.parse({ shader: 'flow-field', global: { fadeSeconds: seconds } });
-    let cycle!: (pick: { shader: string }) => unknown;
-    window.scrnsvr = {
-      getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
-      onCycle: listener => { cycle = listener; return vi.fn(); },
-    };
-    await import('../src/renderer/index');
-    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
-    advance(1000);
-    return { cycle };
-  }
-  it.each([0, 1])('keeps the previous scene alive if a replacement fails, and allows retry (fade seconds: %s)', async seconds => {
-    const outgoing = vi.fn();
-    state.mount.mockReturnValueOnce(outgoing);
-    const { cycle } = await start(seconds);
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    state.mount.mockImplementationOnce(() => { throw new Error('mount failed'); });
-    await cycle({ shader: 'plasma' });
-    advance(500);
-    expect(outgoing).not.toHaveBeenCalled();
-    expect(warning).toHaveBeenCalledOnce();
-    advance(500);
-    expect(opacity()).toBe(0);
-    const incoming = vi.fn();
-    state.mount.mockImplementationOnce(() => {
-      expect(outgoing).not.toHaveBeenCalled();
-      return incoming;
-    });
-    await cycle({ shader: 'plasma' });
-    advance(500);
-    expect(state.mount).toHaveBeenCalledTimes(3);
-    expect(outgoing).toHaveBeenCalledOnce();
-    window.dispatchEvent(new Event('pagehide'));
-    expect(incoming).toHaveBeenCalledOnce();
-  });
-  it('mounts only the latest overlapping pick after a continuous fade-out', async () => {
-    const { cycle } = await start();
-    await cycle({ shader: 'plasma' });
-    advance(400);
-    await cycle({ shader: 'silk-ribbons' });
-    advance(16);
-    expect(opacity()).toBeCloseTo(0.832);
-    advance(84);
-    expect(state.mount).toHaveBeenCalledTimes(2);
-    expect((state.mount.mock.calls[1] as unknown as [unknown, { manifest: { id: string } }])[1].manifest.id).toBe('silk-ribbons');
-    advance(500);
-    expect(opacity()).toBe(0);
-  });
-  it('cancels a pending replacement if the latest pick returns to the running scene', async () => {
-    const { cycle } = await start();
-    await cycle({ shader: 'plasma' });
-    advance(250);
-    await cycle({ shader: 'flow-field' });
-    advance(250);
-    advance(500);
-    expect(state.mount).toHaveBeenCalledOnce();
-    expect(opacity()).toBe(0);
-  });
-  it('ignores older cycle requests whose config reads complete after a newer request', async () => {
-    const { cycle } = await start(0);
-    let resolveConfig!: (value: unknown) => void;
-    const getConfig = vi.mocked(window.scrnsvr.getConfig);
-    const config = await getConfig();
-    getConfig.mockImplementationOnce(() => new Promise(resolve => { resolveConfig = resolve as typeof resolveConfig; }));
-    const older = cycle({ shader: 'plasma' });
-    await cycle({ shader: 'silk-ribbons' });
-    resolveConfig(config);
-    await older;
-    expect(state.mount).toHaveBeenCalledTimes(2);
-    expect((state.mount.mock.calls[1] as unknown as [unknown, { manifest: { id: string } }])[1].manifest.id).toBe('silk-ribbons');
-  });
-  it.each([false, true])('ignores queued and subsequent cycle requests after dismissal (nofade: %s)', async nofade => {
-    document.body.innerHTML = '<canvas></canvas>';
-    if (nofade) window.history.replaceState({}, '', '/?nofade=1');
-    const config = ConfigSchema.parse({ shader: 'flow-field', global: { fadeSeconds: 0 } });
-    let cycle!: (pick: { shader: string }) => unknown;
-    let dismiss!: () => void;
-    const getConfig = vi.fn(async () => config);
-    window.scrnsvr = {
-      getConfig, setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
-      onCycle: listener => { cycle = listener; return vi.fn(); },
-      onDismiss: listener => { dismiss = listener; return vi.fn(); },
-    };
-    await import('../src/renderer/index');
-    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
-    let resolveConfig!: (value: typeof config) => void;
-    getConfig.mockImplementationOnce(() => new Promise(resolve => { resolveConfig = resolve; }));
-    const cycling = cycle({ shader: 'plasma' });
-    dismiss();
-    resolveConfig(config);
-    await cycling;
-    await cycle({ shader: 'plasma' });
-    expect(getConfig).toHaveBeenCalledTimes(2);
-    expect(state.mount).toHaveBeenCalledOnce();
-    expect(window.scrnsvr.close).toHaveBeenCalledOnce();
-  });
-  it('passes the global stack on launch and refreshed stack on shuffle without altering the clock', async () => {
-    document.body.innerHTML = '<canvas></canvas>';
-    let config = ConfigSchema.parse({
+    const config = ConfigSchema.parse({
       shader: 'flow-field', clock: { enabled: true }, global: { fadeSeconds: 0 },
       effects: { layers: [{ id: 'tape', effectId: 'vhs-distortion', values: { intensity: 0.7 } }] },
     });
-    let cycle: ((pick: { shader: string; preset?: string }) => unknown) | undefined;
-    const unsubscribe = vi.fn();
-    window.scrnsvr = {
-      getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn(),
-      onCycle: listener => { cycle = listener; return unsubscribe; },
-    };
+    const stop = vi.fn();
+    state.mount.mockReturnValueOnce(stop);
+    window.scrnsvr = { getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn() };
     await import('../src/renderer/index');
-    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
     const first = state.mount.mock.calls[0] as unknown as unknown[];
-    expect(first[5]).toMatchObject({ effects: config.effects });
     expect((first[5] as { effects: unknown }).effects).toBe(config.effects);
     expect(state.clock).toHaveBeenCalledWith(document.body, config.clock);
-
-    config = ConfigSchema.parse({ ...config, effects: { enabled: false, layers: [{ id: 'new-tape', effectId: 'vhs-distortion', values: {} }] } });
-    await cycle?.({ shader: 'plasma' });
-    expect(state.mount).toHaveBeenCalledTimes(2);
-    const second = state.mount.mock.calls[1] as unknown as unknown[];
-    expect((second[5] as { effects: unknown }).effects).toBe(config.effects);
-    expect(state.clock).toHaveBeenCalledTimes(1);
     window.dispatchEvent(new Event('pagehide'));
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledOnce();
+  });
+  it.each([false, true])('closes the window once after the fade on any input (nofade: %s)', async nofade => {
+    document.body.innerHTML = '<canvas></canvas>';
+    if (nofade) window.history.replaceState({}, '', '/?nofade=1');
+    const config = ConfigSchema.parse({ shader: 'plasma', global: { fadeSeconds: 1 } });
+    window.scrnsvr = { getConfig: vi.fn(async () => config), setConfig: vi.fn(), close: vi.fn(), importNoctaliaColors: vi.fn() };
+    await import('../src/renderer/index');
+    await vi.waitFor(() => expect(state.mount).toHaveBeenCalledOnce());
+    expect((state.mount.mock.calls[0] as unknown as [unknown, { manifest: { id: string } }])[1].manifest.id).toBe('plasma');
+    advance(1000);
+    window.dispatchEvent(new KeyboardEvent('keydown'));
+    window.dispatchEvent(new PointerEvent('pointerdown'));
+    if (!nofade) {
+      expect(window.scrnsvr.close).not.toHaveBeenCalled();
+      advance(500);
+      expect(opacity()).toBeCloseTo(0.5);
+      advance(500);
+    }
+    expect(window.scrnsvr.close).toHaveBeenCalledOnce();
   });
 });

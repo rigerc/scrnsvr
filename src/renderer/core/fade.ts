@@ -16,9 +16,6 @@ export function fadeOutOpacity(elapsedMs: number, fadeMs: number): number {
 
 export interface FadeOverlay {
   fadeOut(close: () => void): void;
-  /** Fade overlay to opaque, run swap, then fade back to transparent. */
-  transition(swap: () => void): void;
-  setOpacity(value: number): void;
   destroy(): void;
 }
 
@@ -34,11 +31,6 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
   let raf = 0;
   let dismissing = false;
   let destroyed = false;
-  let pendingSwap: (() => void) | undefined;
-  const swapScene = (swap: () => void) => {
-    try { swap(); }
-    catch (error) { console.warn('scrnsvr scene transition failed', error); }
-  };
   const startedAt = performance.now();
   const stepIn = (now: number) => {
     overlay.style.opacity = String(fadeInOpacity(now - startedAt, fadeMs));
@@ -51,7 +43,6 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
     fadeOut(close) {
       if (dismissing || destroyed) return;
       dismissing = true;
-      pendingSwap = undefined;
       cancelAnimationFrame(raf);
       if (fadeMs <= 0) { overlay.style.opacity = '1'; close(); return; }
       const outStart = performance.now();
@@ -63,43 +54,8 @@ export function mountFadeOverlay(host: HTMLElement, fadeSeconds: number): FadeOv
       };
       raf = requestAnimationFrame(stepOut);
     },
-    transition(swap) {
-      if (dismissing || destroyed) return;
-      // Keep the fade-out deadline when newer picks arrive faster than a fade.
-      // Only the most recent pick is mounted once the overlay reaches black.
-      if (pendingSwap) { pendingSwap = swap; return; }
-      cancelAnimationFrame(raf);
-      if (fadeMs <= 0) { swapScene(swap); return; }
-      pendingSwap = swap;
-      // Fade out (half time), swap the scene, then fade back in (half time).
-      const half = Math.max(fadeMs / 2, 1000 / 60);
-      const outStart = performance.now();
-      const opacity = Number(overlay.style.opacity);
-      const stepOut = (now: number) => {
-        overlay.style.opacity = String(opacity + (1 - opacity) * fadeOutOpacity(now - outStart, half));
-        if (Number(overlay.style.opacity) < 1) { raf = requestAnimationFrame(stepOut); return; }
-        const latest = pendingSwap!;
-        pendingSwap = undefined;
-        swapScene(latest);
-        if (dismissing || destroyed || pendingSwap) return;
-        const inStart = performance.now();
-        const stepIn = (then: number) => {
-          overlay.style.opacity = String(fadeInOpacity(then - inStart, half));
-          if (Number(overlay.style.opacity) > 0) raf = requestAnimationFrame(stepIn);
-        };
-        raf = requestAnimationFrame(stepIn);
-      };
-      raf = requestAnimationFrame(stepOut);
-    },
-    setOpacity(value) {
-      if (dismissing || destroyed) return;
-      pendingSwap = undefined;
-      cancelAnimationFrame(raf);
-      overlay.style.opacity = String(value);
-    },
     destroy() {
       destroyed = true;
-      pendingSwap = undefined;
       cancelAnimationFrame(raf);
       overlay.remove();
     },

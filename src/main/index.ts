@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
@@ -13,8 +12,8 @@ import { shaderIds, shaderRegistry } from '../renderer/shaders';
 import { withCustomShaders } from '../shared/custom-shaders';
 import { applySoftwareGl } from '../shared/gpu-flags';
 import { PlaybackAudio } from './audio';
-import { rendererQuery, rendererWindowOptions, resolveRendererTarget, startWindowGroupCycling } from './windows';
-import { launchNativeScreensaver, nativeRendererPath, useNativeRenderer } from './native-renderer';
+import { previewWindowOptions, rendererQuery, resolveRendererTarget } from './windows';
+import { launchNativeScreensaver, nativeRendererPath, nativeUnavailableReason } from './native-renderer';
 import { effectRegistry } from '../renderer/effects';
 
 const playbackAudio = new PlaybackAudio();
@@ -25,100 +24,40 @@ if (options.thumbnail) applySoftwareGl(app.commandLine);
 const rendererHtml = path.join(__dirname, '../renderer/index.html');
 const settingsHtml = path.join(__dirname, '../settings/index.html');
 const preload = path.join(__dirname, '../preload/index.js');
-let creatingRenderers = 0;
-let nativeFailed = false;
+/** The service's RestartPreventExitStatus: restarting cannot fix an unsupported session. */
+const UNSUPPORTED_EXIT = 2;
 
 function webPreferences(): Electron.WebPreferences {
   return { preload, contextIsolation: true, nodeIntegration: false, sandbox: true };
 }
 
-async function createRendererWindow(config: Config, bounds: Electron.Rectangle, shaderId: string, preview: boolean, preset?: string): Promise<BrowserWindow> {
-  const window = new BrowserWindow({ ...rendererWindowOptions(config, bounds, preview), webPreferences: webPreferences() });
+/** The windowed `--preview` on the primary display; it shows the saved shader without rotation. */
+async function createPreviewWindow(shaderOverride?: string): Promise<BrowserWindow> {
+  const config = await loadConfig();
+  playbackAudio.setEnabled(config.audio.enabled);
+  const available = withCustomShaders(shaderRegistry, config.customShaders);
+  const { shaderId, preset } = resolveRendererTarget(config, shaderOverride, true, available);
+  const window = new BrowserWindow({ ...previewWindowOptions(screen.getPrimaryDisplay().bounds), webPreferences: webPreferences() });
   window.once('ready-to-show', () => { if (!window.isDestroyed()) window.show(); });
   try { await window.loadFile(rendererHtml, { query: rendererQuery(shaderId, preset) }); }
   catch (error) { window.destroy(); throw error; }
   return window;
 }
 
-/** Electron windows: the windowed preview, and the screensaver where the native renderer is unavailable. */
-async function createRendererWindows(shaderOverride?: string, preview = false): Promise<BrowserWindow[]> {
-  const config = await loadConfig();
-  playbackAudio.setEnabled(config.audio.enabled);
-  const available = withCustomShaders(shaderRegistry, config.customShaders);
-  const { shaderId, preset } = resolveRendererTarget(config, shaderOverride, preview, available);
-  let windows: BrowserWindow[];
-  creatingRenderers += 1;
-  try { windows = await createFullscreenWindows(config, shaderId, preview, preset); }
-  finally { creatingRenderers -= 1; }
-  // Dismissing one output closes the complete screensaver group.
-  if (!preview) for (const window of windows) window.once('closed', () => {
-    for (const other of windows) if (!other.isDestroyed()) other.close();
-  });
-  // Auto-cycle needs an anchor so --open (one-shot) can swap while it runs too.
-  if (!preview && intervalEnabled(config) && windows.length > 0) startWindowGroupCycling(windows, {
-    initial: { shaderId, preset }, config, loadConfig,
-    shaderIds: latest => Object.keys(withCustomShaders(shaderRegistry, latest.customShaders)),
-  });
-  return windows;
-}
-
-/** Start the screensaver: the native layer-shell renderer when possible, otherwise fullscreen windows. */
+/** Start the screensaver in the native layer-shell renderer; there is no other backend. */
 async function launchScreensaver(shaderOverride?: string): Promise<RendererChild> {
   const binary = nativeRendererPath();
-  const wanted = useNativeRenderer(options.backend, false);
-  if (options.backend === 'layer-shell' && (!wanted || !binary)) {
-    throw new Error(wanted ? 'The native renderer is not built; run npm run build:native' : 'The layer-shell backend requires a Linux Wayland session');
-  }
-  if (wanted && binary && (!nativeFailed || options.backend === 'layer-shell')) {
-    const config = await loadConfig();
-    playbackAudio.setEnabled(config.audio.enabled);
-    const registry = (latest: Config) => withCustomShaders(shaderRegistry, latest.customShaders);
-    const target = resolveRendererTarget(config, shaderOverride, false, registry(config));
-    const primary = screen.getPrimaryDisplay();
-    creatingRenderers += 1;
-    try {
-      const saver = await launchNativeScreensaver({
-        binary, config, target, registry, effects: effectRegistry, loadConfig, audio: playbackAudio,
-        output: { name: primary.label, x: primary.bounds.x, y: primary.bounds.y },
-      });
-      console.log('scrnsvr using the native layer-shell renderer');
-      return saver;
-    } catch (error) {
-      if (options.backend === 'layer-shell') throw error;
-      // Remember the failure so later idle launches go straight to the fallback.
-      nativeFailed = true;
-      console.warn('scrnsvr native renderer unavailable; using fullscreen windows', error);
-    } finally { creatingRenderers -= 1; }
-  }
-  return launchWindowGroup(shaderOverride);
-}
-
-async function createFullscreenWindows(config: Config, shaderId: string, preview: boolean, preset?: string): Promise<BrowserWindow[]> {
-  const windows: BrowserWindow[] = [];
-  try {
-    // Keep ownership of every window even when loading another output fails.
-    for (const display of renderDisplays(config, preview)) {
-      windows.push(await createRendererWindow(config, display.bounds, shaderId, preview, preset));
-      if (windows.some(window => window.isDestroyed())) {
-        for (const window of windows) if (!window.isDestroyed()) window.destroy();
-        return [];
-      }
-    }
-    return windows;
-  } catch (error) {
-    for (const window of windows) if (!window.isDestroyed()) window.destroy();
-    throw error;
-  }
-}
-
-/** Preview and single-monitor mode render on the primary display only. */
-function renderDisplays(config: Config, preview: boolean): Electron.Display[] {
-  return preview || config.global.monitors === 'primary' ? [screen.getPrimaryDisplay()] : screen.getAllDisplays();
-}
-
-/** Screensaver mode (`--open`) has no daemon group; cycle its windows directly. */
-function intervalEnabled(config: Config): boolean {
-  return config.rotation.enabled && config.rotation.intervalMinutes > 0;
+  const unavailable = nativeUnavailableReason(binary);
+  if (unavailable || !binary) throw new Error(unavailable);
+  const config = await loadConfig();
+  playbackAudio.setEnabled(config.audio.enabled);
+  const registry = (latest: Config) => withCustomShaders(shaderRegistry, latest.customShaders);
+  const target = resolveRendererTarget(config, shaderOverride, false, registry(config));
+  const primary = screen.getPrimaryDisplay();
+  return launchNativeScreensaver({
+    binary, config, target, registry, effects: effectRegistry, loadConfig, audio: playbackAudio,
+    output: { name: primary.label, x: primary.bounds.x, y: primary.bounds.y },
+  });
 }
 
 async function createSettingsWindow(): Promise<BrowserWindow> {
@@ -149,18 +88,6 @@ async function captureThumbnails(output: string, frames: number): Promise<void> 
   }
 }
 
-async function launchWindowGroup(shaderOverride?: string): Promise<RendererChild> {
-  const windows = await createRendererWindows(shaderOverride);
-  if (!windows.length) throw new Error('Screensaver closed during startup');
-  const emitter = new EventEmitter();
-  let remaining = windows.length;
-  for (const window of windows) window.once('closed', () => {
-    remaining -= 1;
-    if (remaining === 0) { emitter.emit('closed'); emitter.emit('exit'); }
-  });
-  return Object.assign(emitter, { kill: () => windows.forEach((window) => { if (!window.isDestroyed()) window.close(); }) });
-}
-
 function registerIpc(): void {
   ipcMain.handle(IPC.getConfig, () => loadConfig());
   ipcMain.handle(IPC.importNoctaliaColors, () => loadNoctaliaColors());
@@ -189,6 +116,13 @@ function registerIpc(): void {
 }
 
 async function startDaemon(): Promise<void> {
+  // Without a usable renderer every idle launch would fail; stop once instead.
+  const unavailable = nativeUnavailableReason(nativeRendererPath());
+  if (unavailable) {
+    console.error(`scrnsvr daemon cannot run: ${unavailable}`);
+    app.exit(UNSUPPORTED_EXIT);
+    return;
+  }
   const config = await loadConfig();
   const daemon = new IdleDaemon({
     thresholdSeconds: config.global.idleThresholdSeconds,
@@ -226,8 +160,7 @@ async function start(): Promise<void> {
     return;
   }
   if (mode === 'screensaver' && options.preview) {
-    const windows = await createRendererWindows(options.shader, true);
-    if (!windows.length) app.quit();
+    await createPreviewWindow(options.shader);
     return;
   }
   if (mode === 'screensaver') {
@@ -244,5 +177,5 @@ app.whenReady().then(start).catch((error) => {
 });
 
 app.on('window-all-closed', () => {
-  if (!creatingRenderers && !options.daemon && !options.thumbnail) app.quit();
+  if (!options.daemon && !options.thumbnail) app.quit();
 });

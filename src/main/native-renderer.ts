@@ -14,13 +14,14 @@ import { resolveShaderValues } from '../renderer/core/selection';
 import type { ShaderDefinition } from '../renderer/core/runtime';
 import { startCycling, type RendererTarget } from './windows';
 
-export type WindowBackend = 'auto' | 'layer-shell' | 'fullscreen';
 type Registry = Record<string, Pick<ShaderDefinition, 'manifest' | 'source' | 'animationTime'>>;
 type NativeValue = number | number[];
 
-/** The native renderer draws directly into layer-shell surfaces; previews keep Electron windows. */
-export function useNativeRenderer(backend: WindowBackend, preview: boolean, platform = process.platform, env = process.env): boolean {
-  return !preview && backend !== 'fullscreen' && platform === 'linux' && !!env.WAYLAND_DISPLAY;
+/** Why this session cannot run the screensaver, or undefined when it can. Previews stay in Electron. */
+export function nativeUnavailableReason(binary: string | undefined, platform = process.platform, env = process.env): string | undefined {
+  if (platform !== 'linux' || !env.WAYLAND_DISPLAY) return 'The screensaver requires a Linux Wayland session with wlr-layer-shell';
+  if (!binary) return 'The native renderer is not built; run npm run build:native';
+  return undefined;
 }
 
 /** Packaged builds unpack the executable from the ASAR archive. */

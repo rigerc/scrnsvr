@@ -5,7 +5,7 @@ import { ConfigSchema, type Config } from '../src/shared/config';
 import type { EffectDefinition } from '../src/shared/effects';
 import type { ShaderManifest } from '../src/shared/manifest';
 import { withCustomShaders } from '../src/shared/custom-shaders';
-import { buildScenePlan, clockMessage, launchNativeScreensaver, nativeArguments, nativeRendererPath, NativeStartupError, useNativeRenderer, type NativeScreensaverOptions } from '../src/main/native-renderer';
+import { buildScenePlan, clockMessage, launchNativeScreensaver, nativeArguments, nativeRendererPath, NativeStartupError, nativeUnavailableReason, type NativeScreensaverOptions } from '../src/main/native-renderer';
 
 const manifest: ShaderManifest = {
   id: 'waves', title: 'Waves', fragment: 'shader.glsl', uniforms: [
@@ -30,12 +30,12 @@ const effects: Record<string, EffectDefinition> = {
 const config = (value: Record<string, unknown> = {}) => ConfigSchema.parse({ shader: 'waves', clock: { enabled: false }, ...value });
 
 describe('native renderer selection', () => {
-  it('runs on Linux Wayland screensavers unless fullscreen windows are forced', () => {
-    expect(useNativeRenderer('auto', false, 'linux', { WAYLAND_DISPLAY: 'wayland-1' })).toBe(true);
-    expect(useNativeRenderer('auto', false, 'linux', {})).toBe(false);
-    expect(useNativeRenderer('fullscreen', false, 'linux', { WAYLAND_DISPLAY: 'wayland-1' })).toBe(false);
-    expect(useNativeRenderer('layer-shell', true, 'linux', { WAYLAND_DISPLAY: 'wayland-1' })).toBe(false);
-    expect(useNativeRenderer('auto', false, 'darwin', { WAYLAND_DISPLAY: 'wayland-1' })).toBe(false);
+  it('requires a Linux Wayland session and a built renderer', () => {
+    const wayland = { WAYLAND_DISPLAY: 'wayland-1' };
+    expect(nativeUnavailableReason('/bin/r', 'linux', wayland)).toBeUndefined();
+    expect(nativeUnavailableReason('/bin/r', 'linux', {})).toMatch(/Wayland/);
+    expect(nativeUnavailableReason('/bin/r', 'darwin', wayland)).toMatch(/Wayland/);
+    expect(nativeUnavailableReason(undefined, 'linux', wayland)).toMatch(/build:native/);
   });
   it('finds the executable outside the ASAR archive in packaged builds', () => {
     expect(nativeRendererPath('/opt/Scrnsvr/resources/app.asar/dist/main', () => true)).toBe('/opt/Scrnsvr/resources/app.asar.unpacked/dist/native/scrnsvr-renderer');

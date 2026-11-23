@@ -1,7 +1,5 @@
 import type { Config } from '../shared/config';
-import type { BrowserWindow } from 'electron';
 import { pickRotationEntry, rotationEntryKey } from '../shared/rotation';
-import { IPC } from '../shared/ipc';
 
 export interface RendererTarget { shaderId: string; preset?: string; }
 export interface RendererBounds { x: number; y: number; width: number; height: number; }
@@ -17,14 +15,11 @@ export function resolveRendererTarget(config: Config, override: string | undefin
   return { shaderId, preset };
 }
 
-export function rendererWindowOptions(config: Config, bounds: RendererBounds, preview: boolean) {
+/** The windowed `--preview`; the screensaver itself is drawn by the native renderer. */
+export function previewWindowOptions(bounds: RendererBounds) {
   return {
     x: bounds.x, y: bounds.y,
-    width: preview ? 960 : bounds.width,
-    height: preview ? 540 : bounds.height,
-    fullscreen: !preview,
-    kiosk: !preview && config.kiosk,
-    frame: preview,
+    width: 960, height: 540,
     autoHideMenuBar: true,
     show: false,
     backgroundColor: '#000000',
@@ -58,17 +53,4 @@ export function startCycling(options: CyclingOptions & { send: (target: Renderer
   }, intervalMs);
   timer.unref?.();
   return () => clearInterval(timer);
-}
-
-/** Broadcast one choice to the group, excluding its actual initial selection. */
-export function startWindowGroupCycling(windows: BrowserWindow[], options: CyclingOptions): void {
-  const stop = startCycling({ ...options, send: target => {
-    for (const window of windows) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.cycle, { shader: target.shaderId, preset: target.preset });
-    }
-  } });
-  if (!stop) return;
-  for (const window of windows) window.once('closed', () => {
-    if (windows.every(window => window.isDestroyed())) stop();
-  });
 }

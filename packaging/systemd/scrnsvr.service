@@ -8,6 +8,8 @@ Type=simple
 ExecStart=/usr/bin/scrnsvr --daemon
 Restart=on-failure
 RestartSec=5
+# Exit status 2: no Wayland layer-shell session or native renderer.
+RestartPreventExitStatus=2
 Environment=ELECTRON_OZONE_PLATFORM_HINT=auto
 
 [Install]

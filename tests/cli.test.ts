@@ -2,13 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { parseArgs, resolveMode } from '../src/main/cli';
 
 describe('parseArgs', () => {
-  it('selects a window backend and rejects invalid or missing values', () => {
-    expect(parseArgs([]).backend).toBe('auto');
-    expect(parseArgs(['--backend', 'layer-shell']).backend).toBe('layer-shell');
-    expect(parseArgs(['--backend', 'fullscreen']).backend).toBe('fullscreen');
-    expect(() => parseArgs(['--backend', 'bogus'])).toThrow('Invalid backend');
-    expect(() => parseArgs(['--backend'])).toThrow('requires');
-    expect(() => parseArgs(['--backend', '--open'])).toThrow('requires');
+  it('has no window backend choice', () => {
+    expect(parseArgs(['--open'])).not.toHaveProperty('backend');
   });
   it('parses public renderer and settings modes', () => {
     expect(parseArgs(['--settings'])).toMatchObject({ settings: true, daemon: false });

@@ -20,7 +20,7 @@ The settings window connects a live WebGL shader preview with direct controls fo
 
 ## Operating Context
 
-The product runs on Linux desktops as an Electron application. People use the settings window before the screensaver starts; the saver itself can launch fullscreen or in a windowed preview. The app may import desktop colors from Noctalia and may react to playing audio through PulseAudio or PipeWire-Pulse.
+The product runs on Linux Wayland desktops with `wlr-layer-shell`. Electron provides the settings window, previews and idle daemon; the screensaver itself is a native renderer that draws into layer-shell overlays. People use the settings window before the screensaver starts, and can open a shader in a windowed preview. The app may import desktop colors from Noctalia and may react to playing audio through PulseAudio or PipeWire-Pulse.
 
 ## Capabilities and Constraints
 

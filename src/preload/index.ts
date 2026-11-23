@@ -1,13 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, type CyclePick, type ScrnsvrApi, type ScrnsvrAudioApi } from '../shared/ipc';
+import { IPC, type ScrnsvrApi, type ScrnsvrAudioApi } from '../shared/ipc';
 import type { AudioFrame } from '../shared/audio';
 let audioListeners = 0;
-let renderingActive = true;
-const renderingListeners = new Set<(active: boolean) => void>();
-ipcRenderer.on(IPC.renderingActive, (_event, active: boolean) => {
-  renderingActive = active;
-  for (const listener of renderingListeners) listener(active);
-});
 const audioApi: ScrnsvrAudioApi = {
   subscribe: (listener: (frame: AudioFrame) => void) => {
     const handler = (_event: unknown, frame: AudioFrame) => listener(frame);
@@ -24,25 +18,10 @@ const audioApi: ScrnsvrAudioApi = {
 };
 
 const api: ScrnsvrApi = {
-  onRenderingActive: listener => {
-    renderingListeners.add(listener);
-    listener(renderingActive);
-    return () => { renderingListeners.delete(listener); };
-  },
   getConfig: () => ipcRenderer.invoke(IPC.getConfig),
   setConfig: config => ipcRenderer.invoke(IPC.setConfig, config),
   importNoctaliaColors: () => ipcRenderer.invoke(IPC.importNoctaliaColors),
   close: () => ipcRenderer.send(IPC.close),
-  onDismiss: listener => {
-    const handler = () => listener();
-    ipcRenderer.on(IPC.dismiss, handler);
-    return () => ipcRenderer.removeListener(IPC.dismiss, handler);
-  },
-  onCycle: listener => {
-    const handler = (_event: unknown, pick: CyclePick) => listener(pick);
-    ipcRenderer.on(IPC.cycle, handler);
-    return () => ipcRenderer.removeListener(IPC.cycle, handler);
-  },
 };
 
 contextBridge.exposeInMainWorld('scrnsvrAudio', audioApi);

@@ -1,5 +1,5 @@
 // Builds dist/native/scrnsvr-renderer, the layer-shell screensaver renderer.
-// Optional unless --required: without it the screensaver uses fullscreen Electron windows.
+// Optional unless --required: without it settings and previews work, but the screensaver cannot run.
 import { spawnSync } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
 
@@ -39,5 +39,5 @@ try {
   await rm(target, { force: true });
   const message = `Native renderer build failed: ${error.message}\nInstall a C/C++ compiler, pkg-config, wayland-scanner and development headers for wayland-client, wayland-egl, EGL, GLESv2 and pangocairo.`;
   if (required) throw new Error(message);
-  console.warn(`${message}\nContinuing with the fullscreen window backend.`);
+  console.warn(`${message}\nContinuing without it: settings and previews work, but the screensaver cannot run.`);
 }

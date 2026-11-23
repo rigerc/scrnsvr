@@ -140,7 +140,6 @@ export function mountShader(
   const scene = createScene(renderer, shader, values, playback, options);
   let active = true;
   let disposed = false;
-  let hostActive = true;
   let stopLoop: (() => void) | undefined;
   const resize = () => {
     if (!active || disposed) return;
@@ -152,7 +151,7 @@ export function mountShader(
   };
   const observer = new ResizeObserver(resize);
   const updateActivity = () => {
-    const next = hostActive && !document.hidden;
+    const next = !document.hidden;
     if (disposed || active === next) return;
     active = next;
     stopLoop?.();
@@ -164,20 +163,14 @@ export function mountShader(
       stopLoop = startLoop(delta => scene.draw(delta), fps);
     } else scene.suspend();
   };
-  let unsubscribeActivity: (() => void) | undefined;
   try {
     observer.observe(canvas);
     resize();
     stopLoop = startLoop(delta => scene.draw(delta), fps);
     document.addEventListener('visibilitychange', updateActivity);
-    unsubscribeActivity = window.scrnsvr?.onRenderingActive?.(next => {
-      hostActive = next;
-      updateActivity();
-    });
     updateActivity();
   } catch (error) {
     stopLoop?.();
-    unsubscribeActivity?.();
     document.removeEventListener('visibilitychange', updateActivity);
     observer.disconnect();
     scene.dispose();
@@ -186,7 +179,6 @@ export function mountShader(
   return () => {
     disposed = true;
     stopLoop?.();
-    unsubscribeActivity?.();
     document.removeEventListener('visibilitychange', updateActivity);
     observer.disconnect();
     scene.dispose();

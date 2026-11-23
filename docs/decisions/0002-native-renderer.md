@@ -8,7 +8,7 @@ ADR-001 kept rendering in Electron: an offscreen window drew the WebGL scene, an
 
 ## Decision
 
-The screensaver is a standalone native program, `dist/native/scrnsvr-renderer` (`native/renderer/`). It creates one overlay-layer surface per selected output and renders the existing GLSL with OpenGL ES 2 through EGL directly into it. Electron keeps settings, gallery thumbnails, the windowed preview, the idle daemon, and the fullscreen-window fallback for compositors without layer-shell (GNOME, X11) or machines without the native build.
+The screensaver is a standalone native program, `dist/native/scrnsvr-renderer` (`native/renderer/`). It creates one overlay-layer surface per selected output and renders the existing GLSL with OpenGL ES 2 through EGL directly into it. Electron keeps settings, gallery thumbnails, the windowed preview and the idle daemon. The native renderer is the only screensaver backend (see *Fallback removed* below).
 
 The main process stays the source of truth for everything a scene needs. `src/main/native-renderer.ts` resolves presets, color schemes, uniform normalization, custom-shader wrapping, rotation picks, effect layers and clock text with the same TypeScript the Electron renderer uses. It streams the result as JSON lines on the renderer's stdin:
 
@@ -17,7 +17,7 @@ The main process stays the source of truth for everything a scene needs. `src/ma
 - `audio`: playback envelope frames while a reactive scene is on screen
 - `dismiss`
 
-The renderer prints `{"type":"ready"}` once every output has presented a frame. Exit codes before readiness (2 unavailable, 3 initial scene failed) let automatic mode fall back to fullscreen windows. `--backend layer-shell` reports the error instead.
+The renderer prints `{"type":"ready"}` once every output has presented a frame. Exit codes before readiness (2 unavailable, 3 initial scene failed) are reported as launch errors.
 
 ### Presentation
 
@@ -34,9 +34,18 @@ On Wayland, EGL can read compositor events into the default queue during `eglSwa
 
 - Rendering is no longer copied out of Chromium. On the development system, the full screensaver (Electron main process plus renderer) measured 1.2% CPU with an animated scene and clock, down from about 100%.
 - GLSL must compile under the platform GLES driver as well as WebGL. `npm run check-native` compiles every built-in shader and effect pass with the native compiler. `--live` also checks on the real compositor that activation starts transparent, transitions swap behind black, broken scenes are skipped and dismissal restores the desktop.
-- The native build needs `wayland-client`, `wayland-egl`, EGL, GLESv2 and `pangocairo` development files, plus `wayland-scanner`. Without them, `npm run build` continues with fullscreen windows. `npm run dist` requires the native build.
+- The native build needs `wayland-client`, `wayland-egl`, EGL, GLESv2 and `pangocairo` development files, plus `wayland-scanner`. Without them, `npm run build` continues so settings and previews work, but the screensaver cannot run. `npm run dist` requires the native build.
 - Integer output scale determines buffer size, as before. Output hotplug or a scale change closes the screensaver, and the daemon reselects outputs on the next launch.
 - Not yet verified on hardware: real display power-off (the frame-callback design covers it, but no DPMS test was run), multi-monitor and mixed-scale setups, and Mesa drivers.
+
+## Fallback removed (2026-11-23)
+
+The first version kept fullscreen Electron windows as an automatic fallback. A single failed native launch switched the daemon to that fallback until it restarted. Under Hyprland the fallback double-faded: the compositor's window animation faded the desktop into a black window, then the page faded from black into the scene. A 60 fps recording also showed the scene flashing at full strength before the black. The fallback and `--backend` were removed:
+
+- `--open` and idle launches always use the native renderer. A failed launch is logged, and the next idle launch tries the native renderer again.
+- Without `WAYLAND_DISPLAY` or a built renderer, `--open` exits with the reason, and `--daemon` exits with status 2. The systemd unit sets `RestartPreventExitStatus=2`.
+- GNOME, X11 and other compositors without `wlr-layer-shell` are not supported for the screensaver. Settings and `--preview` still run there.
+- The Electron renderer page now serves only the windowed preview and thumbnail capture. Its rotation, dismiss and rendering-activity IPC was removed.
 
 ## Vendored protocols
 

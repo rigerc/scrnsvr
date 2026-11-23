@@ -56,12 +56,11 @@ function mount(integrated: boolean, playback?: { paused: boolean }) {
 }
 
 describe('runtime animation contract', () => {
-  it('stops drawing and audio while inactive, defers resize, and resumes with a fresh loop', () => {
-    let activity!: (active: boolean) => void;
-    const unsubscribe = vi.fn();
-    vi.stubGlobal('scrnsvr', { onRenderingActive: (listener: typeof activity) => {
-      activity = listener; listener(true); return unsubscribe;
-    } });
+  it('stops drawing and audio while hidden, defers resize, and resumes with a fresh loop', () => {
+    let hidden = false;
+    vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
+    const activity = (active: boolean) => { hidden = !active; document.dispatchEvent(new Event('visibilitychange')); };
+    const removeListener = vi.spyOn(document, 'removeEventListener');
     const render = vi.spyOn(Renderer.prototype, 'render');
     const { dispose } = mount(true);
     const audio = vi.spyOn(window.scrnsvrAudio!, 'subscribe');
@@ -83,7 +82,7 @@ describe('runtime animation contract', () => {
     state.tick(100);
     expect(state.uniforms.uTime.value).toBeCloseTo(Number(phase) + 0.2);
     dispose();
-    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(removeListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
     render.mockClear();
     activity(true); state.resize();
     expect(render).not.toHaveBeenCalled();
