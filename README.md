@@ -149,6 +149,19 @@ listener {
 }
 ```
 
+#### Building the native AppImage (rewrite branch)
+
+Requires Rust 1.88+, `curl`, `sha256sum` and the pango/cairo/wayland development packages.
+
+```sh
+npm run dist:native        # or: scripts/build-appimage.sh [--skip-build] [--out dir]
+npm run check:appimage     # smoke test on a live Hyprland session (needs jq, hyprctl, grim)
+```
+
+This writes `release/native/Scrnsvr-<version>-x86_64.AppImage` and `SHA256SUMS-<version>-native.txt`. Packaging uses a pinned `appimagetool` and type2 runtime, cached in `target/appimage-cache` and checked by SHA-256. The AppImage contains only `scrnsvr`, `scrnsvr-renderer`, `scrnsvr-settings`, the desktop entry and the icon; glibc, pango, cairo, glib, fontconfig, freetype, harfbuzz, libxkbcommon, libxcb, Wayland, EGL and Vulkan come from the host. Build releases in an older-glibc environment (for example Ubuntu 22.04) with `SCRNSVR_MAX_GLIBC=2.35`, which fails the build if a binary needs a newer glibc.
+
+Run `./Scrnsvr-<version>-x86_64.AppImage --install` once to link `~/.local/bin/scrnsvr` to it, then `scrnsvr --setup-noctalia`. After replacing the AppImage with a new version, run `--install` again.
+
 ## Shader controls
 
 Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.

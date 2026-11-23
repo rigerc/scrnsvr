@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Scrnsvr
+Comment=Ambient shader screensaver
+Exec=scrnsvr
+Icon=scrnsvr
+Terminal=false
+Categories=Utility;
+StartupWMClass=scrnsvr-settings

@@ -385,6 +385,13 @@ Known gaps before the Rust renderer can become the default:
 - Evidence: 15 crate tests (4 persistence, 7 model, 3 headless app including one widget per manifest control for all 41 visuals, 1 window background); `npm run test:rust` 88 tests, Clippy and rustfmt clean. Release walkthrough on Hyprland: the menu over the preview (about 117 fps), search and favorite, pause held at a fixed frame with one redraw per edit, randomize with a locked control and undo, saved looks create/rename/apply/delete, a real permission error then Retry, relaunch restoring state, reflow at 880 px and stacking at 560 px, no frames while on another workspace, and reduced motion both at startup and switched mid-run.
 - Deviations from DESIGN.md for now: text rows instead of thumbnail tiles (until the thumbnails work), two tabs (Visuals, Saved looks), no light theme. Preview rendering stays on the UI thread (no input lag observed); moving it needs its own thread, Wayland queue and EGL context.
 
+### Milestone 6 (prep): native AppImage
+
+- `scripts/build-appimage.sh` (`npm run dist:native`) builds `release/native/Scrnsvr-<version>-x86_64.AppImage` (19 MB) and its SHA256SUMS with pinned, checksum-verified `appimagetool` 1.9.1 and type2-runtime 20251108, and `SOURCE_DATE_EPOCH` from HEAD (two builds from the same binaries were identical). `AppRun` links to `usr/bin/scrnsvr`, so sibling lookup of the renderer and settings and `$APPIMAGE` for `--install` work unchanged. The desktop entry is `packaging/native/scrnsvr.desktop` (`StartupWMClass=scrnsvr-settings`).
+- Nothing but the three binaries is bundled; host libraries are listed in the README. Built on this machine (glibc 2.44) the floors are 2.34 (renderer), 2.39 (`scrnsvr`, Rust std `pidfd_*`) and 2.44 (`scrnsvr-settings`, libm symbol versions). The 1.0.0 build must run in an older-glibc container with `SCRNSVR_MAX_GLIBC` enforcing the floor; that is not yet tried.
+- `scripts/check-appimage.sh` (`npm run check:appimage`) passed all 20 checks: help, `--daemon` exit 2, `--open` layer and screenshot, second `--open`, `--dismiss`, `--install` and re-install, the linked path, 41 thumbnails, a Noctalia dry run against a fake CLI with no `config-set`, and the settings window opening and closing.
+- Open: the older-glibc release build, CI wiring (fmt, Clippy, tests, AppImage smoke), a clean first run with no config, AppStream metadata and a PNG icon if a launcher needs them, and the 1.0.0 release notes.
+
 ### Not started
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
