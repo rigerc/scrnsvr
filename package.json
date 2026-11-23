@@ -28,6 +28,7 @@
     "render-thumbnails": "npm run build && electron dist/main/index.js --thumbnail --output assets/thumbnails --frames 3",
     "dist": "npm run build -- --require-native && electron-builder --config electron-builder.yml",
     "dist:native": "bash scripts/build-appimage.sh",
+    "dist:native:container": "bash scripts/build-appimage-container.sh",
     "check:appimage": "bash scripts/check-appimage.sh",
     "check-shaders": "npm run build && node scripts/check-shaders.cjs",
     "check-native": "npm run build && node scripts/check-native.cjs",

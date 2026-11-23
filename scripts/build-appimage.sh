@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Build the native scrnsvr AppImage: release/native/Scrnsvr-<version>-x86_64.AppImage
 #
-#   scripts/build-appimage.sh [--skip-build] [--out <dir>]
+#   scripts/build-appimage.sh [--skip-build] [--bin-dir <dir>] [--out <dir>]
+#
+# --bin-dir packages prebuilt binaries from <dir> (implies --skip-build); scripts/build-appimage-container.sh
+# uses it to package binaries built in an Ubuntu 22.04 container.
 #
 # The AppImage bundles only scrnsvr, scrnsvr-renderer, scrnsvr-settings, the desktop entry and the
 # icon. GPU, Wayland, pango/cairo and glib libraries come from the host (see README, "Building the
@@ -22,12 +25,14 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
 skip_build=0
+bin_dir=
 out_dir="$root/release/native"
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-build) skip_build=1 ;;
+    --bin-dir) bin_dir=$(realpath "${2:?--bin-dir needs a directory}"); skip_build=1; shift ;;
     --out) out_dir=$(realpath -m "${2:?--out needs a directory}"); shift ;;
-    -h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "build-appimage: unknown argument $1" >&2; exit 2 ;;
   esac
   shift
@@ -42,7 +47,7 @@ version=$(awk '/^\[workspace\.package\]/ { in_pkg = 1; next } /^\[/ { in_pkg = 0
 if [ "$skip_build" = 0 ]; then
   cargo build --release --locked -p scrnsvr-app -p scrnsvr-settings
 fi
-bin_dir=${CARGO_TARGET_DIR:-$root/target}/release
+: "${bin_dir:=${CARGO_TARGET_DIR:-$root/target}/release}"
 for binary in scrnsvr scrnsvr-renderer scrnsvr-settings; do
   [ -x "$bin_dir/$binary" ] || { echo "build-appimage: missing $bin_dir/$binary" >&2; exit 1; }
 done

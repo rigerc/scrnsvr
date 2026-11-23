@@ -160,6 +160,8 @@ npm run check:appimage     # smoke test on a live Hyprland session (needs jq, hy
 
 This writes `release/native/Scrnsvr-<version>-x86_64.AppImage` and `SHA256SUMS-<version>-native.txt`. Packaging uses a pinned `appimagetool` and type2 runtime, cached in `target/appimage-cache` and checked by SHA-256. The AppImage contains only `scrnsvr`, `scrnsvr-renderer`, `scrnsvr-settings`, the desktop entry and the icon; glibc, pango, cairo, glib, fontconfig, freetype, harfbuzz, libxkbcommon, libxcb, Wayland, EGL and Vulkan come from the host. Build releases in an older-glibc environment (for example Ubuntu 22.04) with `SCRNSVR_MAX_GLIBC=2.35`, which fails the build if a binary needs a newer glibc.
 
+For a release, build in an Ubuntu 22.04 container instead so the AppImage starts on glibc 2.35 and newer: `npm run dist:native:container` (or `bash scripts/build-appimage-container.sh [--out <dir>]`). It needs podman or docker and git, builds a reusable builder image from `packaging/native/Containerfile.builder` (Ubuntu 22.04 pinned by digest, Rust 1.99.1 via rustup), exports the committed `HEAD` with `git archive` (uncommitted changes are not built), keeps the cargo cache and build output under `target/` so reruns take seconds, and fails if any binary needs a glibc symbol newer than 2.35. Verify the result with `bash scripts/check-appimage.sh <AppImage>`.
+
 Run `./Scrnsvr-<version>-x86_64.AppImage --install` once to link `~/.local/bin/scrnsvr` to it, then `scrnsvr --setup-noctalia`. After replacing the AppImage with a new version, run `--install` again.
 
 ## Shader controls
