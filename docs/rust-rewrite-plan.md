@@ -440,6 +440,12 @@ Done 2026-11-23 on the rewrite branch. Nothing is tagged or published; the maint
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5), and the Orca and IME checks of the settings app.
 - Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
+### Release 1.0.0 (2026-11-23)
+
+- The release AppImage was built in the Ubuntu 22.04 container from the cutover commit (glibc floors 2.34, 2.34, 2.35) and passed all 20 `check-appimage.sh` steps.
+- Applied to the maintainer's session: `scrnsvr --install` (link to `~/.local/share/scrnsvr/Scrnsvr-x86_64.AppImage`), `scrnsvr --setup-noctalia --apply` (the existing `screensaver` behavior now runs `~/.local/bin/scrnsvr --open`, `pre_action_fade_seconds` 2.0 → 0.0), and the top-right hot corner pointed at the same command. Noctalia's settings were backed up first. Noctalia 5.5 kept the old command in memory until `noctalia msg config-reload`.
+- A real Noctalia-triggered activation recorded at 60 fps (timeout temporarily 20 s, then restored to 600 s): luma flat for the second before activation (no tint stage), then one monotonic fade to the scene. A short pause of about 10 frames near the start of the fade (about 4 frames when launched directly) is listed as a known limit.
+
 ## Technical references
 
 - [Current native renderer design](decisions/0002-native-renderer.md)
