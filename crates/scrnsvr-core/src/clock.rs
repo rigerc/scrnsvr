@@ -100,7 +100,8 @@ impl Default for ClockConfig {
     }
 }
 
-pub(crate) fn valid_pattern(pattern: &str) -> bool {
+/// Whether `pattern` is a non-empty strftime pattern that chrono can format.
+pub fn valid_pattern(pattern: &str) -> bool {
     format_pattern(pattern, &DateTime::UNIX_EPOCH).is_some()
 }
 

@@ -1,33 +1,11 @@
-use std::env;
 use std::fs;
 use std::io;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::Result;
 
-pub fn bin_link() -> Result<PathBuf> {
-    let bin = env::var_os("XDG_BIN_HOME").filter(|path| !path.is_empty()).map(PathBuf::from);
-    let bin = match bin {
-        Some(bin) => bin,
-        None => PathBuf::from(env::var_os("HOME").ok_or("HOME is unset; set XDG_BIN_HOME to install scrnsvr")?).join(".local/bin"),
-    };
-    Ok(std::path::absolute(bin)?.join("scrnsvr"))
-}
-
-pub fn current_distribution() -> Result<PathBuf> {
-    match env::var_os("APPIMAGE").filter(|path| !path.is_empty()) {
-        Some(path) => Ok(std::path::absolute(path)?),
-        None => Ok(env::current_exe()?),
-    }
-}
-
-pub fn is_scrnsvr_executable(path: &Path) -> bool {
-    path.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
-        let name = name.to_ascii_lowercase();
-        name == "scrnsvr" || (name.starts_with("scrnsvr-") && name.ends_with(".appimage"))
-    })
-}
+pub use scrnsvr_core::noctalia::{bin_link, current_distribution, is_scrnsvr_executable};
 
 pub fn install(link: &Path, target: &Path, force: bool) -> Result<bool> {
     let dir = link.parent().ok_or("Cannot determine the install directory")?;

@@ -82,6 +82,8 @@ pub struct PreviewSurface {
     next_clock_check: Option<Instant>,
     dirty: bool,
     pub diagnostic: Option<String>,
+    /// Effect layers of the mounted scene that failed to compile and are skipped.
+    pub skipped_layers: Vec<String>,
     placement: Placement,
     last_frame: Option<Instant>,
     paused: bool,
@@ -139,6 +141,7 @@ impl PreviewSurface {
             next_clock_check: None,
             dirty: true,
             diagnostic: None,
+            skipped_layers: Vec::new(),
             placement: Placement::default(),
             last_frame: None,
             paused: false,
@@ -245,10 +248,18 @@ impl PreviewSurface {
         }
         let renderer = self.renderer.as_mut().expect("created above");
         if let Some(scene) = self.next_scene.take() {
-            let same_program = self
-                .scene
-                .as_ref()
-                .is_some_and(|current| current.key == scene.key && current.source == scene.source && current.effects == scene.effects);
+            // Edits to a uniform of the base shader or of an effect layer keep the mounted programs,
+            // histories and clocks. Anything structural mounts the scene again.
+            let same_program = self.scene.as_ref().is_some_and(|current| {
+                current.key == scene.key
+                    && current.source == scene.source
+                    && current.effects.len() == scene.effects.len()
+                    && current
+                        .effects
+                        .iter()
+                        .zip(&scene.effects)
+                        .all(|(old, new)| old.id == new.id && old.passes == new.passes && old.history == new.history)
+            });
             if same_program {
                 let current = self.scene.as_ref().expect("matched a scene");
                 for (name, value) in &scene.uniforms {
@@ -256,11 +267,25 @@ impl PreviewSurface {
                         renderer.set_uniform(name, value.clone());
                     }
                 }
+                for (old, new) in current.effects.iter().zip(&scene.effects) {
+                    for (name, value) in &new.uniforms {
+                        if !old.uniforms.iter().any(|(old_name, old)| old_name == name && old == value) {
+                            renderer.set_effect_uniform(&new.id, name, value.clone());
+                        }
+                    }
+                }
                 self.scene = Some(scene);
                 self.diagnostic = None;
             } else {
                 match renderer.set_scene(&scene) {
                     Ok(()) => {
+                        let mounted = renderer.layer_ids();
+                        self.skipped_layers = scene
+                            .effects
+                            .iter()
+                            .filter(|effect| !mounted.contains(&effect.id.as_str()))
+                            .map(|effect| effect.id.clone())
+                            .collect();
                         self.scene = Some(scene);
                         self.diagnostic = None;
                         self.last_frame = None;

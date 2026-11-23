@@ -235,6 +235,19 @@ impl Renderer {
         }
     }
 
+    /// Change one uniform of a mounted effect layer without recompiling, for live settings edits.
+    /// The layer's history, the effect clock and the base shader's clock are untouched. Unknown
+    /// layers (including ones skipped at compile time) are ignored.
+    pub fn set_effect_uniform(&mut self, layer: &str, name: &str, value: UniformValue) {
+        let Some(layer) = self.scene.as_mut().and_then(|scene| scene.layers.iter_mut().find(|candidate| candidate.id == layer)) else {
+            return;
+        };
+        match layer.uniforms.iter_mut().find(|(existing, _)| existing == name) {
+            Some(slot) => slot.1 = value,
+            None => layer.uniforms.push((name.to_owned(), value)),
+        }
+    }
+
     /// Effect layer ids that compiled for the current scene, in order.
     pub fn layer_ids(&self) -> Vec<&str> {
         self.scene.as_ref().map(|scene| scene.layers.iter().map(|layer| layer.id.as_str()).collect()).unwrap_or_default()

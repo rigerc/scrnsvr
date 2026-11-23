@@ -8,24 +8,24 @@ use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use scrnsvr_core::catalog::{ShaderValues, UniformKind};
 
-use crate::app::{LookAction, Settings};
-use crate::controls::Control;
+use crate::app::{Settings, Tab};
+use crate::controls::{Control, Target};
 use crate::model::{self, RandomScope};
 use crate::preview::Placement;
 
-const CANVAS: u32 = 0x171819;
-const SURFACE: u32 = 0x191a1b;
-const PREVIEW_SURFACE: u32 = 0x1a1b1c;
-const RAISED: u32 = 0x222425;
-const CONTROL: u32 = 0x252728;
-const LINE: u32 = 0x343738;
-const STRONG_LINE: u32 = 0x505455;
-const INK: u32 = 0xebe9e2;
-const MUTED: u32 = 0xb6b5ae;
-const QUIET: u32 = 0x959892;
-const SIGNAL: u32 = 0xef7b4d;
-const SIGNAL_HOVER: u32 = 0xff976d;
-const SAVED: u32 = 0x85c6a1;
+pub(crate) const CANVAS: u32 = 0x171819;
+pub(crate) const SURFACE: u32 = 0x191a1b;
+pub(crate) const PREVIEW_SURFACE: u32 = 0x1a1b1c;
+pub(crate) const RAISED: u32 = 0x222425;
+pub(crate) const CONTROL: u32 = 0x252728;
+pub(crate) const LINE: u32 = 0x343738;
+pub(crate) const STRONG_LINE: u32 = 0x505455;
+pub(crate) const INK: u32 = 0xebe9e2;
+pub(crate) const MUTED: u32 = 0xb6b5ae;
+pub(crate) const QUIET: u32 = 0x959892;
+pub(crate) const SIGNAL: u32 = 0xef7b4d;
+pub(crate) const SIGNAL_HOVER: u32 = 0xff976d;
+pub(crate) const SAVED: u32 = 0x85c6a1;
 
 pub fn init_theme(cx: &mut App) {
     Theme::change(ThemeMode::Dark, None, cx);
@@ -63,15 +63,20 @@ pub fn init_theme(cx: &mut App) {
     });
 }
 
-fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
+pub(crate) fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
     Button::new(id).small().outline().label(label)
 }
 
-fn label(text: impl Into<SharedString>) -> Div {
+pub(crate) fn label(text: impl Into<SharedString>) -> Div {
     div().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(MUTED)).child(text.into())
 }
 
-fn note(text: impl Into<SharedString>) -> Div {
+/// A live-region line: assistive technology announces changes to its text.
+pub(crate) fn status(id: impl Into<ElementId>) -> Stateful<Div> {
+    div().id(id).role(Role::Status)
+}
+
+pub(crate) fn note(text: impl Into<SharedString>) -> Div {
     div().text_size(px(13.)).text_color(rgb(MUTED)).child(text.into())
 }
 
@@ -102,7 +107,8 @@ impl Render for Settings {
             .filter(|ratio| ratio.is_finite() && *ratio > 0.)
             .unwrap_or(16. / 9.);
         let stage_width = (stage_column_width - 40.).clamp(1., 1100.);
-        let stage_height = (stage_width / display_aspect).min((top_height - 155.).max(120.));
+        let reserved = if self.tab == Tab::Looks { 380. } else { 155. };
+        let stage_height = (stage_width / display_aspect).min((top_height - reserved).max(120.));
         let stage_width = stage_width.min(stage_height * display_aspect);
 
         let menu_width = (bank_width + 160.).min(width - 40.).max(200.);
@@ -153,29 +159,54 @@ impl Render for Settings {
 
 impl Settings {
     fn header(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let tabs = [("Visuals", false), ("Saved looks", true)].map(|(name, looks)| {
-            let active = self.show_looks == looks;
+        let tabs = Tab::ALL.map(|tab| {
+            let active = self.tab == tab;
             div()
                 .h_full()
                 .flex()
+                .flex_none()
                 .items_center()
                 .border_b_2()
                 .border_color(if active { rgb(SIGNAL).into() } else { transparent_black() })
                 .child(
-                    button(name, name)
+                    button(("tab", tab as usize), tab.title())
                         .custom(
                             ButtonCustomVariant::new(cx)
                                 .foreground(rgb(if active { SIGNAL } else { MUTED }).into())
                                 .hover(rgb(RAISED).into()),
                         )
                         .selected(active)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.show_looks = looks;
-                            this.inspector_scroll.set_offset(point(px(0.), px(0.)));
-                            cx.notify();
-                        })),
+                        .toggled(active)
+                        .track_focus(&self.tab_focus[tab as usize])
+                        // Roving focus: only the selected tab is reached with Tab. Arrow keys move along the row.
+                        .tab_stop(active)
+                        .on_click(cx.listener(move |this, _, window, cx| this.show_tab(tab, window, cx))),
                 )
         });
+        let tab_row = h_flex()
+            .id("tabs")
+            .role(Role::TabList)
+            .h_full()
+            .min_w_0()
+            .gap(if compact { px(2.) } else { px(12.) })
+            .overflow_x_scroll()
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                let current = this.tab;
+                let next = match event.keystroke.key.as_str() {
+                    "left" => current.offset(-1),
+                    "right" => current.offset(1),
+                    "home" => Tab::Visuals,
+                    "end" => Tab::Settings,
+                    _ => return,
+                };
+                // Only react while a tab itself has focus, not controls inside the panel.
+                if !this.tab_focus.iter().any(|handle| handle.is_focused(window)) {
+                    return;
+                }
+                this.step_tab(next, window, cx);
+                cx.stop_propagation();
+            }))
+            .children(tabs);
         let failed = self.config_save.error.is_some();
         let status = if self.config_save.pending() {
             "Saving…"
@@ -188,16 +219,17 @@ impl Settings {
             .h(px(54.))
             .flex_none()
             .justify_between()
-            .px(if compact { px(10.) } else { px(20.) })
+            .px(if compact { px(8.) } else { px(20.) })
             .border_b_1()
             .border_color(rgb(LINE))
             .bg(rgb(CANVAS))
             .child(
                 h_flex()
                     .h_full()
-                    .gap(if compact { px(8.) } else { px(24.) })
-                    .child(div().text_size(px(17.)).font_weight(FontWeight::SEMIBOLD).child("scrnsvr"))
-                    .children(tabs),
+                    .min_w_0()
+                    .gap(if compact { px(6.) } else { px(24.) })
+                    .when(!compact, |this| this.child(div().text_size(px(17.)).font_weight(FontWeight::SEMIBOLD).child("scrnsvr")))
+                    .child(tab_row),
             )
             .child(
                 h_flex()
@@ -452,11 +484,19 @@ impl Settings {
                             })),
                     )
                     .children(self.preview_error.clone().map(note))
+                    .children(
+                        self.effect_warnings()
+                            .into_iter()
+                            .map(|warning| status("effect-warning").text_size(px(13.)).text_color(rgb(SIGNAL_HOVER)).child(warning)),
+                    )
                     .children(self.config_save.error.as_ref().map(|error| note(format!("Your edits are still here. {error}"))))
                     .when(self.close_after_save && (self.config_save.error.is_some() || self.ui_save.error.is_some()), |this| {
                         this.child(button("discard-and-close", "Close without saving").on_click(|_, window, _| window.remove_window()))
                     })
-                    .when(self.warning_details, |this| this.children(self.load_warnings.iter().cloned().map(note))),
+                    .when(self.warning_details, |this| this.children(self.load_warnings.iter().cloned().map(note)))
+                    .when(self.tab == Tab::Looks, |this| {
+                        this.child(div().pt_3().border_t_1().border_color(rgb(LINE)).child(self.looks_workspace(cx)))
+                    }),
             );
         v_flex()
             .size_full()
@@ -477,51 +517,63 @@ impl Settings {
     }
 
     fn inspector(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let heading = match self.tab {
+            Tab::Visuals => "INSPECTOR",
+            Tab::Effects => "GLOBAL EFFECTS",
+            Tab::Looks => "SHUFFLE",
+            Tab::Clock => "CLOCK OVERLAY",
+            Tab::Settings => "SETTINGS",
+        };
+        let body = match self.tab {
+            Tab::Visuals => self.visuals_inspector(cx).into_any_element(),
+            Tab::Effects => self.effects_panel(cx).into_any_element(),
+            Tab::Looks => self.shuffle_panel(cx).into_any_element(),
+            Tab::Clock => self.clock_panel(cx).into_any_element(),
+            Tab::Settings => self.system_panel(cx).into_any_element(),
+        };
+        v_flex().size_full().p_4().gap_3().bg(rgb(SURFACE)).border_l_1().border_color(rgb(LINE)).child(label(heading)).child(
+            v_flex()
+                .id("inspector-scroll")
+                .track_scroll(&self.inspector_scroll)
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .gap_4()
+                .px_1()
+                .pb_2()
+                .child(body),
+        )
+    }
+
+    fn visuals_inspector(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let values = self.model.effective();
         let has_controls = !self.controls.is_empty();
         v_flex()
-            .size_full()
-            .p_4()
-            .gap_3()
-            .bg(rgb(SURFACE))
-            .border_l_1()
-            .border_color(rgb(LINE))
-            .child(label(if self.show_looks { "SAVED LOOKS" } else { "INSPECTOR" }))
-            .child(
-                v_flex()
-                    .id("inspector-scroll")
-                    .track_scroll(&self.inspector_scroll)
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .gap_4()
-                    .px_1()
-                    .pb_2()
-                    .when(self.show_looks, |this| this.child(self.looks(cx)))
-                    .when(!self.show_looks && !has_controls, |this| this.child(note("This visual has no adjustable parameters.")))
-                    .when(!self.show_looks && has_controls, |this| {
-                        this.child(self.control_toolbar(cx))
-                            .children(["Motion", "Shape", "Color"].into_iter().filter_map(|group| self.control_group(group, &values, cx)))
-                            .when(self.controls.iter().any(|control| control.def.advanced), |this| {
-                                this.child(
-                                    button("advanced", if self.advanced { "Hide advanced" } else { "Advanced" })
-                                        .selected(self.advanced)
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.advanced = !this.advanced;
-                                            cx.notify();
-                                        })),
-                                )
-                                .when(self.advanced, |this| {
-                                    this.children(
-                                        self.controls
-                                            .iter()
-                                            .filter(|control| control.def.advanced && model::visible(&control.def, &values))
-                                            .map(|control| self.control_row(control, &values, cx)),
-                                    )
-                                })
-                            })
-                    }),
-            )
+            .gap_4()
+            .when(!has_controls, |this| this.child(note("This visual has no adjustable parameters.")))
+            .when(has_controls, |this| {
+                this.child(self.control_toolbar(cx))
+                    .children(["Motion", "Shape", "Color"].into_iter().filter_map(|group| self.control_group(group, &values, cx)))
+                    .when(self.controls.iter().any(|control| control.def.advanced), |this| {
+                        this.child(
+                            button("advanced", if self.advanced { "Hide advanced" } else { "Advanced" }).selected(self.advanced).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.advanced = !this.advanced;
+                                    cx.notify();
+                                }),
+                            ),
+                        )
+                        .when(self.advanced, |this| {
+                            this.children(
+                                self.controls
+                                    .iter()
+                                    .filter(|control| control.def.advanced && model::visible(&control.def, &values))
+                                    .map(|control| self.control_row(control, &values, cx)),
+                            )
+                        })
+                    })
+            })
+            .child(self.color_section(cx))
     }
 
     fn control_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
@@ -570,7 +622,11 @@ impl Settings {
                                 cx.notify();
                             }),
                         ),
-                    ),
+                    )
+                    .child(button("open-save-look", "Save look").on_click(cx.listener(|this, _, window, cx| {
+                        this.show_tab(Tab::Looks, window, cx);
+                        this.look_name.update(cx, |state, cx| state.focus(window, cx));
+                    }))),
             )
     }
 
@@ -611,7 +667,9 @@ impl Settings {
             .id((ElementId::from("uniform"), name.clone()))
             .flex_none()
             .gap_1()
-            .on_action(cx.listener(move |this, event: &Escape, window, cx| this.cancel_control_edit(&escape_name, event, window, cx)))
+            .on_action(cx.listener(move |this, event: &Escape, window, cx| {
+                this.cancel_control_edit(&Target::Shader, &escape_name, event, window, cx)
+            }))
             .child(
                 h_flex()
                     .gap_2()
@@ -641,100 +699,13 @@ impl Settings {
                     ),
             )
             .children(def.description.clone().map(note))
-            .child(control.element(&values[&def.name], cx))
+            .child(control.element(&values[&def.name], false, cx))
             .children(color_source.map(|source| div().text_xs().text_color(rgb(QUIET)).child(source)))
             .children(
-                self.selected_control_error
+                self.control_error
                     .as_ref()
-                    .filter(|(name, _)| *name == def.name)
-                    .map(|(_, error)| div().text_xs().text_color(rgb(SIGNAL_HOVER)).child(error.clone())),
+                    .filter(|(key, name, _)| *key == Target::Shader.key() && *name == def.name)
+                    .map(|(_, _, error)| div().text_xs().text_color(rgb(SIGNAL_HOVER)).child(error.clone())),
             )
-    }
-
-    fn looks(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
-        let confirm = match &self.look_action {
-            Some(LookAction::Delete(name)) => Some(format!("Delete “{name}”? This also removes any shuffle entry for this look.")),
-            Some(LookAction::Overwrite(name)) => Some(format!("Update “{name}” with the current edits?")),
-            _ => None,
-        };
-        let confirming = confirm.is_some();
-        let submit = match &self.look_action {
-            Some(LookAction::Delete(_)) => "Delete look",
-            Some(LookAction::Overwrite(_)) => "Update look",
-            Some(LookAction::Rename(_)) => "Save name",
-            None => "Save look",
-        };
-        let rows: Vec<_> = self.model.looks().cloned().collect();
-        v_flex()
-            .id("looks")
-            .gap_4()
-            .flex_none()
-            .on_action(cx.listener(|this, _: &Escape, window, cx| {
-                this.cancel_look(window, cx);
-                this.look_name.update(cx, |state, cx| state.focus(window, cx));
-            }))
-            .child(div().text_lg().child(self.model.visual().title.clone()))
-            .child(
-                v_flex()
-                    .gap_2()
-                    .children(confirm.map(note))
-                    .when(!confirming, |this| this.child(Input::new(&self.look_name).small().aria_label("Look name")))
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(
-                                button("save-look", submit)
-                                    .track_focus(&self.look_confirm_focus)
-                                    .on_click(cx.listener(|this, _, window, cx| this.submit_look(window, cx))),
-                            )
-                            .when(self.look_action.is_some(), |this| {
-                                this.child(button("cancel-look", "Cancel").ghost().on_click(cx.listener(|this, _, window, cx| {
-                                    this.cancel_look(window, cx);
-                                    this.look_name.update(cx, |state, cx| state.focus(window, cx));
-                                })))
-                            }),
-                    )
-                    .children(self.look_message.clone().map(note)),
-            )
-            .when(rows.is_empty(), |this| this.child(note("Adjust this visual, then save a look to keep those settings.")))
-            .children(rows.into_iter().map(|name| {
-                let apply = name.clone();
-                let rename = name.clone();
-                let delete = name.clone();
-                let key = SharedString::from(name.clone());
-                v_flex()
-                    .flex_none()
-                    .gap_2()
-                    .pt_2()
-                    .border_t_1()
-                    .border_color(rgb(LINE))
-                    .child(div().font_weight(FontWeight::MEDIUM).child(name))
-                    .child(
-                        h_flex()
-                            .flex_wrap()
-                            .gap_2()
-                            .child(button((ElementId::from("apply"), key.clone()), "Apply").on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    if this.model.apply_look(&apply) {
-                                        this.finish_bulk_edit(window, cx);
-                                    }
-                                    this.look_message = Some(format!("Applied “{apply}”."));
-                                    cx.notify();
-                                },
-                            )))
-                            .child(button((ElementId::from("rename"), key.clone()), "Rename").ghost().on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    this.start_look_action(LookAction::Rename(rename.clone()), window, cx);
-                                    this.inspector_scroll.set_offset(point(px(0.), px(0.)));
-                                },
-                            )))
-                            .child(button((ElementId::from("delete"), key), "Delete").ghost().on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    this.start_look_action(LookAction::Delete(delete.clone()), window, cx);
-                                    this.inspector_scroll.set_offset(point(px(0.), px(0.)));
-                                },
-                            ))),
-                    )
-            }))
     }
 }

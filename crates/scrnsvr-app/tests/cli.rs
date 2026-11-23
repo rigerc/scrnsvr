@@ -2,7 +2,36 @@ use std::env;
 use std::fs;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Command, ExitStatus, Output};
+
+/// Executables written by a test can be briefly busy ("Text file busy") when another test thread
+/// forks while the file is open for writing. Retrying the spawn is the standard remedy.
+trait Retrying {
+    fn output_retrying(&mut self) -> Output;
+    fn status_retrying(&mut self) -> ExitStatus;
+}
+
+fn retry<T>(mut spawn: impl FnMut() -> std::io::Result<T>) -> T {
+    for _ in 0..50 {
+        match spawn() {
+            Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                std::thread::sleep(std::time::Duration::from_millis(20))
+            }
+            result => return result.unwrap(),
+        }
+    }
+    spawn().unwrap()
+}
+
+impl Retrying for Command {
+    fn output_retrying(&mut self) -> Output {
+        retry(|| self.output())
+    }
+
+    fn status_retrying(&mut self) -> ExitStatus {
+        retry(|| self.status())
+    }
+}
 
 fn cli() -> Command {
     Command::new(env!("CARGO_BIN_EXE_scrnsvr"))
@@ -68,7 +97,7 @@ resume_command = ''
 fn noctalia_dry_run_reuses_screensaver_and_keeps_the_existing_timeout() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let output = fixture(root, EXISTING_IDLE).args(["--setup-noctalia"]).output().unwrap();
+    let output = fixture(root, EXISTING_IDLE).args(["--setup-noctalia"]).output_retrying();
     let output = assert_success(&output);
     assert!(output.contains("idle.behavior.screensaver.command"));
     assert!(output.contains("Scrnsvr-0.5.0.AppImage --open"));
@@ -97,7 +126,7 @@ fn noctalia_apply_uses_installed_link_and_updates_only_changed_settings() {
         .replace("enabled = false", "enabled = true")
         .replace("timeout = 742.5", "timeout = 55.25");
     fs::write(root.join("result"), updated).unwrap();
-    let output = command.args(["--setup-noctalia", "--apply", "--timeout", "55.25"]).output().unwrap();
+    let output = command.args(["--setup-noctalia", "--apply", "--timeout", "55.25"]).output_retrying();
     assert!(assert_success(&output).contains("Noctalia idle settings after setup"));
     assert_eq!(
         fs::read_to_string(root.join("calls")).unwrap(),
@@ -121,7 +150,7 @@ fn noctalia_apply_creates_a_behavior_and_appends_it_to_the_order() {
         ),
     )
     .unwrap();
-    let output = command.args(["--setup-noctalia", "--apply"]).output().unwrap();
+    let output = command.args(["--setup-noctalia", "--apply"]).output_retrying();
     assert_success(&output);
     let calls = fs::read_to_string(root.join("calls")).unwrap();
     let mut calls = calls.lines();
@@ -137,15 +166,15 @@ fn noctalia_apply_creates_a_behavior_and_appends_it_to_the_order() {
 #[test]
 fn reports_missing_or_inactive_noctalia_and_removed_daemon() {
     let temp = tempfile::tempdir().unwrap();
-    let missing = cli().args(["--setup-noctalia"]).env("PATH", temp.path()).output().unwrap();
+    let missing = cli().args(["--setup-noctalia"]).env("PATH", temp.path()).output_retrying();
     assert_eq!(missing.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&missing.stderr).contains("Noctalia is unavailable"));
     let mut inactive = fixture(temp.path(), EXISTING_IDLE);
     fs::write(temp.path().join("fake-bin/noctalia"), "#!/bin/sh\nprintf 'no shell running' >&2\nexit 1\n").unwrap();
-    let inactive = inactive.args(["--setup-noctalia"]).output().unwrap();
+    let inactive = inactive.args(["--setup-noctalia"]).output_retrying();
     assert_eq!(inactive.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&inactive.stderr).contains("no shell running"));
-    let daemon = cli().arg("--daemon").output().unwrap();
+    let daemon = cli().arg("--daemon").output_retrying();
     assert_eq!(daemon.status.code(), Some(2));
     let error = String::from_utf8_lossy(&daemon.stderr);
     assert!(error.contains("--setup-noctalia"));
@@ -175,7 +204,7 @@ fn settings_launch_next_to_the_executable_with_and_without_arguments() {
         let marker = temp.path().join("launched");
         let _ = fs::remove_file(&marker);
         let status =
-            isolated_clean(temp.path(), &format!("echo \"$#\" > '{}'; exit 7", marker.display()), "exit 0").args(args).status().unwrap();
+            isolated_clean(temp.path(), &format!("echo \"$#\" > '{}'; exit 7", marker.display()), "exit 0").args(args).status_retrying();
         assert_eq!(status.code(), Some(7), "the settings exit status is propagated for {args:?}");
         assert_eq!(fs::read_to_string(&marker).unwrap().trim(), "0", "settings receive no arguments");
     }
@@ -197,15 +226,14 @@ fn open_reports_a_missing_renderer_and_missing_wayland_with_exit_one() {
         .arg("--open")
         .env("PATH", temp.path())
         .env("XDG_RUNTIME_DIR", temp.path().join("runtime"))
-        .output()
-        .unwrap();
+        .output_retrying();
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("scrnsvr-renderer is unavailable"));
 
-    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").output().unwrap();
+    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").output_retrying();
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("Cannot connect to Wayland"));
-    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").env_remove("XDG_RUNTIME_DIR").output().unwrap();
+    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").env_remove("XDG_RUNTIME_DIR").output_retrying();
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("XDG_RUNTIME_DIR"));
 }
@@ -225,7 +253,7 @@ fn hold_saver_lock(root: &Path) -> fs::File {
 fn second_open_exits_zero_while_the_saver_lock_is_held() {
     let temp = tempfile::tempdir().unwrap();
     let _lock = hold_saver_lock(temp.path());
-    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").output().unwrap();
+    let output = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--open").output_retrying();
     assert_eq!(output.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&output.stderr).contains("already running"));
 }
@@ -233,9 +261,9 @@ fn second_open_exits_zero_while_the_saver_lock_is_held() {
 #[test]
 fn dismiss_exits_zero_without_a_saver_and_signals_the_lock_holder() {
     let temp = tempfile::tempdir().unwrap();
-    assert_eq!(isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").status().unwrap().code(), Some(0));
+    assert_eq!(isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").status_retrying().code(), Some(0));
     assert_eq!(
-        isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").env_remove("XDG_RUNTIME_DIR").status().unwrap().code(),
+        isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").env_remove("XDG_RUNTIME_DIR").status_retrying().code(),
         Some(0)
     );
 
@@ -254,7 +282,7 @@ fn dismiss_exits_zero_without_a_saver_and_signals_the_lock_holder() {
     while !dir.join("saver.pid").exists() && std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
-    let status = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").status().unwrap();
+    let status = isolated_clean(temp.path(), "exit 0", "exit 0").arg("--dismiss").status_retrying();
     assert_eq!(status.code(), Some(0));
     assert!(holder.wait().unwrap().success());
     assert_eq!(fs::read_to_string(marker).unwrap().trim(), "usr1");
@@ -275,7 +303,7 @@ fn install_links_the_appimage_or_current_executable_and_protects_other_files() {
         if force {
             command.arg("--force");
         }
-        command.output().unwrap()
+        command.output_retrying()
     };
     assert!(assert_success(&run(false, Some(&appimage))).starts_with("Linked"));
     assert_eq!(fs::read_link(bin_home.join("scrnsvr")).unwrap(), appimage);
@@ -308,8 +336,7 @@ fn thumbnail_reports_each_failed_shader_without_retrying_and_exits_nonzero() {
     let output = isolated_clean(temp.path(), "exit 0", &renderer)
         .args(["--thumbnail", "--frames", "2", "--output"])
         .arg(&output_dir)
-        .output()
-        .unwrap();
+        .output_retrying();
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("scrnsvr thumbnail flow-field: renderer returned"), "{stderr}");

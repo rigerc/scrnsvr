@@ -385,6 +385,15 @@ Known gaps before the Rust renderer can become the default:
 - Evidence: 15 crate tests (4 persistence, 7 model, 3 headless app including one widget per manifest control for all 41 visuals, 1 window background); `npm run test:rust` 88 tests, Clippy and rustfmt clean. Release walkthrough on Hyprland: the menu over the preview (about 117 fps), search and favorite, pause held at a fixed frame with one redraw per edit, randomize with a locked control and undo, saved looks create/rename/apply/delete, a real permission error then Retry, relaunch restoring state, reflow at 880 px and stacking at 560 px, no frames while on another workspace, and reduced motion both at startup and switched mid-run.
 - Deviations from DESIGN.md for now: text rows instead of thumbnail tiles (until the thumbnails work), two tabs (Visuals, Saved looks), no light theme. Preview rendering stays on the UI thread (no input lag observed); moving it needs its own thread, Wayland queue and EGL context.
 
+### Milestone 5 (part 2): remaining settings tabs
+
+- Effects, Looks & Shuffle, Clock and Settings tabs in `scrnsvr-settings` (`effects_tab`, `looks_tab`, `clock_tab`, `system_tab`, `idle_ui`) on GPUI-free models under `model/` (effects, rotation, clock, colors). One `Control` widget set edits shader, effect-layer, clock and global values. Tabs use roving focus (Left/Right/Home/End).
+- Effects: global stack of up to eight layers with stable IDs, add/remove/reorder (buttons, Alt+Up/Down), per-layer and global enable, manifest controls; unavailable effects are kept, skipped and flagged. `Renderer::set_effect_uniform` (additive) lets value edits reach the preview without remounting the scene.
+- Looks & Shuffle: saved looks under the preview; the shuffle list (load, reorder, remove, stale entries flagged) and timing (on start, while running, interval 1–180 min). Clock: every `ClockConfig` field, a nine-position grid, custom font and the strftime pattern validated as you type (an invalid pattern is not saved, so the clock keeps its default format).
+- `scrnsvr_core::noctalia` holds the `noctalia msg` client, idle status parsing, the setup plan and color import, shared by `--setup-noctalia` and the Idle section. The Idle section reads off the UI thread, sends one `config-set` for "Apply timeout", and for "Set up…" lists the planned changes and applies them only on confirmation, then re-reads to confirm.
+- Evidence: 52 settings tests (10 headless tab tests); `npm run test:rust` 134 tests, Clippy and rustfmt clean; vitest 376. Release walkthrough on Hyprland with a fake `noctalia` (19 captures: effects added, reordered and bypassed, shuffle, clock pattern valid and invalid, global and per-visual schemes, idle review/apply/timeout); the real session's Noctalia config was not changed. A flaky "Text file busy" race in two milestone 4 CLI tests now retries in test setup.
+- Open: fullscreen preview from settings, custom shader editor, thumbnail tiles, screen-reader check.
+
 ### Milestone 6 (prep): native AppImage
 
 - `scripts/build-appimage.sh` (`npm run dist:native`) builds `release/native/Scrnsvr-<version>-x86_64.AppImage` (19 MB) and its SHA256SUMS with pinned, checksum-verified `appimagetool` 1.9.1 and type2-runtime 20251108, and `SOURCE_DATE_EPOCH` from HEAD (two builds from the same binaries were identical). `AppRun` links to `usr/bin/scrnsvr`, so sibling lookup of the renderer and settings and `$APPIMAGE` for `--install` work unchanged. The desktop entry is `packaging/native/scrnsvr.desktop` (`StartupWMClass=scrnsvr-settings`).
@@ -396,7 +405,7 @@ Known gaps before the Rust renderer can become the default:
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- The rest of milestone 5: global effects, shuffle, clock controls, global settings, desktop/Noctalia colors, the Noctalia Idle section, the custom shader editor, thumbnail tiles in the shader bank, and a screen-reader check. Then milestone 6 (packaging cutover).
+- The rest of milestone 5: fullscreen preview from settings, the custom shader editor, thumbnail tiles in the shader bank, and a screen-reader check. Then the milestone 6 cutover.
 - Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
 ## Technical references

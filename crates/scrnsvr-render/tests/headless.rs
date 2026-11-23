@@ -222,3 +222,24 @@ fn updates_uniforms_live_without_recompiling() {
     let pixel = frame(&mut renderer, 500.0, 0.0, 1.0);
     assert!(near(pixel, [255, 0, 0, 255]), "the new level shows and zero speed freezes integrated time: {pixel:?}");
 }
+
+#[test]
+fn updates_effect_uniforms_live_on_the_mounted_layer_only() {
+    let Some((_lock, _headless, mut renderer)) = context() else { return };
+    let tint = "precision mediump float; uniform sampler2D uInput; uniform vec3 tint; varying vec2 vUv;\
+        void main(){gl_FragColor=vec4(texture2D(uInput,vUv).rgb*tint,1.0);}";
+    let spec = scene(
+        "precision mediump float; void main(){gl_FragColor=vec4(1.0,1.0,1.0,1.0);}",
+        vec![],
+        vec![
+            effect("first", &[tint], false, vec![("tint", UniformValue::Vector(vec![1.0, 0.0, 0.0]))]),
+            effect("second", &[tint], false, vec![("tint", UniformValue::Vector(vec![1.0, 1.0, 1.0]))]),
+        ],
+    );
+    renderer.set_scene(&spec).unwrap();
+    assert!(near(frame(&mut renderer, 16.0, 0.0, 1.0), [255, 0, 0, 255]));
+    renderer.set_effect_uniform("first", "tint", UniformValue::Vector(vec![0.0, 1.0, 0.0]));
+    renderer.set_effect_uniform("missing", "tint", UniformValue::Vector(vec![0.0, 0.0, 1.0]));
+    assert!(near(frame(&mut renderer, 16.0, 0.0, 1.0), [0, 255, 0, 255]), "the edit shows without remounting the scene");
+    assert_eq!(renderer.layer_ids(), ["first", "second"]);
+}

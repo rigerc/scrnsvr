@@ -140,6 +140,13 @@ The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is
 
 **Settings.** `scrnsvr --settings` opens a GPUI Kit window with a shader bank (search, favorites, categories), a live preview with your saved effects and clock, and an inspector built from each shader's manifest: sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset shader, Randomize with locks, Undo, and saved looks. Edits save automatically to `~/.config/scrnsvr/config.toml` with a visible status and Retry; favorites live in `~/.local/state/scrnsvr/ui.toml`. It needs Wayland and Vulkan. With reduced animations set on the desktop, the preview starts paused.
 
+**Settings tabs.** Left/Right/Home/End move between them.
+- **Visuals:** shader bank, inspector, per-visual color scheme, Noctalia color import.
+- **Effects:** one global stack of up to eight layers (add, remove, reorder with buttons or Alt+Up/Down, enable per layer or globally), live in the preview.
+- **Looks & Shuffle:** saved looks, the shuffle list and its timing.
+- **Clock:** every clock option, a placement grid, and an optional strftime pattern with a live example.
+- **Settings:** frame rate, fade, monitors, global color scheme, and the Idle section. It shows whether Noctalia launches scrnsvr, edits Noctalia's timeout, and offers "Set up…", which lists the `noctalia msg config-set` changes and applies them only after you confirm. Without Noctalia it shows hypridle and hot-corner instructions.
+
 **Idle with hypridle.**
 
 ```

@@ -24,6 +24,7 @@ wayland-egl.workspace = true
 raw-window-handle = "0.6.2"
 
 [dev-dependencies]
+serde_json.workspace = true
 # Headless windows and painted-scene inspection for the window background test. This enables
 # test support on the GPUI that Kit already uses; gpui-kit's own test-support feature would also
 # resolve its optional gpui-fast backend, which conflicts with this lockfile.

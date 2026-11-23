@@ -8,6 +8,7 @@ pub mod catalog;
 pub mod clock;
 pub mod config;
 pub mod input;
+pub mod noctalia;
 pub mod options;
 pub mod outputs;
 pub mod presentation;

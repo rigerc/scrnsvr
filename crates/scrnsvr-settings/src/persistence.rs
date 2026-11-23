@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use scrnsvr_core::config::{Config, config_path};
+
+use crate::idle::IdleSource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -39,14 +41,19 @@ impl UiState {
     }
 }
 
+#[derive(Clone, Default)]
 pub struct Paths {
     pub config: Option<PathBuf>,
     pub ui: Option<PathBuf>,
+    /// Noctalia's color file. `None` reads `$XDG_CONFIG_HOME/noctalia/colors.json`.
+    pub colors: Option<PathBuf>,
+    /// The `noctalia` command and the command it is told to run.
+    pub idle: IdleSource,
 }
 
 impl Paths {
     pub fn native() -> Self {
-        Self { config: config_path(), ui: dirs::state_dir().map(|dir| dir.join("scrnsvr/ui.toml")) }
+        Self { config: config_path(), ui: dirs::state_dir().map(|dir| dir.join("scrnsvr/ui.toml")), ..Self::default() }
     }
 
     pub fn load(&self) -> (Config, UiState, Vec<String>, Option<String>) {
@@ -137,7 +144,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("state/scrnsvr/ui.toml");
         let config = temp.path().join("config/scrnsvr/config.toml");
-        let paths = Paths { ui: Some(path.clone()), config: Some(config.clone()) };
+        let paths = Paths { ui: Some(path.clone()), config: Some(config.clone()), ..Paths::default() };
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, "favorites = invalid").unwrap();
         let (_, mut ui, _, warning) = paths.load();
@@ -206,7 +213,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("config.toml");
         fs::write(&path, "bad = [").unwrap();
-        let paths = Paths { config: Some(path.clone()), ui: None };
+        let paths = Paths { config: Some(path.clone()), ..Paths::default() };
         let (config, ui, warnings, _) = paths.load();
         assert_eq!(config, Config::default());
         assert_eq!(ui, UiState::default());

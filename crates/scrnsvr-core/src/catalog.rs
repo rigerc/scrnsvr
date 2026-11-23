@@ -77,6 +77,11 @@ impl UniformDef {
         self.normalize(value, false)
     }
 
+    /// Resolve a stored effect-layer value. Unlike shader values, numeric text is not accepted.
+    pub fn resolve_effect_value(&self, value: Option<&SettingValue>) -> SettingValue {
+        self.normalize(value, true)
+    }
+
     pub(crate) fn normalize(&self, value: Option<&SettingValue>, effect: bool) -> SettingValue {
         use SettingValue::{Bool, Number, Text};
         match (self.kind, value) {
@@ -223,7 +228,7 @@ pub enum ColorRole {
     OnSurface,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ColorRoles {
     pub primary: String,

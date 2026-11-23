@@ -10,6 +10,11 @@ use scrnsvr_core::scene::{SceneTarget, UnknownShader, shader_color_values};
 use crate::catalog::{self, Visual};
 use crate::persistence::UiState;
 
+pub mod clock;
+pub mod colors;
+pub mod effects;
+pub mod rotation;
+
 pub struct Model {
     pub config: Config,
     pub ui: UiState,
@@ -20,6 +25,8 @@ pub struct Model {
     featured: Vec<usize>,
     locks: BTreeMap<String, BTreeSet<String>>,
     undo: BTreeMap<String, (&'static str, ShaderValues)>,
+    /// The shuffle interval to restore when cycling is switched back on (this session).
+    last_interval: f64,
 }
 
 impl Model {
@@ -27,6 +34,7 @@ impl Model {
         let visuals = catalog::visuals(&config);
         let selected = visuals.iter().position(|visual| visual.id == config.shader).unwrap_or(0);
         let featured = catalog::featured(&visuals, &visuals[selected].id);
+        let config_interval = config.rotation.interval_minutes;
         Self {
             config,
             ui,
@@ -37,6 +45,7 @@ impl Model {
             featured,
             locks: BTreeMap::new(),
             undo: BTreeMap::new(),
+            last_interval: if config_interval > 0.0 { config_interval } else { rotation::DEFAULT_INTERVAL_MINUTES },
         }
     }
 

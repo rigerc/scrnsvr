@@ -2,11 +2,19 @@
 
 mod app;
 mod catalog;
+mod clock_tab;
 mod controls;
+mod effects_tab;
+mod idle;
+mod idle_ui;
+mod looks_tab;
 mod model;
 mod persistence;
 mod preview;
 mod smoke;
+mod system_tab;
+#[cfg(test)]
+mod tab_tests;
 mod view;
 
 use std::time::Duration;
@@ -48,10 +56,15 @@ fn main() {
     // explicitly provides isolated XDG directories to inspect after the process exits.
     let smoke_temp = (smoke.as_deref() == Some("steps") && std::env::var_os("SCRNSVR_SETTINGS_SMOKE_USE_XDG").is_none())
         .then(|| tempfile::tempdir().expect("create the settings smoke directory"));
-    let paths = smoke_temp.as_ref().map_or_else(Paths::native, |directory| Paths {
+    let mut paths = smoke_temp.as_ref().map_or_else(Paths::native, |directory| Paths {
         config: Some(directory.path().join("config.toml")),
         ui: Some(directory.path().join("ui.toml")),
+        ..Paths::default()
     });
+    // The walkthrough only writes to Noctalia when it is pointed at a stand-in program.
+    if let Some(program) = std::env::var_os("SCRNSVR_SETTINGS_SMOKE_NOCTALIA") {
+        paths.idle.noctalia = scrnsvr_core::noctalia::Noctalia::with_program(program);
+    }
     gpui_kit::application().with_assets(gpui_kit::assets::Assets).run(move |cx| {
         gpui_kit::init(cx);
         let motion = reduce_motion();

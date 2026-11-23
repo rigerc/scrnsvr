@@ -10,10 +10,14 @@ use gpui_kit::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use scrnsvr_core::catalog::SettingValue;
 
-use crate::controls::Control;
+use crate::clock_tab::ClockUi;
+use crate::controls::{Control, Target};
+use crate::effects_tab::EffectsUi;
+use crate::looks_tab::ShuffleUi;
 use crate::model::{Model, RandomScope};
 use crate::persistence::{self, Paths, SaveQueue};
 use crate::preview::PreviewSurface;
+use crate::system_tab::SystemUi;
 
 pub type TextSelect = SelectState<SearchableVec<SharedString>>;
 
@@ -42,8 +46,42 @@ pub enum LookAction {
     Overwrite(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tab {
+    Visuals,
+    Effects,
+    Looks,
+    Clock,
+    Settings,
+}
+
+impl Tab {
+    pub const ALL: [Self; 5] = [Self::Visuals, Self::Effects, Self::Looks, Self::Clock, Self::Settings];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Visuals => "Visuals",
+            Self::Effects => "Effects",
+            Self::Looks => "Looks & Shuffle",
+            Self::Clock => "Clock",
+            Self::Settings => "Settings",
+        }
+    }
+
+    /// The tab `steps` places along from this one, wrapping around.
+    pub fn offset(self, steps: isize) -> Self {
+        Self::ALL[(self as isize + steps).rem_euclid(Self::ALL.len() as isize) as usize]
+    }
+}
+
 pub struct Settings {
     pub model: Model,
+    pub tab: Tab,
+    pub tab_focus: Vec<FocusHandle>,
+    pub effects_ui: EffectsUi,
+    pub shuffle_ui: ShuffleUi,
+    pub clock_ui: ClockUi,
+    pub system_ui: SystemUi,
     pub search: Entity<InputState>,
     pub quick_picker: Entity<SelectState<SearchableVec<VisualItem>>>,
     pub random_scope: Entity<TextSelect>,
@@ -54,8 +92,8 @@ pub struct Settings {
     pub controls: Vec<Control>,
     pub advanced: bool,
     pub show_locks: bool,
-    pub show_looks: bool,
-    pub selected_control_error: Option<(String, String)>,
+    /// A rejected entry in one control, as `(target key, control name, message)`.
+    pub control_error: Option<(String, String, String)>,
     pub preview: Option<PreviewSurface>,
     pub preview_error: Option<String>,
     pub paused: bool,
@@ -73,11 +111,12 @@ pub struct Settings {
     pub undo_focus: FocusHandle,
     pub pause_focus: FocusHandle,
     pub save_status_focus: FocusHandle,
-    paths: Paths,
+    pub(crate) paths: Paths,
     save_running: bool,
     save_task: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
     _preview_task: Task<()>,
+    _clock_task: Task<()>,
 }
 
 impl Settings {
@@ -148,8 +187,34 @@ impl Settings {
         window.on_window_should_close(cx, move |window, cx| entity.update(cx, |this, cx| this.request_close(window, cx)).unwrap_or(true));
         let row_focus = model.visuals.iter().map(|_| cx.focus_handle()).collect();
         let paused = cx.reduce_motion();
+        let effects_ui = EffectsUi::new(&model, window, cx);
+        let shuffle_ui = ShuffleUi::new(&model, window, cx);
+        let clock_ui = ClockUi::new(&model, window, cx);
+        let system_ui = SystemUi::new(&model, window, cx);
+        // The clock example shows the current time, so it refreshes each second while it is on screen.
+        let clock_task = cx.spawn_in(window, async move |this, cx| {
+            loop {
+                cx.background_executor().timer(Duration::from_secs(1)).await;
+                if this
+                    .update_in(cx, |this, _, cx| {
+                        if this.tab == Tab::Clock {
+                            cx.notify()
+                        }
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        });
         let mut settings = Self {
             model,
+            tab: Tab::Visuals,
+            tab_focus: Tab::ALL.iter().map(|_| cx.focus_handle()).collect(),
+            effects_ui,
+            shuffle_ui,
+            clock_ui,
+            system_ui,
             search,
             quick_picker,
             random_scope,
@@ -160,8 +225,7 @@ impl Settings {
             controls: Vec::new(),
             advanced: false,
             show_locks: false,
-            show_looks: false,
-            selected_control_error: None,
+            control_error: None,
             preview,
             preview_error,
             paused,
@@ -184,6 +248,7 @@ impl Settings {
             save_task: None,
             _subscriptions: vec![search_changed, picked, look_enter],
             _preview_task: preview_task,
+            _clock_task: clock_task,
         };
         if let Some(preview) = settings.preview.as_mut() {
             preview.set_paused(paused);
@@ -208,6 +273,7 @@ impl Settings {
                 state.set_selected_value(&index, window, cx);
             }
         });
+        self.sync_shader_scheme(window, cx);
         self.update_scene();
         self.config_changed(window, cx);
     }
@@ -258,8 +324,9 @@ impl Settings {
 
     fn rebuild_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let values = self.model.effective();
-        self.controls = self.model.visual().uniforms.iter().map(|def| Control::new(def, &values[&def.name], window, cx)).collect();
-        self.selected_control_error = None;
+        self.controls =
+            self.model.visual().uniforms.iter().map(|def| Control::new(def, Target::Shader, &values[&def.name], window, cx)).collect();
+        self.control_error = None;
     }
 
     pub fn set_uniform(&mut self, name: &str, value: SettingValue, window: &mut Window, cx: &mut Context<Self>) {
@@ -299,15 +366,15 @@ impl Settings {
         }
     }
 
-    fn sync_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn sync_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let effective = self.model.effective();
         for control in &self.controls {
             control.sync(&effective[&control.def.name], window, cx);
         }
-        self.selected_control_error = None;
+        self.control_error = None;
     }
 
-    fn update_scene(&mut self) {
+    pub fn update_scene(&mut self) {
         if let Some(preview) = self.preview.as_mut() {
             match self.model.scene() {
                 Ok(scene) => preview.set_scene(scene),
@@ -366,7 +433,26 @@ impl Settings {
         cx.notify();
     }
 
+    /// Show another tab. Entering Settings reads Noctalia the first time.
+    pub fn show_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tab != tab {
+            self.tab = tab;
+            self.inspector_scroll.set_offset(point(px(0.), px(0.)));
+        }
+        if tab == Tab::Settings && self.system_ui.idle.state == crate::idle::Idle::Unchecked {
+            self.refresh_idle(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// Move along the tab row (Left, Right, Home, End), activate that tab and focus it.
+    pub fn step_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_tab(tab, window, cx);
+        self.tab_focus[tab as usize].focus(window, cx);
+    }
+
     pub fn config_changed(&mut self, window: &Window, cx: &mut Context<Self>) {
+        self.shuffle_ui.grow(&self.model, cx);
         self.config_save.edit(cx.background_executor().now());
         self.start_saving(window, cx);
         cx.notify();
@@ -491,7 +577,7 @@ mod tests {
         let directory = temp.path().join("config");
         std::fs::create_dir(&directory).unwrap();
         let (config, ui) = (directory.join("config.toml"), temp.path().join("state/ui.toml"));
-        let (window, settings) = open(cx, Paths { config: Some(config.clone()), ui: Some(ui.clone()) });
+        let (window, settings) = open(cx, Paths { config: Some(config.clone()), ui: Some(ui.clone()), ..Paths::default() });
         let edit = |cx: &mut TestAppContext, value: f64| {
             cx.update_window(window, |_, window, cx| {
                 settings.update(cx, |settings, cx| settings.set_uniform("speed", SettingValue::Number(value), window, cx));
@@ -539,7 +625,8 @@ mod tests {
     #[gpui::test]
     fn every_visual_gets_a_widget_per_manifest_control_and_draws(cx: &mut TestAppContext) {
         let temp = tempfile::tempdir().unwrap();
-        let (window, settings) = open(cx, Paths { config: Some(temp.path().join("config.toml")), ui: Some(temp.path().join("ui.toml")) });
+        let (window, settings) =
+            open(cx, Paths { config: Some(temp.path().join("config.toml")), ui: Some(temp.path().join("ui.toml")), ..Paths::default() });
         let count = cx.read(|cx| settings.read(cx).model.visuals.len());
         let mut kinds = std::collections::BTreeSet::new();
         for index in 0..count {
@@ -566,7 +653,8 @@ mod tests {
     #[gpui::test]
     fn search_and_precise_controls_respond_to_keyboard(cx: &mut TestAppContext) {
         let temp = tempfile::tempdir().unwrap();
-        let paths = Paths { config: Some(temp.path().join("config.toml")), ui: Some(temp.path().join("state/ui.toml")) };
+        let paths =
+            Paths { config: Some(temp.path().join("config.toml")), ui: Some(temp.path().join("state/ui.toml")), ..Paths::default() };
         let (window, settings) = open(cx, paths);
         cx.update_window(window, |_, window, cx| {
             let search = settings.read(cx).search.clone();

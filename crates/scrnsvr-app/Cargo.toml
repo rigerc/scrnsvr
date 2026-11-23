@@ -22,7 +22,6 @@ chrono = { version = "=0.4.45", features = ["clock"], default-features = false }
 png = "=0.18.1"
 rand = "=0.9.5"
 serde_json = { version = "=1.0.154", features = ["preserve_order", "float_roundtrip"] }
-shlex = "=2.0.1"
 toml = "=0.8.23"
 tempfile = "=3.27.0"
 
