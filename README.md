@@ -1,8 +1,12 @@
+<img src="assets/icon.svg" alt="" width="72" height="72" align="right">
+
 # scrnsvr
 
 A shader-based idle screensaver for Hyprland and other Wayland desktops with `wlr-layer-shell`. A native Rust app draws GLSL shaders with OpenGL ES straight into overlay surfaces on your monitors, with a clock, a stack of GPU effects and a settings window to browse, preview and tune everything. There is no Electron, Node or web view: one AppImage holds three small programs.
 
 scrnsvr does not watch for idle on its own. Your idle service (Noctalia's, or hypridle) runs `scrnsvr --open` when the desktop has been idle, and any input dismisses it.
+
+[User documentation](docs/README.md) · [Download](https://github.com/rigerc/scrnsvr/releases/latest)
 
 ## Gallery
 
@@ -85,7 +89,7 @@ The media in `assets/` was captured by the 0.x releases at 1280×720 (stills) an
 1.0.0 is a rewrite, and it starts clean:
 
 - Settings live in `$XDG_CONFIG_HOME/scrnsvr/config.toml` (`~/.config/scrnsvr/config.toml`). The old Electron `config.json` is **not read or migrated**, so shaders, effects and clock start at their defaults and favorites start empty.
-- **Reactive audio was removed.** There is no audio capture and no audio settings. The three audio visuals (Reactive Bass Bloom, Reactive Pulse Rings, Reactive Audio Ribbons) stay but always show their quiet state, and custom shaders that read `uAudio` still compile.
+- **Reactive audio was removed.** Quiet Horizon, Velvet Cloud and Lightwell show their quiet state, and custom shaders that read `uAudio` receive zeros.
 - There is no built-in idle daemon or systemd user service; `scrnsvr --daemon` exits 2 with a pointer to Noctalia and hypridle. Remove an old `scrnsvr.service` and any Noctalia command that points at an old AppImage.
 - The AppImage is the only package; there is no `.deb`.
 
@@ -256,6 +260,6 @@ To add a shader, create its directory with those two files and rebuild. `crates/
 - `reference/` — the Ghostty/iTerm2 color-scheme YAMLs that `data/palettes.json` was curated from (not read at build or run time)
 - `packaging/native/` — desktop entry and the Ubuntu 22.04 builder image
 - `scripts/` — `check.sh`, `build-appimage.sh`, `build-appimage-container.sh`, `check-appimage.sh`
-- `docs/` — [architecture decisions](docs/decisions/), the [rewrite plan](docs/rust-rewrite-plan.md) and [checklist](docs/rust-rewrite-checklist.md), and research notes
+- `docs/` — [Starlight user documentation](docs/README.md), [architecture decisions](docs/decisions/), the [rewrite plan](docs/rust-rewrite-plan.md) and [checklist](docs/rust-rewrite-checklist.md), and research notes
 
 See [ADR-0003](docs/decisions/0003-native-rust-app.md) for the architecture.
