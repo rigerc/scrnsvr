@@ -376,11 +376,20 @@ Known gaps before the Rust renderer can become the default:
 - Evidence: 17 unit and 10 integration tests (fake renderer, fake `noctalia`), plus core tests, 61 in all; workspace Clippy and rustfmt clean; `cargo tree -p scrnsvr-app` has no GPUI crates. Live on Hyprland: the saver from a TOML config (plasma with the clock), a second `--open` refused with exit 0, `--dismiss` fade-out with exit 0, pointer and SIGTERM dismissal, the preview, 41 thumbnails, and the real-Noctalia dry run.
 - Left for cutover: `packaging/systemd/` and `packaging/post-install.sh` stay until the Electron build is removed.
 
+### Milestone 5 (part 1): native settings core
+
+- `scrnsvr-settings` is split into `model` (GPUI-free state: search, favorites, selection, effective values, edits, locks, randomize, undo, saved looks), `controls`, `view`, `app`, `persistence`, `preview` and `smoke` modules.
+- It browses all 41 visuals (featured, categories, search, favorites), edits every uniform type from its manifest (slider with exact entry, color picker with hex, select, switch, Advanced), and supports per-control and whole-shader reset, locks, conservative randomize, per-shader undo and saved looks. The three former audio shaders are listed under Ambient without audio controls or a Reactive badge.
+- Edits go through `Config::load`/`save`: debounced and atomic off the UI thread, with a visible status and Retry that keeps edits after a failed save. Favorites live in `$XDG_STATE_HOME/scrnsvr/ui.toml`. The save debounce runs on the GPUI executor clock, so headless tests drive it.
+- The inline preview renders `Catalog::build_scene` with the saved effects and clock, pauses, draws nothing while the window is hidden, and starts paused when the desktop asks for reduced motion.
+- Evidence: 15 crate tests (4 persistence, 7 model, 3 headless app including one widget per manifest control for all 41 visuals, 1 window background); `npm run test:rust` 88 tests, Clippy and rustfmt clean. Release walkthrough on Hyprland: the menu over the preview (about 117 fps), search and favorite, pause held at a fixed frame with one redraw per edit, randomize with a locked control and undo, saved looks create/rename/apply/delete, a real permission error then Retry, relaunch restoring state, reflow at 880 px and stacking at 560 px, no frames while on another workspace, and reduced motion both at startup and switched mid-run.
+- Deviations from DESIGN.md for now: text rows instead of thumbnail tiles (until the thumbnails work), two tabs (Visuals, Saved looks), no light theme. Preview rendering stays on the UI thread (no input lag observed); moving it needs its own thread, Wayland queue and EGL context.
+
 ### Not started
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- The rest of milestone 5 (effects, shuffle, clock, global settings, colors, the Noctalia Idle section, the custom shader editor, the thumbnail gallery) and milestone 6 (packaging cutover).
+- The rest of milestone 5: global effects, shuffle, clock controls, global settings, desktop/Noctalia colors, the Noctalia Idle section, the custom shader editor, thumbnail tiles in the shader bank, and a screen-reader check. Then milestone 6 (packaging cutover).
 - Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
 ## Technical references

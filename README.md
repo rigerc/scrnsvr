@@ -138,6 +138,8 @@ The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is
 
 **Idle with Noctalia.** Run `scrnsvr --install`, then `scrnsvr --setup-noctalia` to preview the changes and `scrnsvr --setup-noctalia --apply` to write them through `noctalia msg config-set`. It reuses an existing behavior that runs scrnsvr or creates `idle.behavior.scrnsvr` (default timeout 600 s), and sets `idle.pre_action_fade_seconds` to 0 so only scrnsvr fades. A Noctalia hot corner can run `scrnsvr --open` directly.
 
+**Settings.** `scrnsvr --settings` opens a GPUI Kit window with a shader bank (search, favorites, categories), a live preview with your saved effects and clock, and an inspector built from each shader's manifest: sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset shader, Randomize with locks, Undo, and saved looks. Edits save automatically to `~/.config/scrnsvr/config.toml` with a visible status and Retry; favorites live in `~/.local/state/scrnsvr/ui.toml`. It needs Wayland and Vulkan. With reduced animations set on the desktop, the preview starts paused.
+
 **Idle with hypridle.**
 
 ```

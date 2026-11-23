@@ -1,6 +1,6 @@
 [package]
 name = "scrnsvr-settings"
-description = "Native settings (GPUI Kit) spike: manifest-driven controls over an inline GLES preview"
+description = "Native visual mixer with a live GLES preview"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,12 @@ publish.workspace = true
 
 [dependencies]
 gpui-kit = "=0.9.1"
+chrono = { version = "=0.4.45", default-features = false, features = ["clock"] }
+dirs = "=6.0.0"
+rand = "=0.9.5"
+serde = { version = "=1.0.229", features = ["derive"] }
+tempfile = "=3.27.0"
+toml = "=0.8.23"
 scrnsvr-core.workspace = true
 scrnsvr-render.workspace = true
 scrnsvr-platform.workspace = true

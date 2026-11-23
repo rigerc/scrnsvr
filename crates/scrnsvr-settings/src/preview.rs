@@ -22,12 +22,13 @@
 
 use std::ffi::c_void;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
-use scrnsvr_core::{SceneSpec, UniformValue};
+use scrnsvr_core::clock::ClockConfig;
+use scrnsvr_core::{ClockSpec, SceneSpec};
 use scrnsvr_platform::{Egl, khronos_egl as egl};
-use scrnsvr_render::Renderer;
+use scrnsvr_render::{Renderer, render_clock};
 use wayland_client::backend::{Backend, ObjectId};
 use wayland_client::globals::{GlobalListContents, registry_queue_init};
 use wayland_client::protocol::{wl_callback, wl_compositor, wl_region, wl_registry, wl_subcompositor, wl_subsurface, wl_surface};
@@ -75,7 +76,12 @@ pub struct PreviewSurface {
     context: egl::Context,
     renderer: Option<Renderer>,
     scene: Option<Arc<SceneSpec>>,
-    scene_dirty: bool,
+    next_scene: Option<Arc<SceneSpec>>,
+    clock: ClockConfig,
+    clock_spec: Option<ClockSpec>,
+    next_clock_check: Option<Instant>,
+    dirty: bool,
+    pub diagnostic: Option<String>,
     placement: Placement,
     last_frame: Option<Instant>,
     paused: bool,
@@ -127,7 +133,12 @@ impl PreviewSurface {
             context,
             renderer: None,
             scene: None,
-            scene_dirty: false,
+            next_scene: None,
+            clock: ClockConfig::default(),
+            clock_spec: None,
+            next_clock_check: None,
+            dirty: true,
+            diagnostic: None,
             placement: Placement::default(),
             last_frame: None,
             paused: false,
@@ -136,31 +147,33 @@ impl PreviewSurface {
         })
     }
 
-    pub fn set_scene(&mut self, scene: Arc<SceneSpec>) {
-        self.scene = Some(scene);
-        self.scene_dirty = true;
+    pub fn set_scene(&mut self, scene: SceneSpec) {
+        self.next_scene = Some(Arc::new(scene));
+        self.dirty = true;
     }
 
-    pub fn set_uniform(&mut self, name: &str, value: UniformValue) {
-        if self.make_current()
-            && let Some(renderer) = self.renderer.as_mut()
-        {
-            renderer.set_uniform(name, value);
+    pub fn set_clock(&mut self, clock: ClockConfig) {
+        if self.clock != clock {
+            self.clock = clock;
+            self.clock_spec = None;
+            self.next_clock_check = None;
+            self.dirty = true;
         }
     }
 
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
-        // Resuming must not animate the time spent paused.
         self.last_frame = None;
+        self.next_clock_check = None;
+        self.dirty = true;
+    }
+
+    pub fn poll_interval(&self) -> Duration {
+        if self.paused && !self.dirty { Duration::from_millis(40) } else { Duration::from_millis(4) }
     }
 
     pub fn placement(&self) -> Placement {
         self.placement
-    }
-
-    pub fn paused(&self) -> bool {
-        self.paused
     }
 
     /// Follow the preview element's layout. Called from GPUI paint.
@@ -175,7 +188,10 @@ impl PreviewSurface {
         if moved {
             self.subsurface.set_position(placement.x, placement.y);
         }
-        if resized {
+        if resized && placement.width > 0 && placement.height > 0 {
+            self.dirty = true;
+            self.clock_spec = None;
+            self.next_clock_check = None;
             let (width, height) = (placement.width.max(1) * placement.scale, placement.height.max(1) * placement.scale);
             self.surface.set_buffer_scale(placement.scale);
             match &self.window {
@@ -204,45 +220,86 @@ impl PreviewSurface {
         self.egl_surface.is_some_and(|surface| self.egl.make_current(surface, self.context).is_ok())
     }
 
-    /// Render one frame if the compositor is ready for it. Returns whether a frame was drawn.
-    pub fn tick(&mut self) -> bool {
+    /// Render one frame when both the scene and compositor are ready.
+    pub fn tick(&mut self, visible: bool) {
         let _ = self.queue.dispatch_pending(&mut self.state);
-        let visible = self.placement.width > 0 && self.placement.height > 0;
-        if self.state.frame_pending || !visible || !self.make_current() {
-            return false;
+        if !visible || self.placement.width <= 0 || self.placement.height <= 0 {
+            self.last_frame = None;
+            return;
+        }
+        if self.state.frame_pending || (self.paused && !self.dirty) || !self.make_current() {
+            return;
         }
         if self.renderer.is_none() {
             // SAFETY: this adapter's context is current.
             let gl = unsafe { glow::Context::from_loader_function(|name| self.egl.proc_address(name)) };
             match Renderer::new(gl) {
                 Ok(renderer) => self.renderer = Some(renderer),
-                Err(e) => {
-                    eprintln!("scrnsvr preview: {e}");
-                    return false;
+                Err(error) => {
+                    self.diagnostic = Some(format!("Preview unavailable: {error}"));
+                    self.dirty = false;
+                    self.paused = true;
+                    return;
                 }
             }
         }
         let renderer = self.renderer.as_mut().expect("created above");
-        if std::mem::take(&mut self.scene_dirty)
-            && let Some(scene) = &self.scene
-            && let Err(e) = renderer.set_scene(scene)
-        {
-            // Keep the last valid preview.
-            eprintln!("scrnsvr preview could not show {}: {e}", scene.key);
+        if let Some(scene) = self.next_scene.take() {
+            let same_program = self
+                .scene
+                .as_ref()
+                .is_some_and(|current| current.key == scene.key && current.source == scene.source && current.effects == scene.effects);
+            if same_program {
+                let current = self.scene.as_ref().expect("matched a scene");
+                for (name, value) in &scene.uniforms {
+                    if !current.uniforms.iter().any(|(old_name, old)| old_name == name && old == value) {
+                        renderer.set_uniform(name, value.clone());
+                    }
+                }
+                self.scene = Some(scene);
+                self.diagnostic = None;
+            } else {
+                match renderer.set_scene(&scene) {
+                    Ok(()) => {
+                        self.scene = Some(scene);
+                        self.diagnostic = None;
+                        self.last_frame = None;
+                    }
+                    Err(error) => self.diagnostic = Some(format!("Could not show {}: {error}", scene.key)),
+                }
+            }
         }
-        if self.paused && renderer.has_scene() && self.last_frame.is_some() {
-            return false;
+        self.dirty = false;
+        if !renderer.has_scene() {
+            return;
         }
         let now = Instant::now();
-        let delta = self.last_frame.map_or(0.0, |last| now.duration_since(last).as_secs_f64() * 1000.0);
-        self.last_frame = Some(now);
         let Placement { width, height, scale, .. } = self.placement;
-        renderer.render(width * scale, height * scale, delta, &[0.0; 4], 0.0, 1.0);
+        let (width, height) = (width * scale, height * scale);
+        if self.next_clock_check.is_none_or(|next| now >= next) {
+            self.next_clock_check = Some(now + Duration::from_millis(250));
+            let clock = self.clock.resolve(&chrono::Local::now());
+            if self.clock_spec.as_ref() != Some(&clock) {
+                match render_clock(&clock, width, height) {
+                    Ok(image) => renderer.set_clock(image.as_ref()),
+                    Err(error) => {
+                        renderer.set_clock(None);
+                        self.diagnostic = Some(format!("Could not draw the clock: {error}"));
+                    }
+                }
+                self.clock_spec = Some(clock);
+            }
+        }
+        let delta = if self.paused { 0.0 } else { self.last_frame.map_or(0.0, |last| now.duration_since(last).as_secs_f64() * 1000.0) };
+        self.last_frame = Some(now);
+        renderer.render(width, height, delta, &[0.0; 4], 0.0, 1.0);
         self.surface.frame(&self.handle, ());
         self.state.frame_pending = true;
-        let presented = self.egl_surface.is_some_and(|surface| self.egl.swap_buffers(surface).is_ok());
-        self.frames += u64::from(presented);
-        presented
+        if self.egl_surface.is_some_and(|surface| self.egl.swap_buffers(surface).is_ok()) {
+            self.frames += 1;
+        } else {
+            self.diagnostic = Some("Could not present the preview frame.".into());
+        }
     }
 }
 

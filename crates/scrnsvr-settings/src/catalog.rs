@@ -1,44 +1,79 @@
-//! Default preview scenes for the settings spike, resolved by core.
+//! Browser metadata and grouping for the native shader bank.
 
-use std::sync::Arc;
-
-use scrnsvr_core::SceneSpec;
-use scrnsvr_core::catalog::Catalog;
-pub use scrnsvr_core::catalog::UniformDef;
+use scrnsvr_core::catalog::{Catalog, UniformDef};
 use scrnsvr_core::config::Config;
-use scrnsvr_core::scene::SceneTarget;
 
-#[derive(Debug, Clone)]
-pub struct Shader {
+const FEATURED: [&str; 6] = ["aurora-veil", "plasma", "tidal-caustics", "silk-ribbons", "mesh-gradient", "flow-field"];
+
+#[derive(Clone)]
+pub struct Visual {
     pub id: String,
     pub title: String,
+    pub description: String,
+    pub category: &'static str,
     pub uniforms: Vec<UniformDef>,
-    pub plan: Arc<SceneSpec>,
 }
 
-pub fn load() -> Vec<Shader> {
-    let catalog = Catalog::builtin();
-    let config = Config::default();
-    catalog
+pub fn visuals(config: &Config) -> Vec<Visual> {
+    let mut visuals: Vec<_> = Catalog::builtin()
         .shaders
         .iter()
-        .map(|def| Shader {
-            id: def.id.clone(),
-            title: def.title.clone(),
-            uniforms: def.uniforms.clone(),
-            plan: Arc::new(catalog.build_scene(&config, &SceneTarget::shader(&def.id)).expect("built-in shader exists")),
+        .map(|shader| {
+            let quiet = shader.category.as_deref() == Some("Reactive");
+            let description = match shader.id.as_str() {
+                "reactive-bass-bloom" => "A softly lit volume of smoky plum and copper folds through darkness.",
+                "reactive-pulse-rings" => "Defocused ivory and amber light drifts over charcoal.",
+                _ => shader.description.as_deref().unwrap_or_default(),
+            };
+            let uniforms = shader
+                .uniforms
+                .iter()
+                .filter(|def| !quiet || !matches!(def.name.as_str(), "sensitivity" | "audioLight" | "audioShape"))
+                .cloned()
+                .map(|mut def| {
+                    if quiet {
+                        match def.name.as_str() {
+                            "speed" => def.description = Some("Slow ambient drift.".into()),
+                            "shapeDetail" => def.description = Some("Adjust the structure of the composition.".into()),
+                            _ => {}
+                        }
+                    }
+                    def
+                })
+                .collect();
+            Visual {
+                id: shader.id.clone(),
+                title: shader.title.clone(),
+                description: description.into(),
+                category: if shader.category.as_deref() == Some("Geometric") { "Geometric" } else { "Ambient" },
+                uniforms,
+            }
         })
-        .collect()
+        .collect();
+    visuals.extend(config.custom_shaders.iter().map(|shader| Visual {
+        id: shader.id.clone(),
+        title: shader.title.clone(),
+        description: String::new(),
+        category: "Custom",
+        uniforms: Vec::new(),
+    }));
+    visuals.sort_by_key(|visual| visual.title.to_lowercase());
+    visuals
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn loads_every_shader_with_slider_controls() {
-        let shaders = super::load();
-        assert_eq!(shaders.len(), 41);
-        assert!(shaders.iter().all(|shader| shader.uniforms.iter().any(super::UniformDef::is_slider)));
-        let plasma = shaders.iter().find(|shader| shader.id == "plasma").unwrap();
-        assert!(plasma.plan.uniforms.iter().any(|(name, _)| name == "speed"));
+pub fn featured(visuals: &[Visual], initial_shader: &str) -> Vec<usize> {
+    let mut results = Vec::new();
+    for index in std::iter::once(initial_shader)
+        .chain(FEATURED)
+        .filter_map(|id| visuals.iter().position(|visual| visual.id == id))
+        .chain(0..visuals.len())
+    {
+        if !results.contains(&index) {
+            results.push(index);
+        }
+        if results.len() == FEATURED.len() {
+            break;
+        }
     }
+    results
 }
