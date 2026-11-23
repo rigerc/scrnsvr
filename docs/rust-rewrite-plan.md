@@ -1,6 +1,6 @@
 # Native Rust rewrite plan
 
-Status: Proposed implementation plan. Updated: 2026-11-13.
+Status: In progress. The Rust saver renderer is an opt-in drop-in for the C++ renderer, and a GPUI Kit settings spike shows an inline GLES preview through a Wayland subsurface; see [implementation progress](#implementation-progress). Updated: 2026-11-23.
 
 Dependency evaluation completed for the current source baseline: see [executed checks, source findings, and adoption decisions](research/rust-rewrite-evaluation.md). Hyprsaver is a selective reference, `glsl` is the preferred optional AST tool, and stock GPUI's missing Linux external-surface API makes inline preview integration the first implementation gate.
 
@@ -14,9 +14,9 @@ The rewrite should consolidate rendering and behavior across settings previews, 
 
 ## Current implementation and migration boundaries
 
-- Electron owns the CLI, configuration, idle daemon, scene resolution, settings, previews, thumbnails, and fullscreen fallback: [`src/main/`](../src/main/) and [`src/settings/`](../src/settings/).
+- Electron owns the CLI, configuration, idle daemon, scene resolution, settings, previews, and thumbnails: [`src/main/`](../src/main/) and [`src/settings/`](../src/settings/).
 - The C++ renderer owns Wayland layer-shell surfaces, EGL/GLES rendering, effects, fades, clock composition, and dismissal: [`native/renderer/`](../native/renderer/).
-- The existing boundary is JSON lines over child-process stdin/stdout. Messages include `scene`, `clock`, `audio`, and `dismiss`; readiness and exit codes control fallback: [`native-renderer.ts`](../src/main/native-renderer.ts).
+- The existing boundary is JSON lines over child-process stdin/stdout. Messages include `scene`, `clock`, `audio`, and `dismiss`; readiness and exit codes control error reporting: [`native-renderer.ts`](../src/main/native-renderer.ts). Since v0.10.0 there is no Electron fallback. Without Wayland or the renderer binary, `--open` exits 1 with the reason and `--daemon` exits 2, which `scrnsvr.service` does not restart (`RestartPreventExitStatus=2`).
 - Built-in shader metadata is TypeScript; shader and effect programs are GLSL. Configuration uses Zod defaults, validation, and legacy-field migration: [`config.ts`](../src/shared/config.ts).
 - Favorites live in browser local storage separately from configuration: [`discovery.ts`](../src/settings/discovery.ts).
 
@@ -48,7 +48,7 @@ The researched installation baseline is GPUI Kit 0.9.1. Depend on the facade and
 
 **Early integration gate: GLES preview inside GPUI.** Kit's custom painting APIs do not by themselves establish that an external EGL texture can be imported. Inspect the pinned Linux renderer and establish a supported GPU image/surface handoff, including ownership, format/modifier compatibility, synchronization, release, clipping, resize, and scale changes. Test NVIDIA and Mesa. Do not assume a GL texture ID is a GPUI image or that raw window handles permit reusing a Wayland surface role. [Painting API](https://gpui-kit.com/docs/paint/)
 
-Pinned-source evaluation has now confirmed that `gpui-pre` 0.3.12's public `surface`/`paint_surface` path only supports Apple CVPixelBuffers; `RenderImage` holds CPU image frames. Budget explicit Linux/wgpu renderer integration or another demonstrated native composition adapter. Stock surface painting is not a Linux EGL import solution. The settings application and adapter have not yet been compiled or demonstrated. [Evaluation evidence](research/rust-rewrite-evaluation.md#gpui-kit-selected-ui-unresolved-linux-gpu-embedding)
+Pinned-source evaluation has now confirmed that `gpui-pre` 0.3.12's public `surface`/`paint_surface` path only supports Apple CVPixelBuffers; `RenderImage` holds CPU image frames. Budget explicit Linux/wgpu renderer integration or another demonstrated native composition adapter. Stock surface painting is not a Linux EGL import solution. The `scrnsvr-settings` spike avoids importing anything: the preview is a Wayland subsurface below a transparent GPUI window, composited by the compositor. See [settings preview gate](#settings-preview-gate-wayland-subsurface-milestone-1). [Evaluation evidence](research/rust-rewrite-evaluation.md#gpui-kit-selected-ui-unresolved-linux-gpu-embedding)
 
 Keep scene resolution, effects, and time in the shared renderer; isolate any platform-specific presentation adapter. A separate native GLES preview window can unblock development while embedding is investigated, but does not meet the final inline-live-preview requirement. If embedding needs a small GPUI adapter/patch, scope and record it explicitly; do not silently switch toolkit, rewrite shaders, or introduce continuous CPU readback. Static thumbnail uploads remain appropriate. Gate further settings work on a demonstrated presentation path.
 
@@ -78,7 +78,7 @@ Do not add **[`shaderc`](https://docs.rs/shaderc/latest/shaderc/)** to the initi
 | [`smithay-client-toolkit`](https://docs.rs/smithay-client-toolkit/latest/smithay_client_toolkit/) | Wayland outputs, seats, layer-shell lifecycle, scaling, and input. Reuse compatible abstractions rather than manually porting every C listener. |
 | [`wayland-client`](https://docs.rs/wayland-client/latest/wayland_client/), [`wayland-protocols`](https://docs.rs/wayland-protocols/latest/wayland_protocols/), [`wayland-protocols-wlr`](https://docs.rs/wayland-protocols-wlr/latest/wayland_protocols_wlr/) | Protocol bindings where toolkit coverage is insufficient: idle notifications, fractional scale/viewporter, and layer-shell. Enable relevant client/staging features only; detect compositor capabilities. |
 | [`calloop`](https://docs.rs/calloop/latest/calloop/) + [`calloop-wayland-source`](https://docs.rs/calloop-wayland-source/latest/calloop_wayland_source/) | Poll Wayland, IPC, timers, and shutdown sources in the saver/platform loop. Do not run a blocking dispatch loop inside GPUI callbacks. |
-| [`winit`](https://docs.rs/winit/latest/winit/) + [`glutin`](https://docs.rs/glutin/latest/glutin/) | Evaluate as the standalone GLES fullscreen/windowed fallback adapter for Wayland and X11, separate from GPUI settings. Use compatible integration/raw-handle versions; prove output targeting and pacing before adoption. |
+| [`winit`](https://docs.rs/winit/latest/winit/) + [`glutin`](https://docs.rs/glutin/latest/glutin/) | Dropped. They were the candidate fullscreen fallback adapter, and v0.10.0 removed the fallback. The saver only targets layer-shell. |
 | [`pango`](https://docs.rs/pango/latest/pango/) + [`pangocairo`](https://docs.rs/pangocairo/latest/pangocairo/) | Retain current clock shaping/layout through Rust bindings. Upload only changed clock textures; this does not require a GTK settings UI. |
 | [`image`](https://docs.rs/image/latest/image/) | PNG thumbnail/capture encoding and reference image loading. Enable only required codecs; no normal frame-by-frame saver readback. |
 
@@ -90,7 +90,7 @@ Do not add **[`shaderc`](https://docs.rs/shaderc/latest/shaderc/)** to the initi
 | [`clap`](https://docs.rs/clap/latest/clap/) | Existing CLI flags/modes, backend enums, and generated help. Preserve established invocation behavior with fixtures instead of inheriting new parser defaults accidentally. |
 | [`directories`](https://docs.rs/directories/latest/directories/) + [`tempfile`](https://docs.rs/tempfile/latest/tempfile/struct.NamedTempFile.html) | XDG base directories and same-directory temporary files persisted by atomic replacement. Assert the exact existing `scrnsvr/config.json` path; add flush/sync policy explicitly rather than assuming rename implies durable storage. |
 | [`zbus`](https://docs.rs/zbus/latest/zbus/) | Direct logind session-property queries and suspend/resume signals, replacing `busctl` subprocesses when that adapter moves to Rust. Keep D-Bus work off the UI/render thread; do not add another async runtime without a demonstrated need. |
-| [`x11rb`](https://docs.rs/x11rb/latest/x11rb/protocol/screensaver/index.html) | X11 ScreenSaver idle information and EWMH fullscreen properties. Use only for genuine X11 sessions; XWayland does not supply global Wayland idle/window state. |
+| [`x11rb`](https://docs.rs/x11rb/latest/x11rb/protocol/screensaver/index.html) | Optional. X11 sessions are no longer supported, so X11 idle information is not needed. It could replace the `xprop` fullscreen check for XWayland windows in [`inhibit.ts`](../src/main/inhibit.ts); otherwise keep running `xprop`. |
 | [`icu_datetime`](https://docs.rs/icu_datetime/latest/icu_datetime/) | Evaluate localized date/time formatting to replace Intl. Supply OS local-time/time-zone information separately and limit locale data to agreed requirements; verify formatting fixtures and package size. |
 | [`thiserror`](https://docs.rs/thiserror/latest/thiserror/) + [`tracing`](https://docs.rs/tracing/latest/tracing/) | Typed core/platform failures and structured diagnostics for startup, backend selection, frame timing, and cleanup. Route renderer logs to stderr to preserve protocol stdout. |
 | [`notify`](https://docs.rs/notify/latest/notify/) | Optional file watching only if live external-edit reload is retained/added deliberately. Watch the containing directory for atomic replacement; coalesce events. Not required for the existing reload-at-launch/rotation semantics. |
@@ -139,11 +139,11 @@ Sources: [release documentation](https://docs.rs/crate/hyprsaver/0.4.8), [source
 
 ### Desktop integration
 
-- Keep existing CLI modes and backend selection, including argless settings, `--open`, `--daemon`, `--preview`, `--shader`, `--thumbnail`, `--output`, `--frames`, and `--backend auto|layer-shell|fullscreen`.
-- Preserve native startup timeout, readiness, exit-code handling, explicit-backend errors, and automatic fallback after startup failure.
-- Provide native fullscreen windows for GNOME/non-layer-shell Wayland and X11; do not make Hyprland or hypridle a runtime requirement.
+- Keep the existing CLI modes: argless settings, `--open`, `--daemon`, `--preview`, `--shader`, `--thumbnail`, `--output` and `--frames`. `--backend` was removed in v0.10.0.
+- Preserve native startup timeout, readiness and exit-code handling. When the saver cannot run (no Wayland session, no wlr-layer-shell, renderer unavailable), `--open` reports the reason and exits 1, and `--daemon` exits 2 so the systemd unit does not restart it. A launch failure in a running daemon is logged, and the next idle launch tries again.
+- The saver requires a Wayland compositor with wlr-layer-shell. GNOME and X11 are unsupported, and there are no fullscreen fallback windows. Do not make Hyprland or hypridle a runtime requirement.
 - Preserve idle thresholds, one active saver group, resume suppression, audio/fullscreen inhibition, and opt-in playback capture.
-- Initially retain `parec`/`pactl` and X11 inhibition helpers to avoid changing integration semantics simultaneously. Direct audio bindings can be a later improvement.
+- Initially retain `parec`/`pactl` and the `xprop` fullscreen check for XWayland windows to avoid changing integration semantics simultaneously. Direct audio bindings can be a later improvement.
 - Preserve the desktop entry and `scrnsvr.service` user service. Remove Electron-specific environment settings at final cutover.
 
 ## Delivery milestones
@@ -167,7 +167,6 @@ Sources: [release documentation](https://docs.rs/crate/hyprsaver/0.4.8), [source
 - Bring the completed corpus findings into Rust compatibility fixtures. Use `glsl` only for needed inspection; keep `glsl-lang` and the unmodified Tree-sitter GLSL grammar deferred unless new evidence resolves the recorded failures.
 - Verify paused redraw, resize, scaling, input, context teardown, and recovery after shader compilation failure.
 - Test signal/dismiss handling while frame callbacks stop. Decide which hyprsaver platform/rendering modules to extract; settings stays on GPUI Kit.
-- Prove native window creation and shader rendering on the planned fullscreen fallback platforms before settling the windowing adapter.
 
 **Exit:** a demonstrated Rust saver and editable inline preview in GPUI Kit, documented GPU ownership/synchronization, a locked compatible dependency set, and recorded source-parser/windowing decisions. Verify the daemon/saver build does not depend on initializing GPUI/Vulkan. Prototype code is not feature parity.
 
@@ -191,7 +190,7 @@ Sources: [release documentation](https://docs.rs/crate/hyprsaver/0.4.8), [source
 
 ### 4. Replace the daemon and launch orchestration
 
-- Implement CLI dispatch, renderer supervision, configuration reload, rotation, startup fallback, and shutdown deadlines.
+- Implement CLI dispatch, renderer supervision, configuration reload, rotation, startup-failure reporting with the exit-2 contract, and shutdown deadlines.
 - Introduce explicit idle-provider capabilities using protocol bindings, `x11rb`, and a `zbus` logind adapter as appropriate. Validate units, monotonic timing, unavailable/stale data, and suspend/resume behavior. Keep unknown capability distinct from zero idle time internally.
 - Replace Electron display selection. Define and test the policy for `primary` where the platform cannot report a primary output; expose the chosen output in diagnostics rather than silently claiming equivalence.
 - Preserve audio subscription sharing, silence on failure, capture shutdown, and retry semantics.
@@ -199,13 +198,12 @@ Sources: [release documentation](https://docs.rs/crate/hyprsaver/0.4.8), [source
 
 **Exit:** Rust `--daemon` runs without GUI initialization or Electron; idle activation, dismissal, resume, and renderer crashes behave correctly. Manual launch remains available when idle capability is unavailable.
 
-### 5. Complete native settings, previews, and fallback
+### 5. Complete native settings and previews
 
 - Implement settings in GPUI Kit: port shader discovery/search/favorites, live preview, manifest-driven Slider/NumberInput/ColorPicker/Select controls, advanced controls, locks, reset/randomize/undo, and saved looks.
 - Port global effects, shuffle, clock controls, desktop colors/Noctalia import, global settings, and the custom-shader editor.
 - Preserve save status/retry, focus after list edits, keyboard operation, reduced-motion startup behavior, and preview pause.
 - Use Kit's native editor/input facilities for custom GLSL; add compatible Tree-sitter highlighting only if needed, and map driver diagnostics back to user source. Keep preview GPU work and background persistence out of UI callbacks.
-- Implement native fullscreen fallback with the same shared renderer, group dismissal, and backend selection semantics.
 - Implement thumbnail capture with deterministic render inputs. Use framebuffer readback only for explicit capture, not as the normal presentation pipeline.
 - Export/import Electron-only preferences before removing the old UI.
 
@@ -230,7 +228,7 @@ Required checks before cutover:
 - Exact comparisons for normalized configuration, scene plans, shader/effect metadata, and deterministic state transitions.
 - GPU checks for all shader/effect programs, representative fixed-time output, multipass/history behavior, transparent activation, fades, failed-scene recovery, and clock composition. Set image tolerances per driver and record why differences are acceptable.
 - Lifecycle checks for partial startup failure, startup timeout, stdin closure, signals, daemon stop, stopped callbacks, display power-off, unplug, scale changes, and cleanup of input grabs/cursors/processes/resources.
-- Desktop checks on Hyprland and Sway layer-shell, GNOME native fullscreen fallback, and X11; test KDE where supported and record results separately.
+- Desktop checks on Hyprland and Sway, and on KDE where supported, with results recorded separately. On GNOME and X11, check that the app reports it is unsupported and the daemon exits 2.
 - Hardware checks on NVIDIA and Mesa, multiple outputs, mixed scales, fractional scales, differing refresh rates, and actual display power-off/resume. Report untested combinations explicitly.
 - Native UI checks for keyboard-only operation, focus, IME/clipboard, accessibility support, high DPI, resizing, paused edits, malformed custom shaders, and failed saves/retry.
 - GPUI/GLES interop checks for image/surface release, synchronization, preview clipping and overlays, resize/scale changes, repeated preview replacement, and unavailable GPU capabilities. Confirm closing settings frees its GPU resources and the independent daemon/saver continues working.
@@ -241,13 +239,92 @@ Keep packaged Rust builds opt-in until these gates pass. Do not delete rollback 
 ## Open decisions and boundaries
 
 - Settings toolkit is decided: GPUI Kit. Open: the tested GPU preview adapter and any narrowly scoped upstream integration required for inline GLES output.
-- Native saver/fallback window adapter and minimum supported Linux/GPUI dependencies: resolve with the spike and packaging baseline; keep settings dependencies isolated.
+- Minimum supported Linux/GPUI dependencies: resolve with the spike and packaging baseline; keep settings dependencies isolated. There is no saver window adapter to choose: layer-shell is the only saver target.
 - Shader source tooling: `glsl` is preferred for optional inspection; direct source handling and GLES compilation remain authoritative. Open: any corrected editor highlighting grammar, not a change to the supported GLSL ES dialect.
 - Reliable idle-provider coverage and primary-output selection across supported desktops: resolve before daemon cutover.
 - Locale formatting replacement for Intl and acceptable cross-platform font differences: resolve before UI parity sign-off.
 - Fractional scaling: evaluate upstream support early; retain current behavior until a tested replacement is available, then document any deliberate improvement.
 
 No implementation-time estimate is committed before the rendering/UI spike establishes the reuse boundary. Keep each milestone reviewable and independently reversible. The first implementation task is milestone 0, followed by the Rust saver/native-preview spike.
+
+## Implementation progress
+
+Recorded 2026-11-14 on the development system (Hyprland, NVIDIA, rustc 1.99.1). Untested combinations from [verification](#verification-and-release-gates) remain untested.
+
+### Done: Rust saver renderer (milestone 1 saver path, milestone 2 replacement)
+
+The Cargo workspace (`Cargo.toml`, `crates/`) has all five planned crates. The four saver crates are the default members; `scrnsvr-settings` builds only when named (`-p scrnsvr-settings` or `--workspace`) so plain `cargo build` never compiles GPUI.
+
+- `scrnsvr-core`: JSON-lines protocol with the C++ reader's leniency, renderer options, output selection, pointer-dismissal distance, the activation/rotation/dismissal timeline, animation clock and audio smoothing, and the `mainImage` wrapper from `shader-source.ts`. No GL or windowing dependencies.
+- `scrnsvr-render`: a `glow` port of `gl.cc` and the Pango/Cairo clock from `clock.cc`. One `Renderer` per GL context draws into framebuffer 0, so the same code runs in layer-shell windows and headless pbuffers. `read_rgba` is for explicit capture only.
+- `scrnsvr-platform`: dynamically loaded EGL (RGBA8, GLES2 contexts) and SCTK-based layer-shell outputs, seats, frame callbacks and opaque regions.
+- `scrnsvr-app`: the `scrnsvr-renderer` executable. It keeps the existing arguments, messages, `ready` line, exit codes 0–3, `--compile-check`, stdin-EOF dismissal, signal handling and `SCRNSVR_RENDERER_DEBUG`.
+
+`SCRNSVR_RENDERER=rust npm run build` (`npm run build:rust`) builds it into `dist/native/scrnsvr-renderer`. The C++ build remains the default and the rollback.
+
+Evidence:
+
+- `npm run test:rust`: 28 unit tests, one fixture test and 6 headless GPU tests pass, with Clippy `-D warnings` and rustfmt clean. The fixture test parses all 47 messages exported from the TypeScript main process by `scripts/export-rust-fixtures.cjs`: 41 built-in scenes, every catalog effect, and a clock message. The GPU tests cover typed uniform upload, opaque premultiplied fades, the rotation overlay, ordered and multipass effects, skipped broken effects, temporal history including zero-delta frames and reset, clock composition and integrated speed.
+- `npm run check-native` against the Rust binary compiles all 61 shader and effect programs.
+- `node scripts/check-native.cjs --live` passes against the Rust binary: transparent activation, fade-in, rotation through black, broken-scene recovery and dismissal that restores the desktop.
+- `electron dist/main/index.js --open --backend layer-shell` with the Rust binary rendered Aurora Veil with bloom, datamosh trails, vignette and a clock. A screenshot matched the C++ renderer's frame by eye, including clock layout. Terminating Electron closed the renderer's stdin, and it exited.
+- Rechecked 2026-11-23 on v0.10.0, where the renderer is the only saver backend and `--backend` no longer exists: `npm run test:rust`, `check-native` (61 programs) and `check-native --live` pass with the Rust binary. `electron dist/main/index.js --open` started it, it drew the scene and clock, and real pointer motion (`ydotool`) dismissed it with exit 0. As in C++, the first motion only delivers pointer enter and sets the origin; the next motion past 12 px dismisses.
+- `npm run check-parity`: both renderers gained `--capture PATH --size WxH --frames N --delta MS`, which renders the plan from stdin headless and writes the last frame as PAM. All 41 built-ins, each of the 17 effects alone, a stacked bloom/trails/aberration/vignette plan, and a clock plan were captured at 320×180 after 30 frames 33 ms apart (reactive shaders with a fixed audio envelope). All 60 Rust frames are **bit-identical** to C++ on this NVIDIA driver. A negative control that renders one frame fewer is reported as different.
+- On a single output, 60 fps, with the same scene and effects: C++ used 1.5–2.3% CPU and Rust used 1.4–2.4% over two 8-second samples. RSS was 114–175 MB for both, dominated by the driver. These are smoke measurements, not the milestone 0 baseline.
+
+Decisions made during implementation:
+
+- **No calloop in the saver.** The loop polls two descriptors and must re-dispatch whenever `prepare_read` finds events that EGL queued during a swap. An explicit `poll` loop reproduces the C++ behaviour exactly. Revisit calloop if more sources are added (timers, IPC, D-Bus).
+- **SCTK without default features.** Its keyboard handler needs xkbcommon only to decode keys, and any key press dismisses. `wl_keyboard`, `wl_pointer` and `wl_touch` are bound directly. Outputs, seats, the compositor and layer-shell use SCTK.
+- **Headless EGL requests RGBA8.** An unconstrained pbuffer config selected a low-precision format on NVIDIA. That is harmless for compile checks but wrong for capture.
+- **EGL displays are process-wide.** Terminating an `Egl` invalidates every other user of the same native display, so keep one `Egl` per native display. Tests serialize their GPU use.
+- No hyprsaver source was copied. SCTK patterns were written against 0.21 directly, so no upstream notices are required yet.
+
+### Settings preview gate: Wayland subsurface (milestone 1)
+
+`crates/scrnsvr-settings` is a GPUI Kit 0.9.1 window with a searchable shader picker, manifest-driven sliders for each shader's basic numeric controls, a pause button and a live preview. It reads `data/shaders.json`, which `scripts/export-rust-fixtures.cjs` exports from the TypeScript registry with each shader's default scene plan. It persists nothing; the Electron settings remain the product.
+
+How the preview is presented (`src/preview.rs`):
+
+- **No texture import.** The adapter creates its own `wl_surface` as a subsurface of GPUI's window surface, using GPUI's `wl_display` and `wl_surface` from its raw handles. It gives that surface its own EGL window, GLES2 context and `scrnsvr-render` renderer. GPUI never sees the preview's pixels and nothing is read back.
+- **Stacking.** The subsurface is placed *below* the window surface. The window is transparent and the stage element leaves its rectangle unpainted, so GPUI popovers and menus drawn over the preview stay on top.
+- **Placement.** A canvas paint callback reports the stage's clipped bounds and scale. Position is parent-committed state, so it moves with GPUI's next frame; size changes resize the EGL window.
+- **Pacing.** The subsurface is desynchronized. A 4 ms GPUI timer on the UI thread renders a frame only after the previous frame callback returned, so a hidden window renders nothing. Pause stops drawing and resuming does not animate the paused interval.
+- **Input.** The subsurface has an empty input region; GPUI receives all input.
+- **Teardown.** The renderer is dropped with its context current, then the EGL surface, context, EGL window, subsurface and surface are destroyed. GPUI's surface is borrowed and never destroyed.
+
+Evidence (2026-11-23, Hyprland 0.57, NVIDIA, 2560×1440 at 120 Hz, scale 1, release build). `SCRNSVR_SETTINGS_SMOKE=steps` drives the window with in-app synthetic clicks and prints each step with a timestamp; full-screen captures were taken throughout and lined up with those timestamps:
+
+- The preview rendered Aurora Veil inline at 1942×1361 and kept pace with the display (about 117 frames per second).
+- Dragging Brightness changed the uniform and the visible preview within one capture interval (about 0.25 s).
+- The shader menu, 520 px wide, opened over the preview and drew above it.
+- Switching to Chromatic Plasma replaced the scene. Widening the sidebar to 640 px moved the subsurface and resized it to 1622×1361 in step with the GPUI layout.
+- Paused: the frame counter stopped and the preview pixels were unchanged across 1.2 s of captures. While running, the same region changed by over a million pixels across three captures.
+- No errors on stderr; the process exited cleanly.
+- `cargo tree -p scrnsvr-app` contains no GPUI crates, so the daemon/saver build does not depend on GPUI or Vulkan.
+
+Findings and limits:
+
+- **Use release builds to judge responsiveness.** Unoptimized GPUI lagged the on-screen UI several seconds behind the app's state in the same run; the release build kept up.
+- **Kit's `Root` paints `tokens.background` over the whole window.** The spike sets that token to transparent and paints panels itself. Dialogs and sheets read the same token, so production needs an upstream opt-out or a small patch.
+- **Preview rendering runs on GPUI's UI thread.** It was smooth here, but a slow shader or driver stall would delay UI input. Moving the preview to its own thread with its own event queue is the likely production shape.
+- **Fractional scales round the buffer scale up** and let the compositor downsample. Only scale 1 was tested.
+- **Not tested:** Mesa, scale changes while open, multiple outputs, moving between monitors, Sway or KDE, keyboard/IME/accessibility, and compositor effects that apply to transparent windows (blur, opacity rules).
+- X11 would need a child-window adapter. Since v0.10.0 the saver requires Wayland, so the settings app can require it as well.
+
+Gate status: the presentation path is demonstrated on one driver and compositor. It meets the milestone 1 requirement for an editable inline preview without CPU readback or a GPUI fork. Before settings work builds on it, repeat the smoke check on Mesa and with a scale change.
+
+Known gaps before the Rust renderer can become the default:
+
+- Parity is proven on one driver only. Run `npm run check-parity` on Mesa before switching the default.
+- Not tested: Mesa, multiple outputs, mixed or fractional scales, display power-off, hotplug, Sway or KDE.
+- Packaging still builds C++ unless `SCRNSVR_RENDERER=rust` is set, and `electron-builder` has not been exercised with the Rust binary.
+
+### Not started
+
+- Milestone 0 beyond the scene fixtures: feature checklist, frame captures and measured baselines.
+- The rest of the milestone 1 settings gate: Mesa, scale changes, keyboard, IME and accessibility checks for the subsurface preview.
+- Milestones 3–6: configuration and scene resolution in Rust, the daemon, native settings, and packaging cutover.
 
 ## Technical references
 

@@ -3,7 +3,9 @@
     "src/renderer/index.html",
     "src/settings/index.html",
     "scripts/capture-frames.cjs",
-    "scripts/render-thumbnails.mjs"
+    "scripts/render-thumbnails.mjs",
+    "scripts/export-rust-fixtures.cjs",
+    "scripts/check-renderer-parity.cjs"
   ],
   "ignorePatterns": ["docs/refs/**"],
   "health": {

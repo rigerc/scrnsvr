@@ -1,0 +1,15 @@
+[package]
+name = "scrnsvr-platform"
+description = "Wayland layer-shell outputs, input and EGL context ownership"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+khronos-egl.workspace = true
+wayland-egl.workspace = true
+smithay-client-toolkit.workspace = true
+wayland-client.workspace = true
+thiserror.workspace = true
+scrnsvr-core.workspace = true

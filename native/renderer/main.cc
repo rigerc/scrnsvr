@@ -24,6 +24,7 @@
 #include <poll.h>
 #include <string>
 #include <unistd.h>
+#include <vector>
 #include "clock.hh"
 #include "gl.hh"
 #include "json.hh"
@@ -61,6 +62,10 @@ struct Options {
   bool hasPosition = false;
   int outputX = 0, outputY = 0;
   bool compileCheck = false;
+  /** --capture: render frames headless and write the last one as PAM (parity checks, thumbnails). */
+  std::string capturePath;
+  int captureWidth = 256, captureHeight = 144, captureFrames = 1;
+  double captureDelta = 1000.0 / 60;
 };
 
 struct App;
@@ -531,6 +536,89 @@ int compileCheck(App& app) {
   return failures ? Failed : Closed;
 }
 
+/** Render the scene from stdin headless at a fixed frame delta and write the last frame as PAM. */
+int capture(App& app) {
+  std::shared_ptr<const SceneSpec> scene;
+  ClockSpec clock;
+  float audio[4] = {0, 0, 0, 0};
+  std::string line;
+  auto handle = [&](const std::string& text) {
+    Json message;
+    try { message = parseJson(text); }
+    catch (const std::exception& error) { fprintf(stderr, "scrnsvr ignored a malformed message: %s\n", error.what()); return; }
+    std::string type = message["type"].str();
+    if (type == "scene") {
+      try { scene = std::make_shared<SceneSpec>(parseScene(message)); }
+      catch (const std::exception& error) { fprintf(stderr, "scrnsvr ignored a scene: %s\n", error.what()); }
+    } else if (type == "clock") clock = parseClock(message);
+    else if (type == "audio") {
+      const Json& value = message["value"];
+      for (size_t i = 0; i < 4 && i < value.items.size(); i++) audio[i] = float(value.items[i].num());
+    }
+  };
+  for (int c; (c = getchar()) != EOF;) {
+    if (c != '\n') { line += char(c); continue; }
+    if (!line.empty()) handle(line);
+    line.clear();
+  }
+  if (!line.empty()) handle(line);
+  if (!scene) throw Fatal{SceneFailed, "No scene to capture"};
+  const Options& o = app.options;
+  app.egl = eglGetDisplay(app.display ? reinterpret_cast<EGLNativeDisplayType>(app.display) : EGL_DEFAULT_DISPLAY);
+  if (app.egl == EGL_NO_DISPLAY || !eglInitialize(app.egl, nullptr, nullptr) || !eglBindAPI(EGL_OPENGL_ES_API)) throw Fatal{Unavailable, "EGL is unavailable"};
+  const EGLint attributes[] = {EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+    EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
+  EGLint count = 0;
+  if (!eglChooseConfig(app.egl, attributes, &app.config, 1, &count) || count < 1) throw Fatal{Unavailable, "No RGBA8 pbuffer EGL config"};
+  EGLContext context = createContext(app);
+  const EGLint size[] = {EGL_WIDTH, o.captureWidth, EGL_HEIGHT, o.captureHeight, EGL_NONE};
+  EGLSurface surface = eglCreatePbufferSurface(app.egl, app.config, size);
+  if (surface == EGL_NO_SURFACE || !eglMakeCurrent(app.egl, surface, surface, context)) throw Fatal{Unavailable, "Could not activate a headless context"};
+  std::vector<unsigned char> pixels(size_t(o.captureWidth) * size_t(o.captureHeight) * 4);
+  {
+    Renderer renderer;
+    try { renderer.init(); }
+    catch (const std::exception& error) { throw Fatal{Unavailable, error.what()}; }
+    try { renderer.setScene(scene); }
+    catch (const std::exception& error) { throw Fatal{SceneFailed, std::string("Scene ") + scene->key + " failed: " + error.what()}; }
+    ClockImage image = renderClock(clock, o.captureWidth, o.captureHeight);
+    renderer.setClock(&image);
+    for (int frame = 0; frame < o.captureFrames; frame++)
+      renderer.render(o.captureWidth, o.captureHeight, frame == 0 ? 0 : o.captureDelta, audio, 0, 1);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, o.captureWidth, o.captureHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+  }
+  eglMakeCurrent(app.egl, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  eglDestroySurface(app.egl, surface);
+  eglDestroyContext(app.egl, context);
+  FILE* file = fopen(o.capturePath.c_str(), "wb");
+  if (!file) throw Fatal{Failed, "Could not write " + o.capturePath};
+  fprintf(file, "P7\nWIDTH %d\nHEIGHT %d\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n", o.captureWidth, o.captureHeight);
+  // GL rows start at the bottom; PAM rows start at the top.
+  size_t row = size_t(o.captureWidth) * 4;
+  for (int y = o.captureHeight - 1; y >= 0; y--) fwrite(pixels.data() + size_t(y) * row, 1, row, file);
+  bool ok = fclose(file) == 0;
+  if (!ok) throw Fatal{Failed, "Could not write " + o.capturePath};
+  return Closed;
+}
+
+/** Non-negative decimal integer without strtol (also redirected by newer glibc headers). */
+bool parseCount(const std::string& text, size_t& i, int& out) {
+  size_t start = i;
+  long value = 0;
+  while (i < text.size() && text[i] >= '0' && text[i] <= '9' && value < 1000000) value = value * 10 + (text[i++] - '0');
+  out = int(value);
+  return i > start;
+}
+
+/** "WxH", each 1..16384. */
+bool parseSize(const std::string& text, int& width, int& height) {
+  size_t i = 0;
+  if (!parseCount(text, i, width) || i >= text.size() || text[i++] != 'x' || !parseCount(text, i, height) || i != text.size()) return false;
+  return width >= 1 && width <= 16384 && height >= 1 && height <= 16384;
+}
+
 /** "x,y" with optional signs. Avoids sscanf, which glibc 2.38 redirects to a newer symbol. */
 bool parsePosition(const std::string& text, int& x, int& y) {
   size_t i = 0;
@@ -563,6 +651,12 @@ Options parseOptions(int argc, char** argv) {
       std::string position = value();
       options.hasPosition = parsePosition(position, options.outputX, options.outputY);
     } else if (arg == "--compile-check") options.compileCheck = true;
+    else if (arg == "--capture") options.capturePath = value();
+    else if (arg == "--size") {
+      std::string size = value();
+      if (!parseSize(size, options.captureWidth, options.captureHeight)) throw Fatal{Failed, "Invalid value for --size: " + size};
+    } else if (arg == "--frames") options.captureFrames = std::max(1, int(std::atof(value().c_str())));
+    else if (arg == "--delta") options.captureDelta = std::max(0.0, std::atof(value().c_str()));
     else throw Fatal{Failed, "Unknown option " + arg};
   }
   return options;
@@ -574,6 +668,8 @@ void dispatchPending(App& app) {
 }
 
 int run(App& app) {
+  // Capture prefers the compositor's GPU but also works without Wayland.
+  if (!app.options.capturePath.empty()) { app.display = wl_display_connect(nullptr); return capture(app); }
   app.display = wl_display_connect(nullptr);
   if (!app.display) throw Fatal{Unavailable, "Cannot connect to Wayland"};
   app.registry = wl_display_get_registry(app.display);

@@ -1,0 +1,39 @@
+# Native Rust rewrite (docs/rust-rewrite-plan.md). The Electron app and the C++
+# renderer remain the default until each Rust replacement passes its checks.
+[workspace]
+resolver = "3"
+members = ["crates/scrnsvr-core", "crates/scrnsvr-render", "crates/scrnsvr-platform", "crates/scrnsvr-app", "crates/scrnsvr-settings"]
+# The settings UI pulls in GPUI (wgpu/Vulkan). Plain `cargo build`/`cargo test` cover the
+# saver crates only; build settings explicitly with `-p scrnsvr-settings` or `--workspace`.
+default-members = ["crates/scrnsvr-core", "crates/scrnsvr-render", "crates/scrnsvr-platform", "crates/scrnsvr-app"]
+
+[workspace.package]
+version = "0.10.0"
+edition = "2024"
+rust-version = "1.88"
+repository = "https://github.com/rigerc/scrnsvr"
+publish = false
+
+[workspace.dependencies]
+scrnsvr-core = { path = "crates/scrnsvr-core" }
+scrnsvr-render = { path = "crates/scrnsvr-render" }
+scrnsvr-platform = { path = "crates/scrnsvr-platform" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
+thiserror = "2.0.18"
+libc = "0.2.177"
+# The compile-checked rendering/platform group from docs/research/rust-rewrite-evaluation.md.
+glow = "=0.18.0"
+khronos-egl = { version = "=6.0.0", features = ["dynamic"] }
+wayland-egl = "=0.32.11"
+smithay-client-toolkit = { version = "=0.21.1", default-features = false }
+wayland-client = { version = "=0.31.15", features = ["system"] }
+pango = "0.22.9"
+pangocairo = "0.22"
+cairo-rs = "0.22.9"
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"

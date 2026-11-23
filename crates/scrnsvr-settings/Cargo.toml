@@ -1,0 +1,20 @@
+[package]
+name = "scrnsvr-settings"
+description = "Native settings (GPUI Kit) spike: manifest-driven controls over an inline GLES preview"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui-kit = "=0.9.1"
+scrnsvr-core.workspace = true
+scrnsvr-render.workspace = true
+scrnsvr-platform.workspace = true
+glow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wayland-client.workspace = true
+wayland-egl.workspace = true
+# Matches GPUI's raw-window-handle so its Window handles can be read.
+raw-window-handle = "0.6.2"

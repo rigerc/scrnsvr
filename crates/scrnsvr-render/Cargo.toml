@@ -1,0 +1,18 @@
+[package]
+name = "scrnsvr-render"
+description = "GLES2 scene renderer: shaders, effect passes and history, fades, clock composition"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+scrnsvr-core.workspace = true
+glow.workspace = true
+libc.workspace = true
+pango.workspace = true
+pangocairo.workspace = true
+cairo-rs.workspace = true
+
+[dev-dependencies]
+scrnsvr-platform.workspace = true

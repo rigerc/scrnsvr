@@ -1,0 +1,19 @@
+[package]
+name = "scrnsvr-app"
+description = "scrnsvr native executables; currently the drop-in layer-shell renderer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "scrnsvr-renderer"
+path = "src/main.rs"
+
+[dependencies]
+scrnsvr-core.workspace = true
+scrnsvr-render.workspace = true
+scrnsvr-platform.workspace = true
+glow.workspace = true
+libc.workspace = true
+wayland-client.workspace = true

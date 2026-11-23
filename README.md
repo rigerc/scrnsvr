@@ -101,6 +101,25 @@ SCRNSVR_RENDERER_DEBUG=1 npx electron dist/main/index.js --open
 
 `npm run build` attempts the native build and continues without it if development dependencies are missing; settings and previews still work, but the screensaver cannot run until `npm run build:native` succeeds. See [ADR-002](docs/decisions/0002-native-renderer.md) for the design.
 
+#### Rust renderer (opt-in)
+
+The [Rust rewrite](docs/rust-rewrite-plan.md) includes a drop-in replacement for the C++ renderer, built from the Cargo workspace in `crates/`. It accepts the same arguments, JSON-lines messages and exit codes. The C++ renderer remains the default and the rollback path. The Rust build needs a Rust toolchain (`rust-version` in `Cargo.toml`) and the same Wayland, EGL and `pangocairo` development files; `wayland-scanner` and GLES headers are not needed.
+
+```sh
+# Build the app with the Rust renderer in dist/native/scrnsvr-renderer
+npm run build:rust            # same as SCRNSVR_RENDERER=rust npm run build
+# Rust unit tests, headless GPU tests, Clippy and rustfmt
+npm run test:rust
+# Capture every built-in shader, effect and the clock headless with both renderers
+# at a fixed frame delta and compare pixels (both binaries accept --capture PATH --size WxH --frames N --delta MS)
+npm run check-parity
+# Refresh the scene-plan fixtures the Rust protocol tests parse and the settings spike's catalog
+node scripts/export-rust-fixtures.cjs
+# Settings spike (GPUI Kit; needs Vulkan). Build in release: debug GPUI is too slow to judge.
+# SCRNSVR_SETTINGS_SMOKE=steps runs a scripted check and prints each step.
+cargo run --release -p scrnsvr-settings
+```
+
 ## Shader controls
 
 Choose a shader and adjust its sliders for a live preview. Numeric fields accept precise values when you press Enter or leave the field. Each control has its own Reset button; Reset shader restores all defaults. Open **Advanced** for finer motion, geometry, and color adjustments. Randomize respects slider steps and conservative motion ranges while keeping background colors unchanged.
@@ -193,3 +212,5 @@ systemctl --user enable --now scrnsvr.service
 - `scripts/generate-shader-registry.mjs` — generates `src/renderer/shaders/generated.ts`
 - `tests/` — Vitest suites for CLI, config, daemon, Noctalia, uniforms, and the shader manifest and canonical-ABI contracts
 - `packaging/` — systemd unit + deb post-install script
+- `native/renderer/` — C++ layer-shell renderer (default)
+- `crates/` — Rust rewrite: `scrnsvr-core` (protocol, fades, timing), `scrnsvr-render` (GLES renderer, clock), `scrnsvr-platform` (EGL, layer-shell), `scrnsvr-app` (the `scrnsvr-renderer` executable), `scrnsvr-settings` (GPUI Kit settings spike with an inline preview; not part of the default build)
