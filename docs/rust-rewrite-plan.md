@@ -306,13 +306,22 @@ Evidence (2026-11-23, Hyprland 0.57, NVIDIA, 2560×1440 at 120 Hz, scale 1, rele
 Findings and limits:
 
 - **Use release builds to judge responsiveness.** Unoptimized GPUI lagged the on-screen UI several seconds behind the app's state in the same run; the release build kept up.
-- **Kit's `Root` paints `tokens.background` over the whole window.** The spike sets that token to transparent and paints panels itself. Dialogs and sheets read the same token, so production needs an upstream opt-out or a small patch.
+- **The window background needs no GPUI Kit patch.** Kit's window plugin paints `tokens.background` over the whole surface, which would hide the preview. `gpui_base::Root` applies its own style after the plugin's, so `clear_window_background` sets a transparent background on `Root` and leaves the token opaque for dialogs, sheets and tabs. Panels paint `theme.background` themselves. Kit 0.10.0 keeps the same order. Kit does not document that order, so the `root_background_overrides_the_window_plugin` test draws a headless Kit window and checks the painted quads. Without the override an opaque quad covers the window (the control case), and with it none does. Making the override a no-op fails the test. Rechecked on screen after the change: the preview shows through, the menu draws over it, and the shader switch and relayout work.
+- **The test enables `test-support` on `gpui-pre` directly.** GPUI Kit's own `test-support` feature also resolves its optional `gpui-fast` backend, which conflicts with the locked `gpui-pre` stack. The test-only additions to `Cargo.lock` (criterion, proptest and others) do not reach the saver build.
 - **Preview rendering runs on GPUI's UI thread.** It was smooth here, but a slow shader or driver stall would delay UI input. Moving the preview to its own thread with its own event queue is the likely production shape.
 - **Fractional scales round the buffer scale up** and let the compositor downsample. Only scale 1 was tested.
 - **Not tested:** Mesa, scale changes while open, multiple outputs, moving between monitors, Sway or KDE, keyboard/IME/accessibility, and compositor effects that apply to transparent windows (blur, opacity rules).
 - X11 would need a child-window adapter. Since v0.10.0 the saver requires Wayland, so the settings app can require it as well.
 
 Gate status: the presentation path is demonstrated on one driver and compositor. It meets the milestone 1 requirement for an editable inline preview without CPU readback or a GPUI fork. Before settings work builds on it, repeat the smoke check on Mesa and with a scale change.
+
+When upgrading GPUI Kit (pinned at `=0.9.1`):
+
+1. Run `cargo test -p scrnsvr-settings`. The window background test fails if Kit changes how `Root` and its window plugin style the surface.
+2. Run `SCRNSVR_SETTINGS_SMOKE=steps cargo run --release -p scrnsvr-settings` and check on screen that the preview is visible, the shader menu draws over it, and relayout moves it.
+3. Check that the window plugin's `decorate` (the window border) still paints nothing opaque over the content.
+
+Patch GPUI Kit only if a release reverses the style order, paints an opaque layer in its window border, or dialog overlays need to treat the preview differently. In that case, vendor the smallest affected crate, point `[patch.crates-io]` at it, and record the upstream version, the diff and the license.
 
 Known gaps before the Rust renderer can become the default:
 

@@ -308,15 +308,24 @@ async fn smoke_steps(view: Entity<Settings>, window: AnyWindowHandle, cx: &mut A
     cx.update(|cx| cx.quit());
 }
 
+/// Let the preview subsurface below the window show through.
+///
+/// Kit's window plugin paints `tokens.background` over the whole surface. Root applies its own
+/// style after the plugin's, so a transparent Root background wins while the token, which
+/// dialogs, sheets and tabs also use, stays opaque. Panels paint `theme.background` themselves.
+/// `tests::root_background_overrides_the_window_plugin` fails if a Kit upgrade changes that order.
+fn clear_window_background(window: &mut Window, cx: &mut App) {
+    gpui_kit::base::Root::update(window, cx, |root, _, cx| {
+        root.style().background = Some(transparent_black().into());
+        cx.notify();
+    });
+}
+
 fn main() {
     let smoke = std::env::var("SCRNSVR_SETTINGS_SMOKE").ok();
     gpui_kit::application().run(move |cx| {
         gpui_kit::init(cx);
         Theme::change(ThemeMode::Dark, None, cx);
-        // Kit's Root paints `tokens.background` over the whole window, which would cover the
-        // preview hole. Panels paint `theme.background` themselves instead. Production needs a
-        // Root opt-out upstream: dialogs and sheets also read this token.
-        Theme::global_mut(cx).tokens.background = transparent_black().into();
         let options = WindowOptions {
             // Transparent so the preview subsurface below the window shows through the unpainted stage.
             window_background: WindowBackgroundAppearance::Transparent,
@@ -326,6 +335,7 @@ fn main() {
         };
         let (window, view) = gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| Settings::new(window, cx)))
             .expect("failed to open the settings window");
+        let _ = window.update(cx, |_, window, cx| clear_window_background(window, cx));
         match smoke.as_deref() {
             Some("steps") => cx.spawn(async move |cx| smoke_steps(view, window, cx).await).detach(),
             Some(seconds) => {
@@ -340,4 +350,63 @@ fn main() {
             None => {}
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    // Explicit imports: the gpui_kit glob also exports GPUI's `test` macro, which would shadow
+    // the built-in `#[test]` that `#[gpui::test]` expands to.
+    use gpui_kit::{
+        AppContext as _, Bounds, Context, IntoElement, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions,
+        div, px, size,
+    };
+
+    use super::clear_window_background;
+
+    struct Blank;
+
+    impl Render for Blank {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+
+    /// Opaque quads that cover the whole window in the last drawn frame.
+    fn covering_quads(cx: &mut TestAppContext, clear: bool) -> usize {
+        let window = cx.update(|cx| {
+            let bounds = Bounds { origin: Point::default(), size: size(px(800.), px(600.)) };
+            let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..WindowOptions::default() };
+            gpui_kit::open_window(options, cx, |_, cx| cx.new(|_| Blank)).expect("open test window").0
+        });
+        cx.update_window(window, |_, window, cx| {
+            if clear {
+                clear_window_background(window, cx);
+            }
+            window.draw(cx).clear(cx);
+            let scale = window.scale_factor();
+            let viewport = window.viewport_size();
+            let (width, height) = (f32::from(viewport.width) * scale, f32::from(viewport.height) * scale);
+            window
+                .painted_quads()
+                .iter()
+                .filter(|quad| {
+                    let bounds = quad.bounds;
+                    !quad.background.is_transparent()
+                        && bounds.origin.x.as_f32() <= 0.
+                        && bounds.origin.y.as_f32() <= 0.
+                        && (bounds.origin.x + bounds.size.width).as_f32() >= width
+                        && (bounds.origin.y + bounds.size.height).as_f32() >= height
+                })
+                .count()
+        })
+        .expect("draw test window")
+    }
+
+    #[gpui::test]
+    fn root_background_overrides_the_window_plugin(cx: &mut TestAppContext) {
+        cx.update(gpui_kit::init);
+        // Control: without the override Kit paints an opaque background over the whole window.
+        assert!(covering_quads(cx, false) > 0, "Kit no longer paints a window background; revisit clear_window_background");
+        assert_eq!(covering_quads(cx, true), 0, "an opaque quad covers the window and would hide the preview");
+    }
 }

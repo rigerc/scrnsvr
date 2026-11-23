@@ -18,3 +18,9 @@ wayland-client.workspace = true
 wayland-egl.workspace = true
 # Matches GPUI's raw-window-handle so its Window handles can be read.
 raw-window-handle = "0.6.2"
+
+[dev-dependencies]
+# Headless windows and painted-scene inspection for the window background test. This enables
+# test support on the GPUI that Kit already uses; gpui-kit's own test-support feature would also
+# resolve its optional gpui-fast backend, which conflicts with this lockfile.
+gpui = { package = "gpui-pre", version = "=0.3.12", features = ["test-support"] }
