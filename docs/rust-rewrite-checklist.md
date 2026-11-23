@@ -18,6 +18,8 @@ In the evidence column, suite names are relative to `tests/` and end in `.test.t
 
 ## Daemon
 
+> **Superseded (2026-11-23):** the native app has no built-in daemon. Idle, inhibition and resume handling move to Noctalia's idle service or hypridle, which run `scrnsvr --open`. The rows below are Dropped except launch supervision, single-saver behavior (now a cross-process lock) and failure reporting, which apply to `--open`. See [Noctalia idle integration](rust-rewrite-plan.md#noctalia-idle-integration).
+
 | Capability | Current source · tests/checks | Status | Milestone | Rust today | Native verification |
 | --- | --- | --- | --- | --- | --- |
 | Start after the configured idle threshold (default 300 s, zero allowed). | `src/main/daemon.ts`, `src/main/index.ts`, `src/shared/config.ts` · daemon, daemon-logind, config | Changed — use `ext-idle-notify-v1` in place of Electron polling and the logind idle-time fallback. Document hypridle calling `scrnsvr --open`. | 4 | No | Fake idle-source unit tests for boundary and activity, then live Hyprland threshold and hypridle smoke. |

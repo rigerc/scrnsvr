@@ -22,10 +22,10 @@ These were agreed with the maintainer and override any conflicting text below.
 - **Test hardware:** the development machine only (NVIDIA, one 2560×1440 output at 120 Hz, scale 1). Mesa, multiple outputs, fractional or mixed scales and hotplug remain documented as untested; do not block on them.
 - **User data:** fresh start. The native app reads and writes `$XDG_CONFIG_HOME/scrnsvr/config.toml` (falling back to `~/.config/scrnsvr/config.toml`). It does not read `config.json`, migrate legacy fields or import favorites from Electron.
 - **Reactive audio is dropped:** no `parec`/`pactl` capture, audio envelope or audio settings. The three audio shaders (Reactive Bass Bloom, Reactive Pulse Rings, Reactive Audio Ribbons) stay; `uAudio` is always zero, so they render their quiet state, and custom shaders that read it still compile.
-- **Idle:** the daemon uses the Wayland `ext-idle-notify-v1` protocol, and the README also documents running `scrnsvr --open` from hypridle as an alternative.
-- **Inhibition:** only Wayland idle inhibitors from apps (and Hyprland `idleinhibit` window rules) prevent activation. No audio-playback check and no `xprop` fullscreen check.
+- **Idle:** no built-in daemon. Noctalia's idle service (or hypridle) runs `scrnsvr --open`; see [Noctalia idle integration](#noctalia-idle-integration). `scrnsvr --daemon` exits 2 with a message pointing there. (Decided later on 2026-11-23, replacing the earlier `ext-idle-notify-v1` daemon decision.)
+- **Inhibition:** left to the idle service. Noctalia respects Wayland idle inhibitors and `org.freedesktop.ScreenSaver` D-Bus inhibits (browsers during video). scrnsvr has no audio-playback or `xprop` fullscreen check.
 - **Clock:** fixed default time and date formats with the 12h/24h option, plus an optional strftime-style pattern in the config. No locale data.
-- **Packaging:** AppImage only. No `.deb`.
+- **Packaging:** AppImage only. No `.deb` and no systemd user service (there is no daemon).
 - **Settings scope:** everything in the current settings app carries over (shader browsing, search, favorites, controls, locks, randomize/undo, saved looks, effects, shuffle, clock, desktop/Noctalia colors, custom shader editor, thumbnails) except reactive audio.
 - **Workflow:** work proceeds autonomously through the milestones, delegated to Codex agents, with commits on the branch as each piece lands.
 
@@ -204,19 +204,31 @@ Sources: [release documentation](https://docs.rs/crate/hyprsaver/0.4.8), [source
 
 **Exit:** Rust resolves the same scene plans as TypeScript for equivalent settings, and TOML configuration round-trips. The renderer still accepts the existing protocol; application behavior can move independently of GPU code.
 
-### 4. Replace the daemon and launch orchestration
+### 4. Replace launch orchestration and the command line
 
-- Implement CLI dispatch, renderer supervision, configuration reload, rotation, startup-failure reporting with the exit-2 contract, and shutdown deadlines.
-- Detect idle with `ext-idle-notify-v1` (configured threshold, resume notification, inhibitors respected). Handle suspend/resume via logind over `zbus` if needed for resume suppression. If the protocol is unavailable, log it and keep manual `--open` working; document the hypridle alternative.
-- Replace Electron display selection. Define and test the policy for `primary` where Wayland cannot report a primary output; expose the chosen output in diagnostics.
-- No audio capture or audio/fullscreen inhibition checks.
+- Implement CLI dispatch, renderer supervision, configuration reload, rotation, startup-failure reporting, and shutdown deadlines for `--open`, plus `--preview`, `--thumbnail` and `--shader`.
+- Replace Electron display selection. On Hyprland, "primary" is the output at logical position (0,0), else the first output; log the choice.
+- Make `--open` safe to trigger externally: a single-instance lock, `--dismiss`, a stable `~/.local/bin/scrnsvr` link (`--install`), and `--setup-noctalia` (see [Noctalia idle integration](#noctalia-idle-integration)).
+- No built-in idle daemon, systemd service, audio capture or audio/fullscreen inhibition checks.
 
-**Exit:** Rust `--daemon` runs without GUI initialization or Electron; idle activation, dismissal, resume, and renderer crashes behave correctly. Manual launch remains available when idle capability is unavailable.
+**Exit:** `scrnsvr --open`, `--preview` and `--thumbnail` run without Electron or GPUI; renderer crashes, startup failures and overlapping triggers behave correctly; Noctalia setup works against a fake `noctalia` CLI.
+
+### Noctalia idle integration
+
+Agreed 2026-11-23. The maintainer's session runs scrnsvr from Noctalia 5.5: an idle behavior `[idle.behavior.screensaver]` (`action = "command"`, 600 s) and a top-right hot corner both run `--open`, and Noctalia persists GUI/IPC changes to `~/.local/state/noctalia/settings.toml`. Noctalia's `idle.pre_action_fade_seconds` (2.0 there) fades a tint over the screen before running the command, which together with scrnsvr's own fade-in is the likely cause of the reported "double fade in".
+
+- **CLI (milestone 4):**
+  - `--open` holds an exclusive lock on `$XDG_RUNTIME_DIR/scrnsvr/saver.lock` while a saver runs; a second trigger exits 0.
+  - `--dismiss` closes a running saver with its normal fade-out.
+  - `--install` links `~/.local/bin/scrnsvr` (or `$XDG_BIN_HOME/scrnsvr`) to the AppImage, so external commands never name a versioned file.
+- **`--setup-noctalia [--apply] [--timeout N]` (milestone 4):** reads `noctalia msg config-get idle` and reuses a behavior whose command already runs scrnsvr, or creates `idle.behavior.scrnsvr` and appends it to `behavior_order`. The desired state is `action = "command"`, command `<stable path> --open`, enabled, and the given/existing/600 s timeout. It also sets `idle.pre_action_fade_seconds = 0` so only scrnsvr fades. It is a dry run by default; `--apply` writes only through `noctalia msg config-set`, never by editing Noctalia's files, and only when the user asks.
+- **Settings app (milestone 5):** an Idle section shows whether Noctalia launches scrnsvr, its timeout and enabled state (via `config-get`), lets the user edit the timeout in Noctalia, and offers the same explicit "Set up" action. It shows hypridle and hot-corner instructions for other setups.
+- **Verification:** unit tests against a fake `noctalia` on `PATH`. Before release, apply the setup to the real session with the maintainer's consent, then record a real Noctalia-triggered activation (wf-recorder, 60 fps) to confirm a single fade.
 
 ### 5. Complete native settings and previews
 
 - Implement settings in GPUI Kit: port shader discovery/search/favorites, live preview, manifest-driven Slider/NumberInput/ColorPicker/Select controls, advanced controls, locks, reset/randomize/undo, and saved looks.
-- Port global effects, shuffle, clock controls (including the optional strftime pattern), desktop colors/Noctalia import, global settings, and the custom-shader editor. No audio settings.
+- Port global effects, shuffle, clock controls (including the optional strftime pattern), desktop colors/Noctalia import, global settings (including the Noctalia Idle section), and the custom-shader editor. No audio settings or idle threshold of scrnsvr's own.
 - Preserve save status/retry, focus after list edits, keyboard operation, reduced-motion startup behavior, and preview pause.
 - Use Kit's native editor/input facilities for custom GLSL; add compatible Tree-sitter highlighting only if needed, and map driver diagnostics back to user source. Keep preview GPU work and background persistence out of UI callbacks.
 - Implement thumbnail capture with deterministic render inputs. Use framebuffer readback only for explicit capture, not as the normal presentation pipeline.
