@@ -394,6 +394,15 @@ Known gaps before the Rust renderer can become the default:
 - Evidence: 52 settings tests (10 headless tab tests); `npm run test:rust` 134 tests, Clippy and rustfmt clean; vitest 376. Release walkthrough on Hyprland with a fake `noctalia` (19 captures: effects added, reordered and bypassed, shuffle, clock pattern valid and invalid, global and per-visual schemes, idle review/apply/timeout); the real session's Noctalia config was not changed. A flaky "Text file busy" race in two milestone 4 CLI tests now retries in test setup.
 - Open: fullscreen preview from settings, custom shader editor, thumbnail tiles, screen-reader check.
 
+### Milestone 5 (part 3): custom shaders, thumbnails, fullscreen preview, accessibility
+
+- Custom shader editor (`custom_ui`, `model/custom`, `validation`): add, rename, delete, import (100 KB); GPUI Kit code editor with line numbers; 400 ms debounce; policy checks plus a real GLES compile in a long-lived `scrnsvr-renderer --compile-check` child (15 s timeout, restarted on hang, off the UI thread). Driver logs (NVIDIA, Mesa, ANGLE formats) map to user lines through a per-line origin map built beside the wrapper (`custom_fragment_source_mapped`), so the compiled text is unchanged and scene parity still holds. Invalid drafts never reach the config or the preview. IDs are `custom-<slug>-<8 hex>`, stable across rename and edit.
+- Thumbnails (`scrnsvr_core::thumbnail`, `thumbnails`, `gallery`): clean 640×360 captures through `scrnsvr-renderer --capture`, two at a time, cached as `<id>-<FNV-1a of the scene message and capture revision>.png` under `$XDG_CACHE_HOME/scrnsvr/thumbnails/` and pruned on change; CLI `--thumbnail` shares the code. The bank shows portrait tiles in a grid with arrow-key navigation.
+- Fullscreen preview (`fullscreen`): flushes saves and pending checks, checks the saver lock, runs `scrnsvr --open --shader <id>`, pauses the settings preview while it runs, reports failures, and exits with `scrnsvr --dismiss`.
+- Accessibility: inspected the AT-SPI tree on the live session (`gi.repository.Atspi`). Live regions now carry their text as the accessible name, tiles expose pressed state, editor and new controls are labelled, and Escape leaves the editor (Tab indents). Plain text (headings, captions) and the preview subsurface are not exposed by GPUI. No Orca or IME pass yet.
+- Evidence: `npm run test:rust` 175 tests (core 58, app 27, render 14, settings 76), Clippy and rustfmt clean, vitest 376; GPU tests on NVIDIA for mapped error lines and deterministic capture. Live release run: 41 then 42 thumbnails, a mapped error on line 4 with the preview keeping the last valid shader, recovery, rename, the custom shader with effects and in shuffle, and the real saver as fullscreen preview.
+- Deviations from DESIGN.md: the editor is an inline panel that autosaves instead of a modal with Preview/Save/Cancel; tiles show clean defaults; no GLSL syntax highlighting. Open: Orca and IME checks, scrolling the bank to a newly added tile, keeping never-valid drafts across restarts.
+
 ### Milestone 6 (prep): native AppImage
 
 - `scripts/build-appimage.sh` (`npm run dist:native`) builds `release/native/Scrnsvr-<version>-x86_64.AppImage` (19 MB) and its SHA256SUMS with pinned, checksum-verified `appimagetool` 1.9.1 and type2-runtime 20251108, and `SOURCE_DATE_EPOCH` from HEAD (two builds from the same binaries were identical). `AppRun` links to `usr/bin/scrnsvr`, so sibling lookup of the renderer and settings and `$APPIMAGE` for `--install` work unchanged. The desktop entry is `packaging/native/scrnsvr.desktop` (`StartupWMClass=scrnsvr-settings`).
@@ -405,7 +414,7 @@ Known gaps before the Rust renderer can become the default:
 
 - Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- The rest of milestone 5: fullscreen preview from settings, the custom shader editor, thumbnail tiles in the shader bank, and a screen-reader check. Then the milestone 6 cutover.
+- Orca and IME checks for the settings app. Then the milestone 6 cutover: remove Electron/TypeScript/C++, release notes, version 1.0.0.
 - Applying the Noctalia setup to the real session and recording a Noctalia-triggered activation to confirm a single fade (needs the maintainer's go-ahead).
 
 ## Technical references

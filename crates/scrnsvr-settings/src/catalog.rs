@@ -53,7 +53,7 @@ pub fn visuals(config: &Config) -> Vec<Visual> {
     visuals.extend(config.custom_shaders.iter().map(|shader| Visual {
         id: shader.id.clone(),
         title: shader.title.clone(),
-        description: String::new(),
+        description: "Your saved shader.".into(),
         category: "Custom",
         uniforms: Vec::new(),
     }));

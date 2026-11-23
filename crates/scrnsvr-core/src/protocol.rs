@@ -9,7 +9,7 @@
 //! are ignored. The main process (`buildScenePlan`, `clockMessage`) is the
 //! source of truth for every value, so the renderer never re-validates them.
 
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
@@ -165,6 +165,40 @@ pub fn compile_report(id: &str, error: Option<&str>) -> String {
         report.insert("error".into(), Value::String(error.into()));
     }
     Value::Object(report).to_string()
+}
+
+fn uniforms_json(values: &[(String, UniformValue)]) -> Map<String, Value> {
+    values
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.clone(),
+                match value {
+                    UniformValue::Scalar(value) => json!(value),
+                    UniformValue::Vector(values) => json!(values),
+                },
+            )
+        })
+        .collect()
+}
+
+/// The `scene` message that carries `scene` to the renderer.
+pub fn scene_message(scene: &SceneSpec) -> Value {
+    let effects: Vec<_> = scene
+        .effects
+        .iter()
+        .map(|layer| {
+            json!({
+                "id": layer.id, "passes": layer.passes, "history": layer.history, "uniforms": uniforms_json(&layer.uniforms)
+            })
+        })
+        .collect();
+    json!({
+        "type": "scene",
+        "key": scene.key,
+        "shader": { "source": scene.source, "uniforms": uniforms_json(&scene.uniforms), "integrated": scene.integrated, "audio": scene.audio },
+        "effects": effects,
+    })
 }
 
 fn num(value: &Value, fallback: f64) -> f64 {

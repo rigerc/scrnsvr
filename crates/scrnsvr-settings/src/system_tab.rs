@@ -14,7 +14,7 @@ use crate::idle_ui::IdleUi;
 use crate::model::Model;
 use crate::model::clock::global_defs;
 use crate::model::colors::{self, NONE};
-use crate::view::{LINE, MUTED, button, label, note, status};
+use crate::view::{LINE, MUTED, button, label, live, note};
 
 #[derive(Clone)]
 pub struct SchemeItem {
@@ -194,21 +194,26 @@ impl Settings {
                     .menu_max_h(px(320.))
                     .accessibility_label("Color scheme for this visual"),
             )
-            .child(status("system-status-11").text_size(px(13.)).text_color(rgb(MUTED)).child(self.model.color_hint()))
+            .child(live("system-status-11", self.model.color_hint()).text_size(px(13.)).text_color(rgb(MUTED)))
             .child(
                 button("import-noctalia", if self.system_ui.importing { "Importing…" } else { "Import Noctalia colors" })
                     .disabled(!colored || self.system_ui.importing)
                     .on_click(cx.listener(|this, _, window, cx| this.import_noctalia_colors(window, cx))),
             )
-            .child(status("system-status-12").text_size(px(13.)).text_color(rgb(MUTED)).child(
-                self.system_ui.import_message.clone().unwrap_or_else(|| {
-                    if colored {
-                        "Apply your desktop palette to this visual.".into()
-                    } else {
-                        "This visual uses a built-in palette. Choose one with color controls to import colors.".into()
-                    }
-                }),
-            ))
+            .child(
+                live(
+                    "system-status-12",
+                    self.system_ui.import_message.clone().unwrap_or_else(|| {
+                        if colored {
+                            "Apply your desktop palette to this visual.".into()
+                        } else {
+                            "This visual uses a built-in palette. Choose one with color controls to import colors.".into()
+                        }
+                    }),
+                )
+                .text_size(px(13.))
+                .text_color(rgb(MUTED)),
+            )
     }
 
     pub(crate) fn system_panel(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {

@@ -1,5 +1,6 @@
 //! Connects the settings model, component state, preview and background saves.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::component::IndexPath;
@@ -12,12 +13,16 @@ use scrnsvr_core::catalog::SettingValue;
 
 use crate::clock_tab::ClockUi;
 use crate::controls::{Control, Target};
+use crate::custom_ui::CustomUi;
 use crate::effects_tab::EffectsUi;
+use crate::fullscreen::Fullscreen;
 use crate::looks_tab::ShuffleUi;
 use crate::model::{Model, RandomScope};
 use crate::persistence::{self, Paths, SaveQueue};
 use crate::preview::PreviewSurface;
 use crate::system_tab::SystemUi;
+use crate::thumbnails::Thumbnails;
+use crate::validation::{RendererChecker, ShaderChecker};
 
 pub type TextSelect = SelectState<SearchableVec<SharedString>>;
 
@@ -82,6 +87,11 @@ pub struct Settings {
     pub shuffle_ui: ShuffleUi,
     pub clock_ui: ClockUi,
     pub system_ui: SystemUi,
+    pub custom: CustomUi,
+    pub thumbnails: Thumbnails,
+    pub fullscreen: Fullscreen,
+    /// The preview was paused for the fullscreen preview and should resume after it.
+    pub fullscreen_paused: bool,
     pub search: Entity<InputState>,
     pub quick_picker: Entity<SelectState<SearchableVec<VisualItem>>>,
     pub random_scope: Entity<TextSelect>,
@@ -97,7 +107,7 @@ pub struct Settings {
     pub preview: Option<PreviewSurface>,
     pub preview_error: Option<String>,
     pub paused: bool,
-    playback_chosen: bool,
+    pub(crate) playback_chosen: bool,
     pub config_save: SaveQueue,
     pub ui_save: SaveQueue,
     pub load_warnings: Vec<String>,
@@ -191,6 +201,20 @@ impl Settings {
         let shuffle_ui = ShuffleUi::new(&model, window, cx);
         let clock_ui = ClockUi::new(&model, window, cx);
         let system_ui = SystemUi::new(&model, window, cx);
+        let checker: Arc<dyn ShaderChecker> =
+            paths.checker.clone().unwrap_or_else(|| Arc::new(RendererChecker::new(paths.renderer.clone())));
+        let custom = CustomUi::new(checker, window, cx);
+        let title_events = cx.subscribe_in(&custom.title, window, |this, _, event: &InputEvent, window, cx| {
+            if matches!(event, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                this.commit_title(window, cx);
+            }
+        });
+        let source_events = cx.subscribe_in(&custom.editor, window, |this, _, event: &InputEvent, window, cx| {
+            if matches!(event, InputEvent::Change) {
+                this.source_edited(window, cx);
+            }
+        });
+        let thumbnails = Thumbnails::new(paths.cache.clone(), scrnsvr_core::thumbnail::DEFAULT_FRAMES);
         // The clock example shows the current time, so it refreshes each second while it is on screen.
         let clock_task = cx.spawn_in(window, async move |this, cx| {
             loop {
@@ -215,6 +239,10 @@ impl Settings {
             shuffle_ui,
             clock_ui,
             system_ui,
+            custom,
+            thumbnails,
+            fullscreen: Fullscreen::default(),
+            fullscreen_paused: false,
             search,
             quick_picker,
             random_scope,
@@ -246,7 +274,7 @@ impl Settings {
             paths,
             save_running: false,
             save_task: None,
-            _subscriptions: vec![search_changed, picked, look_enter],
+            _subscriptions: vec![search_changed, picked, look_enter, title_events, source_events],
             _preview_task: preview_task,
             _clock_task: clock_task,
         };
@@ -256,10 +284,16 @@ impl Settings {
         }
         settings.rebuild_controls(window, cx);
         settings.update_scene();
+        settings.sync_editor(window, cx);
+        settings.request_all_thumbnails(cx);
         settings
     }
 
     pub fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if index == self.model.selected {
+            return;
+        }
+        self.flush_editor(window, cx);
         if !self.model.select(index) {
             return;
         }
@@ -275,6 +309,27 @@ impl Settings {
         });
         self.sync_shader_scheme(window, cx);
         self.update_scene();
+        self.sync_editor(window, cx);
+        self.config_changed(window, cx);
+    }
+
+    /// The list of visuals changed (a custom shader was added, renamed or deleted). Rebuild what
+    /// is indexed by it and follow the model's selection.
+    pub fn visuals_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.row_focus = self.model.visuals.iter().map(|_| cx.focus_handle()).collect();
+        let items: Vec<_> =
+            self.model.visuals.iter().enumerate().map(|(index, visual)| VisualItem { index, title: visual.title.clone().into() }).collect();
+        let selected = self.model.selected;
+        self.quick_picker.update(cx, |state, cx| {
+            state.set_items(SearchableVec::new(items), window, cx);
+            state.set_selected_value(&selected, window, cx);
+        });
+        self.rebuild_controls(window, cx);
+        self.advanced = false;
+        self.cancel_look(window, cx);
+        self.sync_shader_scheme(window, cx);
+        self.update_scene();
+        self.sync_editor(window, cx);
         self.config_changed(window, cx);
     }
 
@@ -314,7 +369,7 @@ impl Settings {
         }
     }
 
-    fn set_paused(&mut self, paused: bool, cx: &mut Context<Self>) {
+    pub(crate) fn set_paused(&mut self, paused: bool, cx: &mut Context<Self>) {
         self.paused = paused;
         if let Some(preview) = &mut self.preview {
             preview.set_paused(self.paused);
@@ -467,8 +522,11 @@ impl Settings {
     }
 
     fn request_close(&mut self, window: &Window, cx: &mut Context<Self>) -> bool {
-        let dirty =
-            self.config_save.pending() || self.ui_save.pending() || self.config_save.error.is_some() || self.ui_save.error.is_some();
+        let dirty = self.config_save.pending()
+            || self.ui_save.pending()
+            || self.config_save.error.is_some()
+            || self.ui_save.error.is_some()
+            || self.custom.busy();
         if dirty {
             self.close_after_save = true;
             self.retry(window, cx);
@@ -476,7 +534,7 @@ impl Settings {
         !dirty
     }
 
-    fn start_saving(&mut self, window: &Window, cx: &mut Context<Self>) {
+    pub(crate) fn start_saving(&mut self, window: &Window, cx: &mut Context<Self>) {
         if self.save_running {
             return;
         }

@@ -11,9 +11,11 @@ use scrnsvr_core::catalog::Catalog;
 use scrnsvr_core::clock::ClockConfig;
 use scrnsvr_core::config::{Config, Monitors};
 use scrnsvr_core::scene::SceneTarget;
-use scrnsvr_core::{ClockSpec, OutputHint, SceneSpec, UniformValue};
+use scrnsvr_core::{ClockSpec, OutputHint, SceneSpec};
 use scrnsvr_platform::LayerShellSession;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
+
+pub use scrnsvr_core::protocol::scene_message;
 
 use crate::instance::Instance;
 use crate::{Result, STOP, executable, load_config};
@@ -49,39 +51,6 @@ pub fn wayland_outputs() -> Result<Vec<OutputHint>> {
 
 pub fn renderer_binary() -> Result<PathBuf> {
     executable("scrnsvr-renderer")
-}
-
-fn uniforms(values: &[(String, UniformValue)]) -> Map<String, Value> {
-    values
-        .iter()
-        .map(|(name, value)| {
-            (
-                name.clone(),
-                match value {
-                    UniformValue::Scalar(value) => json!(value),
-                    UniformValue::Vector(values) => json!(values),
-                },
-            )
-        })
-        .collect()
-}
-
-pub fn scene_message(scene: &SceneSpec) -> Value {
-    let effects: Vec<_> = scene
-        .effects
-        .iter()
-        .map(|layer| {
-            json!({
-                "id": layer.id, "passes": layer.passes, "history": layer.history, "uniforms": uniforms(&layer.uniforms)
-            })
-        })
-        .collect();
-    json!({
-        "type": "scene",
-        "key": scene.key,
-        "shader": { "source": scene.source, "uniforms": uniforms(&scene.uniforms), "integrated": scene.integrated, "audio": scene.audio },
-        "effects": effects,
-    })
 }
 
 fn clock_message(clock: &ClockSpec) -> Value {

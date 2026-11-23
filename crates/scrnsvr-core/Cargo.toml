@@ -15,4 +15,6 @@ tempfile.workspace = true
 dirs.workspace = true
 chrono.workspace = true
 regex.workspace = true
+libc.workspace = true
+png = "=0.18.1"
 shlex = "=2.0.1"

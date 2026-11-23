@@ -4,7 +4,12 @@ mod app;
 mod catalog;
 mod clock_tab;
 mod controls;
+mod custom_ui;
+#[cfg(test)]
+mod editor_tests;
 mod effects_tab;
+mod fullscreen;
+mod gallery;
 mod idle;
 mod idle_ui;
 mod looks_tab;
@@ -15,6 +20,10 @@ mod smoke;
 mod system_tab;
 #[cfg(test)]
 mod tab_tests;
+#[cfg(test)]
+mod testing;
+mod thumbnails;
+mod validation;
 mod view;
 
 use std::time::Duration;
@@ -59,6 +68,7 @@ fn main() {
     let mut paths = smoke_temp.as_ref().map_or_else(Paths::native, |directory| Paths {
         config: Some(directory.path().join("config.toml")),
         ui: Some(directory.path().join("ui.toml")),
+        cache: Some(directory.path().join("cache")),
         ..Paths::default()
     });
     // The walkthrough only writes to Noctalia when it is pointed at a stand-in program.

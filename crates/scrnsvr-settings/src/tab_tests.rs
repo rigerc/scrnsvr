@@ -37,7 +37,7 @@ impl Harness {
 
     fn with(cx: &mut TestAppContext, root: tempfile::TempDir, idle: IdleSource, colors: Option<PathBuf>) -> Self {
         let config = root.path().join("config.toml");
-        let paths = Paths { config: Some(config.clone()), ui: Some(root.path().join("ui.toml")), colors, idle };
+        let paths = Paths { config: Some(config.clone()), ui: Some(root.path().join("ui.toml")), colors, idle, ..Paths::default() };
         let (window, settings) = cx.update(|cx| {
             gpui_kit::init(cx);
             crate::view::init_theme(cx);

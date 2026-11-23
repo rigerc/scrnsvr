@@ -6,8 +6,7 @@ mod preview;
 mod thumbnail;
 
 use std::env;
-use std::ffi::{CString, OsString};
-use std::os::unix::ffi::OsStrExt;
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -155,21 +154,7 @@ fn load_config() -> Config {
 }
 
 fn executable(name: &str) -> Result<PathBuf> {
-    let current = env::current_exe()?;
-    let sibling = current.with_file_name(name);
-    let path = env::var_os("PATH").unwrap_or_default();
-    let executable = std::iter::once(sibling)
-        .chain(env::split_paths(&path).map(|dir| dir.join(name)))
-        .find(|path| {
-            path.is_file()
-                && CString::new(path.as_os_str().as_bytes()).is_ok_and(|path| {
-                    // SAFETY: the CString is live and NUL-terminated.
-                    unsafe { libc::access(path.as_ptr(), libc::X_OK) == 0 }
-                })
-        })
-        .ok_or_else(|| format!("{name} is unavailable; checked next to {} and on PATH", current.display()))?;
-    // A relative PATH entry still needs a slash when handed to Command.
-    Ok(std::path::absolute(executable)?)
+    Ok(scrnsvr_core::exec::find_executable(name)?)
 }
 
 static STOP: AtomicBool = AtomicBool::new(false);

@@ -10,6 +10,7 @@ use scrnsvr_core::catalog::{ShaderValues, UniformKind};
 
 use crate::app::{Settings, Tab};
 use crate::controls::{Control, Target};
+use crate::fullscreen::Fullscreen;
 use crate::model::{self, RandomScope};
 use crate::preview::Placement;
 
@@ -76,6 +77,13 @@ pub(crate) fn status(id: impl Into<ElementId>) -> Stateful<Div> {
     div().id(id).role(Role::Status)
 }
 
+/// A live-region line with its text. GPUI does not expose plain text in the accessibility tree,
+/// so the text is also the region's label, which is what a screen reader reads and announces.
+pub(crate) fn live(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
+    let text = text.into();
+    status(id).aria_label(text.clone()).child(text)
+}
+
 pub(crate) fn note(text: impl Into<SharedString>) -> Div {
     div().text_size(px(13.)).text_color(rgb(MUTED)).child(text.into())
 }
@@ -107,12 +115,14 @@ impl Render for Settings {
             .filter(|ratio| ratio.is_finite() && *ratio > 0.)
             .unwrap_or(16. / 9.);
         let stage_width = (stage_column_width - 40.).clamp(1., 1100.);
-        let reserved = if self.tab == Tab::Looks { 380. } else { 155. };
+        let editing = self.tab == Tab::Visuals && self.model.is_custom();
+        let reserved = if self.tab == Tab::Looks || editing { 380. } else { 155. };
         let stage_height = (stage_width / display_aspect).min((top_height - reserved).max(120.));
         let stage_width = stage_width.min(stage_height * display_aspect);
 
         let menu_width = (bank_width + 160.).min(width - 40.).max(200.);
-        let bank = self.bank(menu_width, cx);
+        let columns = if width >= 1700. { 3 } else { 2 };
+        let bank = self.bank(bank_width, menu_width, columns, cx);
         let preview = self.stage(stage_width, stage_height, cx);
         let inspector = self.inspector(cx);
         let workspace = if desktop {
@@ -246,6 +256,7 @@ impl Settings {
                             .id("save-status")
                             .track_focus(&self.save_status_focus)
                             .role(Role::Status)
+                            .aria_label(status)
                             .text_xs()
                             .text_color(rgb(if failed {
                                 SIGNAL_HOVER
@@ -265,48 +276,43 @@ impl Settings {
             )
     }
 
-    fn bank(&self, menu_width: f32, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn bank(&self, bank_width: f32, menu_width: f32, columns: usize, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let groups = self.model.matches();
         let count: usize = groups.iter().map(|(_, rows)| rows.len()).sum();
+        // Panel padding (2 × 16), its border and the list's padding (2 × 4) come off the width.
+        let tile_width = ((bank_width - 41. - 8. * (columns as f32 - 1.)) / columns as f32).floor().max(64.);
         let mut layout_index = 0;
-        let visible_rows: Vec<_> = groups
-            .iter()
-            .flat_map(|(_, rows)| {
-                layout_index += 1; // Category heading consumes a scroll item.
-                rows.iter()
-                    .map(|index| {
-                        let row = (layout_index, *index);
-                        layout_index += 1;
-                        row
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
+        let mut tiles = Vec::new();
+        for (_, rows) in &groups {
+            layout_index += 1; // Category heading consumes a scroll item.
+            for chunk in rows.chunks(columns) {
+                tiles.extend(chunk.iter().map(|index| (layout_index, *index)));
+                layout_index += 1; // Each row of tiles is one scroll item.
+            }
+        }
+        let visible_rows = tiles;
         let filter = self.model.favorites_only;
         let scroll = v_flex()
             .id("shader-list")
             .track_scroll(&self.bank_scroll)
             .flex_1()
             .min_h_0()
-            .gap_1()
+            .gap_2()
             .px_1()
             .py_1()
             .overflow_y_scroll()
             .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
-                let direction = match event.keystroke.key.as_str() {
-                    "up" => -1,
-                    "down" => 1,
-                    "home" => 0,
-                    "end" => 2,
-                    _ => return,
-                };
                 let Some(focused) = window.focused(cx) else { return };
                 let Some(current) = visible_rows.iter().position(|(_, index)| this.row_focus[*index] == focused) else { return };
                 let last = visible_rows.len() - 1;
-                let next = match direction {
-                    0 => 0,
-                    2 => last,
-                    _ => current.saturating_add_signed(direction).min(last),
+                let next = match event.keystroke.key.as_str() {
+                    "left" => current.saturating_sub(1),
+                    "right" => (current + 1).min(last),
+                    "up" => current.saturating_sub(columns),
+                    "down" => (current + columns).min(last),
+                    "home" => 0,
+                    "end" => last,
+                    _ => return,
                 };
                 let (position, index) = visible_rows[next];
                 this.row_focus[index].focus(window, cx);
@@ -314,8 +320,18 @@ impl Settings {
                 cx.stop_propagation();
             }))
             .children(groups.into_iter().flat_map(|(group, rows)| {
-                std::iter::once(label(group.to_uppercase()).pt_3().pb_1().into_any_element())
-                    .chain(rows.into_iter().map(|index| self.bank_row(index, cx).into_any_element()))
+                let tiles: Vec<_> = rows
+                    .chunks(columns)
+                    .map(|chunk| {
+                        h_flex()
+                            .gap_2()
+                            .items_start()
+                            .flex_none()
+                            .children(chunk.iter().map(|index| self.bank_tile(*index, tile_width, cx).into_any_element()))
+                            .into_any_element()
+                    })
+                    .collect();
+                std::iter::once(label(group.to_uppercase()).pt_3().pb_1().into_any_element()).chain(tiles)
             }));
         let storage_error = self.ui_save.error.as_ref().or(self.ui_warning.as_ref());
         v_flex()
@@ -325,7 +341,15 @@ impl Settings {
             .bg(rgb(SURFACE))
             .border_r_1()
             .border_color(rgb(LINE))
-            .child(label("SHADER BANK"))
+            .child(
+                h_flex().justify_between().items_center().child(label("SHADER BANK")).child(
+                    button("add-shader", "Add shader")
+                        .track_focus(&self.custom.add_focus)
+                        .accessibility_label("Add custom shader")
+                        .tooltip("Add a custom GLSL shader")
+                        .on_click(cx.listener(|this, _, window, cx| this.add_custom_shader(window, cx))),
+                ),
+            )
             .child(
                 div().flex_none().child(
                     Select::new(&self.quick_picker)
@@ -374,51 +398,123 @@ impl Settings {
             .child(scroll)
     }
 
-    fn bank_row(&self, index: usize, cx: &Context<Self>) -> impl IntoElement + use<> {
+    /// A portrait thumbnail with the visual's name beneath it. The active tile gains a coral border and name.
+    fn bank_tile(&self, index: usize, width: f32, cx: &Context<Self>) -> impl IntoElement + use<> {
         let visual = &self.model.visuals[index];
         let selected = self.model.selected == index;
         let favorite = self.model.ui.favorites.contains(&visual.id);
         let favorite_label =
             if favorite { format!("Remove {} from favorites", visual.title) } else { format!("Add {} to favorites", visual.title) };
-        h_flex()
+        let height = (width * 157. / 125.).round();
+        let picture = match self.thumbnails.image(&visual.id) {
+            Some(path) => img(path.to_path_buf()).size_full().object_fit(ObjectFit::Cover).into_any_element(),
+            None => {
+                let (text, tip) = match self.thumbnails.failure(&visual.id) {
+                    Some(error) => ("No preview", Some(error.to_owned())),
+                    None if self.thumbnails.available() => ("Rendering…", None),
+                    None => ("No preview", None),
+                };
+                div()
+                    .id(("placeholder", index))
+                    .size_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(11.))
+                    .text_color(rgb(QUIET))
+                    .when_some(tip, |this, tip| {
+                        this.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+                    })
+                    .child(text)
+                    .into_any_element()
+            }
+        };
+        v_flex()
             .id(("shader", index))
+            .w(px(width))
             .flex_none()
             .gap_1()
-            .p_1()
-            .rounded(px(5.))
-            .border_1()
-            .border_color(rgb(if selected { SIGNAL } else { LINE }))
-            .bg(rgb(if selected { RAISED } else { SURFACE }))
             .child(
-                div().flex_1().min_w_0().child(
-                    Button::new(("choose", index))
-                        .small()
-                        .ghost()
-                        .w_full()
-                        .child(
-                            div()
-                                .w_full()
-                                .overflow_hidden()
-                                .text_ellipsis()
-                                .text_color(rgb(if selected { SIGNAL } else { INK }))
-                                .child(visual.title.clone()),
-                        )
-                        .accessibility_label(visual.title.clone())
-                        .selected(selected)
-                        .track_focus(&self.row_focus[index])
-                        .on_click(cx.listener(move |this, _, window, cx| this.select(index, window, cx))),
-                ),
+                div()
+                    .relative()
+                    .w(px(width))
+                    .h(px(height))
+                    .rounded(px(5.))
+                    .overflow_hidden()
+                    .border_2()
+                    .border_color(rgb(if selected { SIGNAL } else { LINE }))
+                    .bg(rgb(RAISED))
+                    .child(
+                        Button::new(("choose", index))
+                            .ghost()
+                            .size_full()
+                            .p_0()
+                            .child(picture)
+                            .accessibility_label(visual.title.clone())
+                            .selected(selected)
+                            .toggled(selected)
+                            .track_focus(&self.row_focus[index])
+                            .on_click(cx.listener(move |this, _, window, cx| this.select(index, window, cx))),
+                    )
+                    .child(
+                        div().absolute().top_1().right_1().rounded(px(4.)).bg(rgba(0x171819cc)).child(
+                            Button::new(("favorite", index))
+                                .small()
+                                .ghost()
+                                .icon(Icon::new(IconName::Star).text_color(rgb(if favorite { SIGNAL } else { MUTED })))
+                                .selected(favorite)
+                                .accessibility_label(favorite_label.clone())
+                                .tooltip(favorite_label)
+                                .on_click(cx.listener(move |this, _, window, cx| this.favorite(index, window, cx))),
+                        ),
+                    ),
             )
             .child(
-                Button::new(("favorite", index))
-                    .small()
-                    .ghost()
-                    .icon(Icon::new(IconName::Star).text_color(rgb(if favorite { SIGNAL } else { QUIET })))
-                    .selected(favorite)
-                    .accessibility_label(favorite_label.clone())
-                    .tooltip(favorite_label)
-                    .on_click(cx.listener(move |this, _, window, cx| this.favorite(index, window, cx))),
+                div()
+                    .w_full()
+                    .overflow_hidden()
+                    .text_ellipsis()
+                    .whitespace_nowrap()
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(rgb(if selected { SIGNAL } else { INK }))
+                    .child(visual.title.clone()),
             )
+    }
+
+    fn fullscreen_button(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        match &self.fullscreen {
+            Fullscreen::Showing => button("fullscreen", "Exit fullscreen")
+                .accessibility_label("Exit the fullscreen preview")
+                .on_click(cx.listener(|this, _, window, cx| this.exit_fullscreen(window, cx))),
+            state => button("fullscreen", "Fullscreen preview")
+                .accessibility_label("Show this visual fullscreen, the way the screensaver does")
+                .disabled(*state == Fullscreen::Saving)
+                .on_click(cx.listener(|this, _, window, cx| this.start_fullscreen(window, cx))),
+        }
+    }
+
+    fn fullscreen_note(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        let (text, failed) = match &self.fullscreen {
+            Fullscreen::Idle => return None,
+            Fullscreen::Saving => ("Saving your edits, then opening the fullscreen preview…".to_owned(), false),
+            Fullscreen::Showing => ("The fullscreen preview is showing. Press any key or move the pointer to close it.".to_owned(), false),
+            Fullscreen::Failed(error) => (error.clone(), true),
+        };
+        Some(
+            h_flex()
+                .gap_2()
+                .items_center()
+                .flex_wrap()
+                .child(live("fullscreen-status", text).text_size(px(13.)).text_color(rgb(if failed { SIGNAL_HOVER } else { MUTED })))
+                .when(failed, |this| {
+                    this.child(
+                        button("dismiss-fullscreen-error", "Dismiss")
+                            .ghost()
+                            .on_click(cx.listener(|this, _, _, cx| this.dismiss_fullscreen_message(cx))),
+                    )
+                }),
+        )
     }
 
     fn stage(&self, width: f32, height: f32, cx: &mut Context<Self>) -> impl IntoElement + use<> {
@@ -477,17 +573,19 @@ impl Settings {
                                     .disabled(self.preview.is_none())
                                     .on_click(cx.listener(|this, _, _, cx| this.toggle_pause(cx))),
                             )
+                            .child(self.fullscreen_button(cx))
                             .children(self.model.undo_label().map(|undo| {
                                 button("preview-undo", undo)
                                     .track_focus(&self.undo_focus)
                                     .on_click(cx.listener(|this, _, window, cx| this.undo(window, cx)))
                             })),
                     )
+                    .children(self.fullscreen_note(cx))
                     .children(self.preview_error.clone().map(note))
                     .children(
                         self.effect_warnings()
                             .into_iter()
-                            .map(|warning| status("effect-warning").text_size(px(13.)).text_color(rgb(SIGNAL_HOVER)).child(warning)),
+                            .map(|warning| live("effect-warning", warning).text_size(px(13.)).text_color(rgb(SIGNAL_HOVER))),
                     )
                     .children(self.config_save.error.as_ref().map(|error| note(format!("Your edits are still here. {error}"))))
                     .when(self.close_after_save && (self.config_save.error.is_some() || self.ui_save.error.is_some()), |this| {
@@ -496,6 +594,9 @@ impl Settings {
                     .when(self.warning_details, |this| this.children(self.load_warnings.iter().cloned().map(note)))
                     .when(self.tab == Tab::Looks, |this| {
                         this.child(div().pt_3().border_t_1().border_color(rgb(LINE)).child(self.looks_workspace(cx)))
+                    })
+                    .when(self.tab == Tab::Visuals && self.model.is_custom(), |this| {
+                        this.child(div().pt_3().border_t_1().border_color(rgb(LINE)).child(self.custom_workspace(cx)))
                     }),
             );
         v_flex()
@@ -550,7 +651,10 @@ impl Settings {
         let has_controls = !self.controls.is_empty();
         v_flex()
             .gap_4()
-            .when(!has_controls, |this| this.child(note("This visual has no adjustable parameters.")))
+            .when(!has_controls && self.model.is_custom(), |this| {
+                this.child(note("Custom shaders have no adjustable parameters. Edit the source under the preview."))
+            })
+            .when(!has_controls && !self.model.is_custom(), |this| this.child(note("This visual has no adjustable parameters.")))
             .when(has_controls, |this| {
                 this.child(self.control_toolbar(cx))
                     .children(["Motion", "Shape", "Color"].into_iter().filter_map(|group| self.control_group(group, &values, cx)))

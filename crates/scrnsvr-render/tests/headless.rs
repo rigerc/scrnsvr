@@ -105,6 +105,37 @@ fn native_custom_audio_uniform_compiles_and_stays_zero() {
     }
 }
 
+/// The editor reports driver errors on the user's own lines: the wrapper's prelude and any
+/// comments that were stripped must not shift them.
+#[test]
+fn a_broken_custom_shader_reports_the_line_in_the_users_source() {
+    use scrnsvr_core::diagnostics::{Diagnostic, map_driver_log};
+    use scrnsvr_core::source::custom_fragment_source_mapped;
+
+    let Some((_lock, headless, _renderer)) = context() else { return };
+    // SAFETY: the headless context is current on this thread.
+    let gl = unsafe { glow::Context::from_loader_function(|name| headless.egl.proc_address(name)) };
+    let sources = [
+        // Undefined variable on line 4, after a block comment that spans lines 1-2.
+        ("/* header\n   notes */\nvoid mainImage(out vec4 color, in vec2 fragCoord) {\n  color = vec4(missing_value);\n}", 4),
+        // A legacy main with the error on line 2 and a trailing line comment on line 1.
+        ("void main() { // entry\n  gl_FragColor = vec4(vec3(1.0), nothing);\n}", 2),
+        // Leading blank lines count: the error is on line 5.
+        ("\n\n\nvoid mainImage(out vec4 color, in vec2 p) {\n  color = oops;\n}", 5),
+    ];
+    for (source, line) in sources {
+        let mapped = custom_fragment_source_mapped(source).unwrap();
+        let error = scrnsvr_render::compile_error(&gl, &mapped.source).expect("the shader is broken").to_string();
+        let diagnostics = map_driver_log(&mapped, &error);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.line == Some(line)), "expected line {line}: {diagnostics:?}\n{error}");
+        assert!(diagnostics.iter().all(|diagnostic: &Diagnostic| diagnostic.line.is_some()), "{diagnostics:?}");
+    }
+    // A shader that is fine compiles without a diagnostic.
+    let ok = custom_fragment_source_mapped("void mainImage(out vec4 c, in vec2 p) { c = vec4(1.0); }").unwrap();
+    assert!(scrnsvr_render::compile_error(&gl, &ok.source).is_none());
+    drop(gl);
+}
+
 #[test]
 fn keeps_the_running_scene_when_a_replacement_fails() {
     let Some((_lock, _headless, mut renderer)) = context() else { return };

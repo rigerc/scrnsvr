@@ -12,6 +12,7 @@ use crate::persistence::UiState;
 
 pub mod clock;
 pub mod colors;
+pub mod custom;
 pub mod effects;
 pub mod rotation;
 
@@ -23,6 +24,8 @@ pub struct Model {
     pub favorites_only: bool,
     pub query: String,
     featured: Vec<usize>,
+    /// The shader selected at startup, which the featured row leads with.
+    initial_shader: String,
     locks: BTreeMap<String, BTreeSet<String>>,
     undo: BTreeMap<String, (&'static str, ShaderValues)>,
     /// The shuffle interval to restore when cycling is switched back on (this session).
@@ -34,6 +37,7 @@ impl Model {
         let visuals = catalog::visuals(&config);
         let selected = visuals.iter().position(|visual| visual.id == config.shader).unwrap_or(0);
         let featured = catalog::featured(&visuals, &visuals[selected].id);
+        let config_shader = visuals[selected].id.clone();
         let config_interval = config.rotation.interval_minutes;
         Self {
             config,
@@ -43,6 +47,7 @@ impl Model {
             favorites_only: false,
             query: String::new(),
             featured,
+            initial_shader: config_shader,
             locks: BTreeMap::new(),
             undo: BTreeMap::new(),
             last_interval: if config_interval > 0.0 { config_interval } else { rotation::DEFAULT_INTERVAL_MINUTES },

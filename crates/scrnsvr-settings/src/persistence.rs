@@ -4,11 +4,13 @@ use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use scrnsvr_core::config::{Config, config_path};
 
 use crate::idle::IdleSource;
+use crate::validation::ShaderChecker;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -49,11 +51,26 @@ pub struct Paths {
     pub colors: Option<PathBuf>,
     /// The `noctalia` command and the command it is told to run.
     pub idle: IdleSource,
+    /// Where thumbnails are cached. `None` shows placeholders only.
+    pub cache: Option<PathBuf>,
+    /// `scrnsvr-renderer`, for compile checks and thumbnails. `None` looks next to this program, then on `PATH`.
+    pub renderer: Option<PathBuf>,
+    /// `scrnsvr`, for the fullscreen preview. `None` looks next to this program, then on `PATH`.
+    pub scrnsvr: Option<PathBuf>,
+    /// The saver's runtime directory. `None` is `$XDG_RUNTIME_DIR/scrnsvr`.
+    pub runtime: Option<PathBuf>,
+    /// Replaces the GPU shader check (tests).
+    pub checker: Option<Arc<dyn ShaderChecker>>,
 }
 
 impl Paths {
     pub fn native() -> Self {
-        Self { config: config_path(), ui: dirs::state_dir().map(|dir| dir.join("scrnsvr/ui.toml")), ..Self::default() }
+        Self {
+            config: config_path(),
+            ui: dirs::state_dir().map(|dir| dir.join("scrnsvr/ui.toml")),
+            cache: scrnsvr_core::thumbnail::cache_directory(),
+            ..Self::default()
+        }
     }
 
     pub fn load(&self) -> (Config, UiState, Vec<String>, Option<String>) {

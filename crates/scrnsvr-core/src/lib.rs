@@ -6,7 +6,10 @@
 pub mod animation;
 pub mod catalog;
 pub mod clock;
+pub mod compile_check;
 pub mod config;
+pub mod diagnostics;
+pub mod exec;
 pub mod input;
 pub mod noctalia;
 pub mod options;
@@ -15,6 +18,7 @@ pub mod presentation;
 pub mod protocol;
 pub mod scene;
 pub mod source;
+pub mod thumbnail;
 
 pub use animation::{AnimationClock, AudioSmoother};
 pub use input::PointerDismissal;

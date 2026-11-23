@@ -11,11 +11,11 @@ use toml::{Table, Value};
 
 use crate::catalog::{Catalog, SettingValue, ShaderValues, UniformDef, hex_color};
 use crate::clock::{ClockConfig, valid_pattern};
-use crate::source::{custom_fragment_source, js_whitespace};
+use crate::source::{MAX_CUSTOM_SOURCE_CHARS, MAX_CUSTOM_TITLE_CHARS, custom_fragment_source, js_whitespace};
 
 pub const DEFAULT_SHADER: &str = "flow-field";
 pub const MAX_EFFECT_LAYERS: usize = 8;
-const MAX_CUSTOM_SHADERS: usize = 100;
+pub const MAX_CUSTOM_SHADERS: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Config {
@@ -420,8 +420,8 @@ fn custom_shader(fields: &mut Fields<'_>) -> Option<CustomShader> {
             .required(field, |s: &String| (1..=max).contains(&s.trim_matches(js_whitespace).encode_utf16().count()))
             .map(|s| s.trim_matches(js_whitespace).to_owned())
     };
-    let title = text(fields, "title", 100);
-    let source = text(fields, "source", 100_000);
+    let title = text(fields, "title", MAX_CUSTOM_TITLE_CHARS);
+    let source = text(fields, "source", MAX_CUSTOM_SOURCE_CHARS);
     Some(CustomShader { id: id?, title: title?, source: source? })
 }
 

@@ -11,7 +11,7 @@ use crate::app::Settings;
 use crate::controls::{Control, Target};
 use crate::model::Model;
 use crate::model::clock::{POSITIONS, PatternState, clock_defs};
-use crate::view::{LINE, MUTED, QUIET, SIGNAL, SIGNAL_HOVER, label, note, status};
+use crate::view::{LINE, MUTED, QUIET, SIGNAL, SIGNAL_HOVER, label, live, note};
 
 pub struct ClockUi {
     pub controls: Vec<Control>,
@@ -155,12 +155,11 @@ impl Settings {
                             .child(Input::new(&self.clock_ui.pattern).small().disabled(disabled).cleanable(true).aria_label("Custom time pattern"))
                             .child(note("Optional strftime-style pattern for the time line, for example %H:%M, %-I:%M %p or %a %H:%M:%S. Leave it empty to use the format above. The date line still follows Show date."))
                             .child(match state {
-                                PatternState::Invalid => status("clock-status-1")
+                                PatternState::Invalid => live("clock-status-1", "This pattern can’t be used, so the clock shows the default format until it is fixed.")
                                     .text_size(px(13.))
-                                    .text_color(rgb(SIGNAL_HOVER))
-                                    .child("This pattern can’t be used, so the clock shows the default format until it is fixed."),
-                                PatternState::Valid => status("clock-status-2").text_size(px(13.)).text_color(rgb(MUTED)).child("Using your pattern."),
-                                PatternState::Default => status("clock-status-3").text_size(px(13.)).text_color(rgb(MUTED)).child("Using the default format."),
+                                    .text_color(rgb(SIGNAL_HOVER)),
+                                PatternState::Valid => live("clock-status-2", "Using your pattern.").text_size(px(13.)).text_color(rgb(MUTED)),
+                                PatternState::Default => live("clock-status-3", "Using the default format.").text_size(px(13.)).text_color(rgb(MUTED)),
                             })
                             .child(
                                 v_flex()

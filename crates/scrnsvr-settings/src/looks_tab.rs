@@ -12,7 +12,7 @@ use scrnsvr_core::config::RotationEntry;
 use crate::app::{LookAction, Settings, Tab};
 use crate::model::Model;
 use crate::model::rotation::{EntryStatus, MAX_INTERVAL_MINUTES, MIN_INTERVAL_MINUTES};
-use crate::view::{LINE, MUTED, SIGNAL_HOVER, button, label, note, status};
+use crate::view::{LINE, MUTED, SIGNAL_HOVER, button, label, live, note};
 
 /// One shuffle row has four buttons that keep focus through list edits.
 const LOAD: usize = 0;
@@ -272,12 +272,9 @@ impl Settings {
                             .child(div().child("minutes"))
                             .child(div().text_xs().text_color(rgb(MUTED)).child(format!("{MIN_INTERVAL_MINUTES}–{MAX_INTERVAL_MINUTES}"))),
                     )
-                    .child(status("looks-status-8").text_color(rgb(MUTED)).child(model.rotation_summary()))
+                    .child(live("looks-status-8", model.rotation_summary()).text_color(rgb(MUTED)))
                     .children(
-                        self.shuffle_ui
-                            .message
-                            .clone()
-                            .map(|message| status("looks-status-9").text_xs().text_color(rgb(MUTED)).child(message)),
+                        self.shuffle_ui.message.clone().map(|message| live("looks-status-9", message).text_xs().text_color(rgb(MUTED))),
                     ),
             )
     }
@@ -358,9 +355,7 @@ impl Settings {
                             }),
                     )
                     .children(
-                        self.look_message
-                            .clone()
-                            .map(|message| status("looks-status-10").text_size(px(13.)).text_color(rgb(MUTED)).child(message)),
+                        self.look_message.clone().map(|message| live("looks-status-10", message).text_size(px(13.)).text_color(rgb(MUTED))),
                     ),
             )
             .when(rows.is_empty(), |this| this.child(note("Adjust this visual, then save a look to keep those settings.")))

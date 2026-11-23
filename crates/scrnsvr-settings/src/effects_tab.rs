@@ -20,7 +20,7 @@ use scrnsvr_core::config::MAX_EFFECT_LAYERS;
 use crate::app::Settings;
 use crate::controls::{Control, Target};
 use crate::model::{self, Model, effects};
-use crate::view::{LINE, MUTED, QUIET, SIGNAL_HOVER, SURFACE, button, label, note, status};
+use crate::view::{LINE, MUTED, QUIET, SIGNAL_HOVER, SURFACE, button, label, live, note};
 
 #[derive(Clone)]
 pub struct EffectItem {
@@ -274,7 +274,7 @@ impl Settings {
                 ))
             })
             .children((0..layers).map(|index| self.effect_layer(index, cx)))
-            .child(status("effects-status-4").text_xs().text_color(rgb(MUTED)).children(self.effects_ui.message.clone()))
+            .child(live("effects-status-4", self.effects_ui.message.clone().unwrap_or_default()).text_xs().text_color(rgb(MUTED)))
     }
 
     fn effect_layer(&self, index: usize, cx: &mut Context<Self>) -> impl IntoElement + use<> {

@@ -14,7 +14,7 @@ use scrnsvr_core::noctalia::Plan;
 
 use crate::app::Settings;
 use crate::idle::{Idle, Ready, apply, apply_timeout, duration_text, hypridle_snippet, probe};
-use crate::view::{LINE, MUTED, QUIET, SAVED, SIGNAL_HOVER, button, label, note, status};
+use crate::view::{LINE, MUTED, QUIET, SAVED, SIGNAL_HOVER, button, label, live, note};
 
 pub struct IdleUi {
     pub state: Idle,
@@ -256,12 +256,10 @@ impl Settings {
                 Idle::Ready(ready) => self.idle_ready(ready, cx).into_any_element(),
             })
             .children(
-                ui.busy
-                    .filter(|_| ui.state != Idle::Unchecked)
-                    .map(|text| status("idle-status-5").text_xs().text_color(rgb(MUTED)).child(text)),
+                ui.busy.filter(|_| ui.state != Idle::Unchecked).map(|text| live("idle-status-5", text).text_xs().text_color(rgb(MUTED))),
             )
             .children(ui.message.as_ref().map(|(ok, text)| {
-                status("idle-status-6").text_size(px(13.)).text_color(rgb(if *ok { SAVED } else { SIGNAL_HOVER })).child(text.clone())
+                live("idle-status-6", text.clone()).text_size(px(13.)).text_color(rgb(if *ok { SAVED } else { SIGNAL_HOVER }))
             }))
             .child(
                 h_flex().gap_2().child(
@@ -288,7 +286,7 @@ impl Settings {
         let launching = behavior.is_some_and(|behavior| behavior.enabled != Some(false));
         v_flex()
             .gap_2()
-            .child(status("idle-status-7").font_weight(FontWeight::MEDIUM).text_color(rgb(if launching { SAVED } else { SIGNAL_HOVER })).child(headline))
+            .child(live("idle-status-7", headline).font_weight(FontWeight::MEDIUM).text_color(rgb(if launching { SAVED } else { SIGNAL_HOVER })))
             .children(behavior.map(|behavior| {
                 note(format!(
                     "Behavior “{}”, {}. Command: {}",

@@ -147,6 +147,8 @@ The native Rust app replaces Electron at the 1.0.0 cutover. Its configuration is
 - **Clock:** every clock option, a placement grid, and an optional strftime pattern with a live example.
 - **Settings:** frame rate, fade, monitors, global color scheme, and the Idle section. It shows whether Noctalia launches scrnsvr, edits Noctalia's timeout, and offers "Set up…", which lists the `noctalia msg config-set` changes and applies them only after you confirm. Without Noctalia it shows hypridle and hot-corner instructions.
 
+**Custom shaders.** Select **Add shader** in the shader bank to write a single-pass GLSL ES 1.00 shader (`mainImage` or `main`; `uTime`, `uResolution`, `iTime`, `iResolution`, `iMouse`, `iDate` and `uAudio` are supplied; no textures or `#version`). Edits are checked with a real GLES compile and saved automatically; errors appear on the offending line, and the preview keeps the last valid version. Import a `.glsl`/`.frag` file (up to 100 KB) or delete a shader from the same panel. Custom shaders can be favorited, shuffled and combined with effects. **Fullscreen preview** shows the current visual the way the screensaver does. Thumbnails are rendered in the background with default values and cached in `$XDG_CACHE_HOME/scrnsvr/thumbnails/`.
+
 **Idle with hypridle.**
 
 ```

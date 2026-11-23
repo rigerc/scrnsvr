@@ -57,6 +57,25 @@ pub fn report(view: &Entity<Settings>, step: &str, cx: &mut AsyncApp) {
             settings.config_save.pending(), settings.config_save.error,
             settings.model.looks().collect::<Vec<_>>(),
         );
+        let custom: Vec<_> = config.custom_shaders.iter().map(|shader| format!("{}:{}:{}b", shader.id, shader.title, shader.source.len())).collect();
+        let shown = settings.custom.shown.clone().unwrap_or_default();
+        let editor_status = match settings.custom.drafts.status(&shown) {
+            crate::validation::Status::Invalid(items) => format!("invalid{:?}", items.iter().map(|item| item.display()).collect::<Vec<_>>()),
+            other => format!("{other:?}"),
+        };
+        println!(
+            "step {step}: thumbs={}/{}pending/{}visuals dir={:?} failure={:?} custom={custom:?} editor={shown:?} editor_status={editor_status} markers={} fullscreen={:?} selected_title={:?} favorites={:?} message={:?}",
+            settings.thumbnails.ready_count(),
+            settings.thumbnails.pending(),
+            settings.model.visuals.len(),
+            settings.thumbnails.directory(),
+            settings.model.visuals.iter().find_map(|visual| settings.thumbnails.failure(&visual.id).map(|error| format!("{}: {error}", visual.id))),
+            settings.custom.editor.read(cx).diagnostics().map_or(0, |set| set.len()),
+            settings.fullscreen,
+            settings.model.visual().title,
+            settings.model.ui.favorites,
+            settings.custom.message,
+        );
         let _ = std::io::stdout().flush();
     });
 }
@@ -96,6 +115,16 @@ pub async fn steps(view: Entity<Settings>, window: AnyWindowHandle, cx: &mut Asy
     wait(cx, 1500).await;
     report(&view, "start", cx);
     wait(cx, 300).await; // Leave time for an external screenshot of this step.
+    // Thumbnails render in the background; give them time, then show how many appeared.
+    for _ in 0..120 {
+        if cx.update(|cx| view.read(cx).thumbnails.pending() == 0) {
+            break;
+        }
+        wait(cx, 250).await;
+    }
+    wait(cx, 400).await;
+    report(&view, "thumbnails", cx);
+    wait(cx, 400).await; // Leave time for an external screenshot of this step.
 
     click(window, cx, 138.0, 115.0);
     wait(cx, 450).await;
@@ -212,9 +241,100 @@ pub async fn steps(view: Entity<Settings>, window: AnyWindowHandle, cx: &mut Asy
     report(&view, "retried", cx);
     wait(cx, 300).await; // Leave time for an external screenshot of this step.
 
+    custom_editor(&view, window, cx, wait).await;
     tabs(&view, window, cx, wait).await;
+    custom_with_effects(&view, window, cx, wait).await;
+    if std::env::var_os("SCRNSVR_SETTINGS_SMOKE_FULLSCREEN").is_some() {
+        fullscreen(&view, window, cx, wait).await;
+    }
     wait(cx, 850).await;
     cx.update(|cx| cx.quit());
+}
+
+const VALID: &str = "void mainImage(out vec4 color, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float wave = 0.5 + 0.5 * sin(uv.x * 12.0 + iTime * 1.5);
+  color = vec4(wave, 0.35 * uv.y, 1.0 - wave, 1.0);
+}";
+const INVALID: &str = "void mainImage(out vec4 color, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float wave = 0.5 + 0.5 * sin(uv.x * 12.0 + iTime * 1.5);
+  color = vec4(wave, oops_undeclared, 1.0 - wave, 1.0);
+}";
+const RECOVERED: &str = "void mainImage(out vec4 color, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float wave = 0.5 + 0.5 * sin(uv.y * 9.0 - iTime * 2.0);
+  color = vec4(1.0 - wave, 0.8 * wave, 0.25 + 0.5 * uv.x, 1.0);
+}";
+
+/// The custom shader editor: add and favorite, edit validly, break it, recover and rename.
+async fn custom_editor(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncApp, wait: impl AsyncFn(&AsyncApp, u64)) {
+    let stage = async |name: &str, ms: u64, cx: &mut AsyncApp| {
+        wait(cx, ms).await;
+        report(view, name, cx);
+        wait(cx, 300).await; // Leave time for an external screenshot of this step.
+    };
+    let type_source = |text: &'static str, cx: &mut AsyncApp| {
+        drive(view, window, cx, move |this, window, cx| {
+            this.custom.editor.update(cx, |state, cx| state.replace_all(text, window, cx));
+        });
+    };
+    drive(view, window, cx, |this, window, cx| {
+        if this.paused {
+            this.toggle_pause(cx);
+        }
+        this.step_tab(Tab::Visuals, window, cx);
+        this.clear_filters(window, cx);
+        this.add_custom_shader(window, cx);
+        let index = this.model.selected;
+        this.favorite(index, window, cx);
+    });
+    stage("editor-added", 1200, cx).await;
+    type_source(VALID, cx);
+    stage("editor-valid", 1400, cx).await;
+    type_source(INVALID, cx);
+    stage("editor-invalid", 1400, cx).await;
+    // The preview must still show the last valid version; the capture at this step compares it with editor-valid.
+    type_source(RECOVERED, cx);
+    stage("editor-recovered", 1500, cx).await;
+    drive(view, window, cx, |this, window, cx| {
+        this.custom.title.update(cx, |state, cx| state.set_value("Smoke waves", window, cx));
+        this.commit_title(window, cx);
+    });
+    stage("editor-renamed", 900, cx).await;
+    drive(view, window, cx, |this, window, cx| {
+        this.select(this.model.visual_index("plasma").unwrap(), window, cx);
+    });
+    stage("editor-back-to-builtin", 700, cx).await;
+}
+
+/// The custom shader under the global effect stack from the earlier steps.
+async fn custom_with_effects(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncApp, wait: impl AsyncFn(&AsyncApp, u64)) {
+    drive(view, window, cx, |this, window, cx| {
+        this.step_tab(Tab::Visuals, window, cx);
+        if let Some(index) = this.model.visuals.iter().position(|visual| visual.category == "Custom") {
+            this.select(index, window, cx);
+            let id = this.model.visual().id.clone();
+            this.toggle_shuffle_entry(&id, None, window, cx);
+        }
+    });
+    wait(cx, 900).await;
+    report(view, "custom-with-effects", cx);
+    wait(cx, 300).await; // Leave time for an external screenshot of this step.
+}
+
+/// Opt-in (`SCRNSVR_SETTINGS_SMOKE_FULLSCREEN`): the fullscreen preview takes over the screen.
+async fn fullscreen(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncApp, wait: impl AsyncFn(&AsyncApp, u64)) {
+    drive(view, window, cx, |this, window, cx| this.start_fullscreen(window, cx));
+    wait(cx, 3500).await;
+    report(view, "fullscreen-showing", cx);
+    wait(cx, 700).await; // Leave time for an external screenshot of this step.
+    drive(view, window, cx, |this, window, cx| this.start_fullscreen(window, cx));
+    wait(cx, 300).await;
+    drive(view, window, cx, |this, window, cx| this.exit_fullscreen(window, cx));
+    wait(cx, 2500).await;
+    report(view, "fullscreen-exited", cx);
+    wait(cx, 300).await;
 }
 
 /// The Effects, Looks & Shuffle, Clock and Settings tabs, reached with the keyboard where it matters.
