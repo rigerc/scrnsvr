@@ -58,7 +58,7 @@ pub struct EffectSpec {
 pub struct SceneSpec {
     /// Rotation entry key (`shader` or `shader/preset`), used in diagnostics.
     pub key: String,
-    /// Complete fragment source, already wrapped by the main process.
+    /// Complete fragment source, already wrapped by the caller.
     pub source: String,
     pub uniforms: Vec<(String, UniformValue)>,
     /// Built-ins read integrated phase as `uTime` with speed fixed at one.
@@ -81,7 +81,7 @@ impl SceneSpec {
     }
 }
 
-/// Clock style and preformatted text (locale formatting stays in the main process).
+/// Clock style and text formatted by the caller.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClockSpec {
     pub enabled: bool,

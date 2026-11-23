@@ -296,7 +296,7 @@ Decisions made during implementation:
 
 ### Settings preview gate: Wayland subsurface (milestone 1)
 
-`crates/scrnsvr-settings` is a GPUI Kit 0.9.1 window with a searchable shader picker, manifest-driven sliders for each shader's basic numeric controls, a pause button and a live preview. It reads `data/shaders.json`, which `scripts/export-rust-fixtures.cjs` exports from the TypeScript registry with each shader's default scene plan. It persists nothing; the Electron settings remain the product.
+`crates/scrnsvr-settings` is a GPUI Kit 0.9.1 window with a searchable shader picker, manifest-driven sliders for each shader's basic numeric controls, a pause button and a live preview. It uses the shared Rust catalog and scene resolver for its controls and default preview scenes. It persists nothing; the Electron settings remain the product.
 
 How the preview is presented (`src/preview.rs`):
 
@@ -343,11 +343,22 @@ Known gaps before the Rust renderer can become the default:
 - Not tested: Mesa, multiple outputs, mixed or fractional scales, display power-off, hotplug, Sway or KDE.
 - Packaging still builds C++ unless `SCRNSVR_RENDERER=rust` is set, and `electron-builder` has not been exercised with the Rust binary.
 
+### Milestone 3: Configuration and scene resolution
+
+- `scrnsvr-core` reads the native XDG `scrnsvr/config.toml`. It defaults and diagnoses individual fields and reports malformed TOML separately. Saving syncs a same-directory temporary file, replaces the config atomically, and syncs the directory. A failed save leaves the caller's edits available for retry.
+- [`data/catalog.json`](../data/catalog.json) contains 41 shader manifests and GLSL sources, 17 effects and their passes, 30 color schemes, and five color families. Core embeds the checked-in JSON with `include_str!`, and the settings spike uses its resolved default scenes. During the Electron overlap, `node scripts/export-rust-fixtures.cjs` refreshes the catalog and reference fixtures from TypeScript. Cargo needs only the checked-in data. Saved looks are user-defined snapshots in the TOML `presets` tables.
+- The resolver preserves uniform normalization, palette precedence, custom GLSL wrapping, effect instance order, and rotation selection. Callers supply a random draw for rotation and a time with an explicit time zone for clock formatting. The optional `clock.pattern` replaces the time line and leaves the date under `clock.show_date`.
+- `config.toml` uses snake_case keys (`global.idle_threshold_seconds`, `custom_shaders`, `effects.layers[].effect_id`) and drops the unused `kiosk` and `settings` fields. The parity test renames the TypeScript settings' camelCase field names before loading them; shader IDs, preset names and uniform names are left unchanged. The shared `data/catalog.json` keeps camelCase, since it is generated data rather than user-edited config.
+- Direct unknown shader requests return the same error as TypeScript. Loading a stale configured shader warns and selects Flow Field. Stale rotation entries and unavailable effects are retained in configuration and skipped at resolution. Native scenes keep `uAudio` at zero. The custom wrapper supplies the uniform on demand, verified with a headless GLES render.
+- Rust matched all 151 settings/reference pairs exported from the TypeScript main process: 142 scenes, six English UTC clock messages, two unknown-shader errors, and one empty rotation pick. The comparison covers every built-in with defaults and edited values, plus presets, palettes, custom sources, and effect stacks. Rust tests also check TOML round-trips, missing and malformed files, failed writes, and strftime formatting across a time-zone date boundary.
+- Verification passed for `npm run test:rust` (48 tests, Clippy and rustfmt), `npm run typecheck`, `npx vitest run` (376 tests), and `npm run build:rust`.
+- The native daemon and full settings editor still need to adopt the core API for startup, reload, debounced saves, and desktop color import.
+
 ### Not started
 
-- Milestone 0 beyond the scene fixtures: feature checklist, frame captures and measured baselines.
+- Milestone 0 beyond the feature checklist and scene fixtures: frame captures and measured baselines.
 - Keyboard, IME and accessibility checks for the subsurface preview (milestone 5).
-- Milestones 3–6: configuration and scene resolution in Rust, the daemon, native settings, and packaging cutover.
+- Milestones 4–6: the daemon, native settings, and packaging cutover.
 
 ## Technical references
 

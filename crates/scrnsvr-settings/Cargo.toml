@@ -12,8 +12,6 @@ scrnsvr-core.workspace = true
 scrnsvr-render.workspace = true
 scrnsvr-platform.workspace = true
 glow.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 wayland-client.workspace = true
 wayland-egl.workspace = true
 # Matches GPUI's raw-window-handle so its Window handles can be read.

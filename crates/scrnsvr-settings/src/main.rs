@@ -23,6 +23,7 @@ use gpui_kit::component::{ActiveTheme, IndexPath, Theme, ThemeMode, h_flex, v_fl
 use gpui_kit::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use scrnsvr_core::UniformValue;
+use scrnsvr_core::catalog::UniformKind;
 
 use crate::catalog::{Shader, UniformDef};
 use crate::preview::{Placement, PreviewSurface};
@@ -115,7 +116,7 @@ impl Settings {
                         _ => None,
                     })
                     .unwrap_or_default();
-                let integer = def.kind == "int";
+                let integer = def.kind == UniformKind::Int;
                 let step = def.step.unwrap_or(if integer { 1.0 } else { 0.01 });
                 let state = cx.new(|_| {
                     SliderState::new()
@@ -174,8 +175,11 @@ impl Render for Settings {
             .child(div().flex_none().child(Select::new(&self.picker).menu_width(px(520.)).menu_max_h(px(360.))))
             .child(v_flex().id("controls").flex_1().min_h_0().gap_5().pt_2().overflow_y_scroll().children(self.controls.iter().map(
                 |control| {
-                    let value =
-                        if control.def.kind == "int" { format!("{}", control.value as i64) } else { format!("{:.2}", control.value) };
+                    let value = if control.def.kind == UniformKind::Int {
+                        format!("{}", control.value as i64)
+                    } else {
+                        format!("{:.2}", control.value)
+                    };
                     v_flex()
                         .gap_2()
                         .child(h_flex().justify_between().child(control.def.title().to_owned()).child(div().text_color(muted).child(value)))

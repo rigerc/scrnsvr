@@ -1,18 +1,18 @@
 //! Shared, windowing-free scrnsvr logic.
 //!
-//! This crate owns the renderer's JSON-lines protocol (the boundary with the
-//! Electron main process, see `src/main/native-renderer.ts`), the presentation
-//! timeline (activation/dismissal fades and rotation through black), animation
-//! clocks, and renderer command-line options. Nothing here touches Wayland, EGL
-//! or GL, so it is unit-testable and reusable by the saver, previews and
-//! thumbnail capture.
+//! Owns native configuration, the asset catalog and scene resolution, the
+//! renderer's JSON-lines protocol, and animation and presentation timing.
 
 pub mod animation;
+pub mod catalog;
+pub mod clock;
+pub mod config;
 pub mod input;
 pub mod options;
 pub mod outputs;
 pub mod presentation;
 pub mod protocol;
+pub mod scene;
 pub mod source;
 
 pub use animation::{AnimationClock, AudioSmoother};

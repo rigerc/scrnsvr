@@ -6146,9 +6146,14 @@ dependencies = [
 name = "scrnsvr-core"
 version = "0.10.0"
 dependencies = [
+ "chrono",
+ "dirs 6.0.0",
+ "regex",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -6187,8 +6192,6 @@ dependencies = [
  "scrnsvr-core",
  "scrnsvr-platform",
  "scrnsvr-render",
- "serde",
- "serde_json",
  "wayland-client",
  "wayland-egl",
 ]

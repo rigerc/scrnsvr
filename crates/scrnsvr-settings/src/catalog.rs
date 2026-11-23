@@ -1,35 +1,12 @@
-//! Shader manifests and default scene plans exported from the TypeScript registry
-//! (`node scripts/export-rust-fixtures.cjs`). Milestone 3 replaces this with shared
-//! language-neutral manifests and Rust scene resolution.
+//! Default preview scenes for the settings spike, resolved by core.
 
 use std::sync::Arc;
 
-use scrnsvr_core::{Message, SceneSpec};
-use serde::Deserialize;
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct UniformDef {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub label: Option<String>,
-    pub min: Option<f64>,
-    pub max: Option<f64>,
-    pub step: Option<f64>,
-    #[serde(default)]
-    pub advanced: bool,
-}
-
-impl UniformDef {
-    /// Numeric controls map to sliders; colors, selects and toggles are later work.
-    pub fn is_slider(&self) -> bool {
-        matches!(self.kind.as_str(), "float" | "int") && self.min.is_some() && self.max.is_some()
-    }
-
-    pub fn title(&self) -> &str {
-        self.label.as_deref().unwrap_or(&self.name)
-    }
-}
+use scrnsvr_core::SceneSpec;
+use scrnsvr_core::catalog::Catalog;
+pub use scrnsvr_core::catalog::UniformDef;
+use scrnsvr_core::config::Config;
+use scrnsvr_core::scene::SceneTarget;
 
 #[derive(Debug, Clone)]
 pub struct Shader {
@@ -39,21 +16,17 @@ pub struct Shader {
     pub plan: Arc<SceneSpec>,
 }
 
-#[derive(Deserialize)]
-struct Entry {
-    id: String,
-    title: String,
-    uniforms: Vec<UniformDef>,
-    plan: serde_json::Value,
-}
-
 pub fn load() -> Vec<Shader> {
-    let entries: Vec<Entry> = serde_json::from_str(include_str!("../data/shaders.json")).expect("bundled shader catalog is valid");
-    entries
-        .into_iter()
-        .filter_map(|entry| match Message::parse(&entry.plan.to_string()) {
-            Ok(Message::Scene(plan)) => Some(Shader { id: entry.id, title: entry.title, uniforms: entry.uniforms, plan: Arc::new(plan) }),
-            _ => None,
+    let catalog = Catalog::builtin();
+    let config = Config::default();
+    catalog
+        .shaders
+        .iter()
+        .map(|def| Shader {
+            id: def.id.clone(),
+            title: def.title.clone(),
+            uniforms: def.uniforms.clone(),
+            plan: Arc::new(catalog.build_scene(&config, &SceneTarget::shader(&def.id)).expect("built-in shader exists")),
         })
         .collect()
 }

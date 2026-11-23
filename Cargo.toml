@@ -19,8 +19,13 @@ scrnsvr-core = { path = "crates/scrnsvr-core" }
 scrnsvr-render = { path = "crates/scrnsvr-render" }
 scrnsvr-platform = { path = "crates/scrnsvr-platform" }
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149", features = ["preserve_order"] }
+serde_json = { version = "1.0.149", features = ["preserve_order", "float_roundtrip"] }
 thiserror = "2.0.18"
+toml = "0.8.23"
+tempfile = "3.27.0"
+dirs = "6.0.0"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+regex = "1.13.1"
 libc = "0.2.177"
 # The compile-checked rendering/platform group from docs/research/rust-rewrite-evaluation.md.
 glow = "=0.18.0"

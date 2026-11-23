@@ -3,6 +3,9 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use scrnsvr_core::catalog::Catalog;
+use scrnsvr_core::config::{Config, CustomShader};
+use scrnsvr_core::scene::SceneTarget;
 use scrnsvr_core::{ClockSpec, EffectSpec, SceneSpec, UniformValue};
 use scrnsvr_platform::{Egl, Headless};
 use scrnsvr_render::{Renderer, render_clock};
@@ -83,6 +86,23 @@ fn uploads_typed_uniforms_and_presents_opaque_premultiplied_frames() {
     assert!(near(frame(&mut renderer, 16.0, 0.0, 0.5), [128, 64, 0, 128]), "fades are premultiplied");
     assert!(near(frame(&mut renderer, 16.0, 1.0, 1.0), [0, 0, 0, 255]), "the rotation overlay reaches black");
     assert!(near(frame(&mut renderer, 16.0, 0.5, 1.0), [128, 64, 0, 255]));
+}
+
+#[test]
+fn native_custom_audio_uniform_compiles_and_stays_zero() {
+    let Some((_lock, _headless, mut renderer)) = context() else { return };
+    for declaration in ["", "uniform highp vec4 uAudio;"] {
+        let shader = CustomShader {
+            id: "custom-audio".into(),
+            title: "Audio probe".into(),
+            source: format!("{declaration} void main() {{ gl_FragColor = vec4(uAudio.rgb + vec3(0.0, 0.25, 0.5), 1.0); }}"),
+        };
+        let config = Config { custom_shaders: vec![shader], ..Config::default() };
+        let spec = Catalog::builtin().build_scene(&config, &SceneTarget::shader("custom-audio")).unwrap();
+        renderer.set_scene(&Arc::new(spec)).unwrap();
+        renderer.render(SIZE, SIZE, 16.0, &[1.0; 4], 0.0, 1.0);
+        assert!(near(renderer.read_rgba(SIZE, SIZE)[..4].try_into().unwrap(), [0, 64, 128, 255]));
+    }
 }
 
 #[test]
