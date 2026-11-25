@@ -10,7 +10,7 @@
 # Needs: hyprctl, grim, jq and a running Hyprland session. Artifacts (saver screenshot, logs) are
 # kept in target/appimage-check/.
 #   SCRNSVR_CHECK_OUTPUT        output for the screenshot (default HDMI-A-2, else the first output)
-#   SCRNSVR_CHECK_THUMBNAILS    expected thumbnail count (default 41)
+#   SCRNSVR_CHECK_THUMBNAILS    expected thumbnail count (default 54)
 set -uo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -115,7 +115,7 @@ check "--install again reports an existing link" grep -q 'Already linked' <<<"$(
 check "the linked path runs the AppImage" grep -q '^Usage: scrnsvr' <<<"$(app "$work/bin/scrnsvr" --help 2>&1)"
 
 # --thumbnail
-thumbs=${SCRNSVR_CHECK_THUMBNAILS:-41}
+thumbs=${SCRNSVR_CHECK_THUMBNAILS:-54}
 mkdir "$work/thumbs"
 app "$appimage" --thumbnail --output "$work/thumbs" --frames 1 >"$artifacts/thumbnail.log" 2>&1
 check "--thumbnail --frames 1 exits 0" test $? = 0
