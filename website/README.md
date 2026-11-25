@@ -21,7 +21,7 @@ The production preview is available under `/scrnsvr/`. Use `src/config/project.c
 
 ## Refresh product media
 
-The included shots and motion previews are from the verified scrnsvr v1.0.0 AppImage. Capture again on a Wayland compositor with layer-shell support. Use a clean config and state directory so personal settings and the desktop are outside the capture.
+The app shots and motion previews are from the verified scrnsvr v1.0.0 AppImage; the stills of the shaders added in 1.1.0 are from the 1.1.0 build. Capture again on a Wayland compositor with layer-shell support. Use a clean config and state directory so personal settings and the desktop are outside the capture.
 
 - Run `scrnsvr --thumbnail --output /tmp/scrnsvr-thumbnails`. Convert the 640×360 PNGs to WebP at quality 85, and keep the shader IDs as filenames under `public/media/shaders/`.
 - For each featured shader in `src/lib/shader-gallery.ts`, open `scrnsvr --preview --shader <id>` with the clock off. Record 5–8 seconds of the preview with a Wayland recorder. Encode the clip as a silent 640×360 H.264 MP4 with `-pix_fmt yuv420p -movflags +faststart`, and save it beside its still.
