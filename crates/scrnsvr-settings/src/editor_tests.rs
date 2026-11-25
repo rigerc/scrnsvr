@@ -289,9 +289,9 @@ fn thumbnails_render_in_the_background_cache_on_disk_and_follow_edits(cx: &mut T
     let h = Harness::open(cx, Fake::default(), "exit 0");
     cx.run_until_parked();
     let builtin = h.read(cx, |settings| settings.model.visuals.len());
-    assert_eq!(builtin, 41);
-    assert_eq!(h.cached().len(), 41, "one file per visual: {:?}", h.cached());
-    assert_eq!(h.captures(), 41);
+    assert_eq!(builtin, 54);
+    assert_eq!(h.cached().len(), 54, "one file per visual: {:?}", h.cached());
+    assert_eq!(h.captures(), 54);
     assert!(h.read(cx, |settings| settings.model.visuals.iter().all(|visual| settings.thumbnails.image(&visual.id).is_some())));
     h.draw(cx);
 
@@ -324,7 +324,7 @@ fn thumbnails_render_in_the_background_cache_on_disk_and_follow_edits(cx: &mut T
     h.act(cx, |settings, window, cx| settings.delete_custom_shader(window, cx));
     cx.run_until_parked();
     assert!(h.cached().iter().all(|name| !name.starts_with(&id)));
-    assert_eq!(h.cached().len(), 41);
+    assert_eq!(h.cached().len(), 54);
 }
 
 #[gpui::test]

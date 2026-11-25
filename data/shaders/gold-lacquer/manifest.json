@@ -1,0 +1,167 @@
+{
+  "id": "gold-lacquer",
+  "title": "Gold Lacquer",
+  "category": "Ambient",
+  "description": "Flecks of gold glint and fade within deep, glossy lacquer as the light drifts.",
+  "fragment": "shader.glsl",
+  "uniforms": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Speed",
+      "description": "Overall animation speed; zero freezes all movement.",
+      "group": "Motion",
+      "random": {
+        "min": 0.1,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "scale",
+      "type": "float",
+      "default": 1,
+      "min": 0.5,
+      "max": 2,
+      "step": 0.01,
+      "label": "Flake scale",
+      "description": "Size of the gold flake pattern.",
+      "group": "Shape",
+      "random": {
+        "min": 0.8,
+        "max": 1.2
+      }
+    },
+    {
+      "name": "flakeDensity",
+      "type": "float",
+      "default": 0.5,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01,
+      "label": "Flake density",
+      "description": "How many gold flakes sit in the lacquer.",
+      "group": "Shape",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "flakeSize",
+      "type": "float",
+      "default": 0.5,
+      "min": 0.2,
+      "max": 1,
+      "step": 0.01,
+      "label": "Flake size",
+      "description": "Size of individual flakes.",
+      "group": "Shape",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "shimmer",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.01,
+      "label": "Shimmer",
+      "description": "How quickly the light moves across the flakes.",
+      "group": "Motion",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "glossWidth",
+      "type": "float",
+      "default": 1,
+      "min": 0.3,
+      "max": 3,
+      "step": 0.01,
+      "label": "Gloss width",
+      "description": "Width of the soft reflection across the lacquer.",
+      "group": "Color",
+      "advanced": true,
+      "random": false
+    },
+    {
+      "name": "brightness",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Brightness",
+      "description": "Overall light intensity.",
+      "group": "Color",
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "saturation",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Saturation",
+      "description": "Color intensity; zero is grayscale.",
+      "group": "Color",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "highlightColor",
+      "type": "color",
+      "default": "#fff1d2",
+      "label": "Gloss light",
+      "description": "Tint of the lacquer's reflection and the brightest glints.",
+      "group": "Color",
+      "advanced": true,
+      "colorRole": "onSurface"
+    },
+    {
+      "name": "color1",
+      "type": "color",
+      "default": "#e2b65c",
+      "label": "Gold",
+      "description": "Color of the gold flakes.",
+      "group": "Color",
+      "colorRole": "primary"
+    },
+    {
+      "name": "color2",
+      "type": "color",
+      "default": "#5c1414",
+      "label": "Lacquer tint",
+      "description": "Color deep in the lacquer.",
+      "group": "Color",
+      "colorRole": "secondary"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "default": "#080405",
+      "label": "Shadow",
+      "description": "Color of the shadow.",
+      "group": "Color",
+      "random": false,
+      "colorRole": "surface"
+    }
+  ],
+  "animationTime": "integrated"
+}

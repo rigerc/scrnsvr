@@ -1,0 +1,168 @@
+{
+  "id": "crushed-velvet",
+  "title": "Crushed Velvet",
+  "category": "Ambient",
+  "description": "Light slides across crushed velvet, catching the pile wherever it turns away.",
+  "fragment": "shader.glsl",
+  "uniforms": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Speed",
+      "description": "Overall animation speed; zero freezes all movement.",
+      "group": "Motion",
+      "random": {
+        "min": 0.1,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "scale",
+      "type": "float",
+      "default": 1.2,
+      "min": 0.8,
+      "max": 2.5,
+      "step": 0.01,
+      "label": "Crush scale",
+      "description": "Size of the crushed patches.",
+      "group": "Shape",
+      "random": {
+        "min": 0.96,
+        "max": 1.44
+      }
+    },
+    {
+      "name": "crush",
+      "type": "float",
+      "default": 0.6,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "label": "Crush",
+      "description": "How sharply the pile is creased and folded.",
+      "group": "Shape",
+      "random": {
+        "min": 0.48,
+        "max": 0.72
+      }
+    },
+    {
+      "name": "pile",
+      "type": "float",
+      "default": 0.5,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01,
+      "label": "Pile sheen",
+      "description": "Width of the soft sheen along the turned pile.",
+      "group": "Shape",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "lightAngle",
+      "type": "float",
+      "default": 40,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "label": "Light angle",
+      "unit": "°",
+      "description": "Direction the light comes from across the fabric.",
+      "group": "Color",
+      "random": {
+        "min": -30,
+        "max": 110
+      }
+    },
+    {
+      "name": "lightOrbit",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.01,
+      "label": "Light orbit",
+      "description": "How quickly the light circles the fabric.",
+      "group": "Motion",
+      "advanced": true,
+      "random": false
+    },
+    {
+      "name": "brightness",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Brightness",
+      "description": "Overall light intensity.",
+      "group": "Color",
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "saturation",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Saturation",
+      "description": "Color intensity; zero is grayscale.",
+      "group": "Color",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "highlightColor",
+      "type": "color",
+      "default": "#f6dce8",
+      "label": "Sheen light",
+      "description": "Tint of the brightest sheen.",
+      "group": "Color",
+      "advanced": true,
+      "colorRole": "onSurface"
+    },
+    {
+      "name": "color1",
+      "type": "color",
+      "default": "#7d2444",
+      "label": "Velvet tint",
+      "description": "Color of the velvet.",
+      "group": "Color",
+      "colorRole": "primary"
+    },
+    {
+      "name": "color2",
+      "type": "color",
+      "default": "#c8587f",
+      "label": "Sheen tint",
+      "description": "Color of the light caught by the pile.",
+      "group": "Color",
+      "colorRole": "secondary"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "default": "#12070d",
+      "label": "Shadow",
+      "description": "Color of the shadow.",
+      "group": "Color",
+      "random": false,
+      "colorRole": "surface"
+    }
+  ],
+  "animationTime": "integrated"
+}

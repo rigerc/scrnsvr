@@ -340,7 +340,7 @@ fn thumbnail_reports_each_failed_shader_without_retrying_and_exits_nonzero() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("scrnsvr thumbnail flow-field: renderer returned"), "{stderr}");
-    assert!(stderr.contains("41 of 41 thumbnail captures failed"), "{stderr}");
-    assert_eq!(fs::read_to_string(count).unwrap().lines().count(), 41, "one attempt per shader");
+    assert!(stderr.contains("54 of 54 thumbnail captures failed"), "{stderr}");
+    assert_eq!(fs::read_to_string(count).unwrap().lines().count(), 54, "one attempt per shader");
     assert_eq!(fs::read_dir(output_dir).unwrap().count(), 0);
 }

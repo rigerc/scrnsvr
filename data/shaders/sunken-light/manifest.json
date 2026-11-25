@@ -1,0 +1,141 @@
+{
+  "id": "sunken-light",
+  "title": "Sunken Light",
+  "category": "Ambient",
+  "description": "Shafts of sunlight sway down through deep water, catching slow drifting motes.",
+  "fragment": "shader.glsl",
+  "uniforms": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Speed",
+      "description": "Overall animation speed; zero freezes all movement.",
+      "group": "Motion",
+      "random": {
+        "min": 0.1,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "rayCount",
+      "type": "int",
+      "default": 6,
+      "min": 3,
+      "max": 9,
+      "step": 1,
+      "label": "Light shafts",
+      "description": "Number of sunbeams reaching down from the surface.",
+      "group": "Shape",
+      "random": {
+        "min": 4.8,
+        "max": 7.2
+      }
+    },
+    {
+      "name": "depth",
+      "type": "float",
+      "default": 0.6,
+      "min": 0.2,
+      "max": 1,
+      "step": 0.01,
+      "label": "Reach",
+      "description": "How far the light reaches into the deep.",
+      "group": "Shape",
+      "random": {
+        "min": 0.48,
+        "max": 0.72
+      }
+    },
+    {
+      "name": "motes",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "label": "Motes",
+      "description": "Amount of drifting particles catching the light.",
+      "group": "Shape",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "sway",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.01,
+      "label": "Sway",
+      "description": "How much the shafts lean and drift with the surface.",
+      "group": "Motion",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "brightness",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Brightness",
+      "description": "Overall light intensity.",
+      "group": "Color",
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "saturation",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Saturation",
+      "description": "Color intensity; zero is grayscale.",
+      "group": "Color",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "color1",
+      "type": "color",
+      "default": "#9fe8df",
+      "label": "Primary color",
+      "description": "Primary color of the effect.",
+      "group": "Color"
+    },
+    {
+      "name": "color2",
+      "type": "color",
+      "default": "#3d7cc0",
+      "label": "Secondary color",
+      "description": "Secondary color of the effect.",
+      "group": "Color"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "default": "#03101b",
+      "label": "Background",
+      "description": "Base color behind the effect.",
+      "group": "Color",
+      "random": false
+    }
+  ],
+  "animationTime": "integrated"
+}

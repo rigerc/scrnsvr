@@ -301,7 +301,7 @@ fn every_builtin_shader_and_effect_compiles_and_links() {
             }
         }
     }
-    assert_eq!(programs, 41 + 17 + 3, "41 shaders, 17 effects and bloom's three extra passes");
+    assert_eq!(programs, 54 + 17 + 3, "54 shaders, 17 effects and bloom's three extra passes");
     assert!(failures.is_empty(), "{} programs failed to compile:\n{}", failures.len(), failures.join("\n"));
     eprintln!("compiled {programs} shader and effect programs");
 }

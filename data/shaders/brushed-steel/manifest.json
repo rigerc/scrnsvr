@@ -1,0 +1,168 @@
+{
+  "id": "brushed-steel",
+  "title": "Brushed Steel",
+  "category": "Ambient",
+  "description": "A brushed steel dial turns its fine grain through a slow sweep of studio light.",
+  "fragment": "shader.glsl",
+  "uniforms": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Speed",
+      "description": "Overall animation speed; zero freezes all movement.",
+      "group": "Motion",
+      "random": {
+        "min": 0.1,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "scale",
+      "type": "float",
+      "default": 1,
+      "min": 0.5,
+      "max": 2,
+      "step": 0.01,
+      "label": "Dial scale",
+      "description": "Size of the circular brushing pattern.",
+      "group": "Shape",
+      "random": {
+        "min": 0.8,
+        "max": 1.2
+      }
+    },
+    {
+      "name": "grain",
+      "type": "float",
+      "default": 0.6,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "label": "Grain",
+      "description": "Strength of the fine brushed texture.",
+      "group": "Shape",
+      "random": {
+        "min": 0.48,
+        "max": 0.72
+      }
+    },
+    {
+      "name": "warp",
+      "type": "float",
+      "default": 0.35,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "label": "Warp",
+      "description": "Gentle dents that bend the highlight.",
+      "group": "Shape",
+      "random": {
+        "min": 0.28,
+        "max": 0.42
+      }
+    },
+    {
+      "name": "lightAngle",
+      "type": "float",
+      "default": 30,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "label": "Light angle",
+      "unit": "°",
+      "description": "Orientation of the studio light across the dial.",
+      "group": "Color",
+      "random": {
+        "min": -40,
+        "max": 100
+      }
+    },
+    {
+      "name": "streakWidth",
+      "type": "float",
+      "default": 1,
+      "min": 0.3,
+      "max": 3,
+      "step": 0.01,
+      "label": "Streak width",
+      "description": "Width of the bright anisotropic streak.",
+      "group": "Color",
+      "advanced": true,
+      "random": false
+    },
+    {
+      "name": "brightness",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Brightness",
+      "description": "Overall light intensity.",
+      "group": "Color",
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "saturation",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Saturation",
+      "description": "Color intensity; zero is grayscale.",
+      "group": "Color",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "highlightColor",
+      "type": "color",
+      "default": "#ffffff",
+      "label": "Studio light",
+      "description": "Tint of the bright streak.",
+      "group": "Color",
+      "advanced": true,
+      "colorRole": "onSurface"
+    },
+    {
+      "name": "color1",
+      "type": "color",
+      "default": "#c9d1da",
+      "label": "Metal tint",
+      "description": "Color of the lit steel.",
+      "group": "Color",
+      "colorRole": "primary"
+    },
+    {
+      "name": "color2",
+      "type": "color",
+      "default": "#8794a6",
+      "label": "Reflection tint",
+      "description": "Color of the softer reflections.",
+      "group": "Color",
+      "colorRole": "secondary"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "default": "#111620",
+      "label": "Shadow",
+      "description": "Color of the shadow.",
+      "group": "Color",
+      "random": false,
+      "colorRole": "surface"
+    }
+  ],
+  "animationTime": "integrated"
+}

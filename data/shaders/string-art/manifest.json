@@ -1,0 +1,157 @@
+{
+  "id": "string-art",
+  "title": "String Art",
+  "category": "Geometric",
+  "description": "Taut threads stretched between pins weave slowly shifting curves of light.",
+  "fragment": "shader.glsl",
+  "uniforms": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Speed",
+      "description": "Overall animation speed; zero freezes all movement.",
+      "group": "Motion",
+      "random": {
+        "min": 0.1,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "pins",
+      "type": "int",
+      "default": 120,
+      "min": 48,
+      "max": 200,
+      "step": 1,
+      "label": "Pins",
+      "description": "Number of pins around the circle.",
+      "group": "Shape",
+      "random": {
+        "min": 96,
+        "max": 144
+      }
+    },
+    {
+      "name": "size",
+      "type": "float",
+      "default": 0.42,
+      "min": 0.25,
+      "max": 0.6,
+      "step": 0.01,
+      "label": "Size",
+      "description": "Radius of the pin circle.",
+      "group": "Shape",
+      "random": {
+        "min": 0.336,
+        "max": 0.504
+      }
+    },
+    {
+      "name": "multiplier",
+      "type": "float",
+      "default": 2,
+      "min": 2,
+      "max": 12,
+      "step": 0.01,
+      "label": "Multiplier",
+      "description": "Starting pattern; each pin connects to its index times this value.",
+      "group": "Shape",
+      "random": {
+        "min": 2,
+        "max": 2.4
+      }
+    },
+    {
+      "name": "morph",
+      "type": "float",
+      "default": 0.5,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.01,
+      "label": "Morph",
+      "description": "How quickly the pattern travels through new curves.",
+      "group": "Motion",
+      "random": {
+        "min": 0.4,
+        "max": 0.6
+      }
+    },
+    {
+      "name": "lineWidth",
+      "type": "float",
+      "default": 1,
+      "min": 0.5,
+      "max": 2.5,
+      "step": 0.01,
+      "label": "Line width",
+      "description": "Thickness of the fine threads.",
+      "group": "Shape",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "brightness",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Brightness",
+      "description": "Overall light intensity.",
+      "group": "Color",
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "saturation",
+      "type": "float",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "label": "Saturation",
+      "description": "Color intensity; zero is grayscale.",
+      "group": "Color",
+      "advanced": true,
+      "random": {
+        "min": 0.7,
+        "max": 1.3
+      }
+    },
+    {
+      "name": "color1",
+      "type": "color",
+      "default": "#f0c27a",
+      "label": "Primary color",
+      "description": "Primary color of the effect.",
+      "group": "Color"
+    },
+    {
+      "name": "color2",
+      "type": "color",
+      "default": "#7fb4e8",
+      "label": "Secondary color",
+      "description": "Secondary color of the effect.",
+      "group": "Color"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "default": "#0b1019",
+      "label": "Background",
+      "description": "Base color behind the effect.",
+      "group": "Color",
+      "random": false
+    }
+  ],
+  "animationTime": "integrated"
+}

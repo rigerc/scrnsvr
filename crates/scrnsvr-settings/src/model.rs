@@ -420,9 +420,9 @@ mod tests {
     #[test]
     fn grouping_has_no_duplicates_and_search_composes_with_favorites() {
         let mut model = model();
-        assert_eq!(model.visuals.len(), 41);
+        assert_eq!(model.visuals.len(), 54);
         assert_eq!(model.matches()[0].1.len(), 6);
-        assert_eq!(filter_ids(&model).into_iter().collect::<std::collections::BTreeSet<_>>().len(), 41);
+        assert_eq!(filter_ids(&model).into_iter().collect::<std::collections::BTreeSet<_>>().len(), 54);
         for (category, rows) in model.matches().into_iter().skip(1) {
             assert!(rows.windows(2).all(|pair| model.visuals[pair[0]].title.to_lowercase() <= model.visuals[pair[1]].title.to_lowercase()));
             assert!(rows.iter().all(|index| model.visuals[*index].category == category));

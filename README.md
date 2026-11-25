@@ -29,7 +29,7 @@ The media in `assets/` was captured by the 0.x releases at 1280×720 (stills) an
 
 ## Features
 
-- 41 GLSL shaders, from quiet ambient gradients to the three audio-themed visuals (see [Fresh start](#fresh-start-coming-from-0x))
+- 54 GLSL shaders, from quiet ambient gradients and fine line art to material studies and the three audio-themed visuals (see [Fresh start](#fresh-start-coming-from-0x))
 - 10–17 controls per shader, grouped into Motion, Shape and Color, with Advanced adjustments, exact numeric entry, per-control reset, locks, conservative Randomize, Undo and saved looks
 - Global GPU effect stack: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom and persistent datamosh/trails; up to eight independent layers, reorder and bypass, live preview
 - Clock overlay: 12h/24h, seconds and date, nine positions, font/weight/size/color/opacity/margin/shadow, and an optional strftime pattern

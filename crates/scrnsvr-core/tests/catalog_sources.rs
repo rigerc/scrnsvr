@@ -27,7 +27,7 @@ fn assembled_catalog_equals_the_frozen_v0_10_0_catalog() {
 #[test]
 fn builtin_catalog_has_the_expected_content() {
     let catalog = Catalog::builtin();
-    assert_eq!(catalog.shaders.len(), 41);
+    assert_eq!(catalog.shaders.len(), 54);
     assert_eq!(catalog.effects.len(), 17);
     assert_eq!(catalog.palettes.len(), 30);
     assert_eq!(catalog.color_families.len(), 5);
