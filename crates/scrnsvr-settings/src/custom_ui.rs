@@ -12,6 +12,7 @@ use gpui_kit::base::input::{
     Diagnostic, DiagnosticSeverity, GutterDecoration, GutterDecorationCollection, RangeDecoration, RangeDecorationCollection,
     RangeDecorationStyle,
 };
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Editor, EditorState, Escape, Input, InputState, Position};
 use gpui_kit::component::{Sizable, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder;
@@ -22,7 +23,7 @@ use scrnsvr_core::source::MAX_CUSTOM_SOURCE_CHARS;
 use crate::app::Settings;
 use crate::model::custom::{self, DEFAULT_TITLE};
 use crate::validation::{DEBOUNCE, Drafts, ShaderChecker, Status, validate};
-use crate::view::{INK, MUTED, QUIET, SAVED, SIGNAL_HOVER, button, label, live, note, status};
+use crate::view::{ALERT, INK, MUTED, QUIET, RAISED, SAVED, SIGNAL, action, button, glyph, icon_button, note, notice, status};
 
 pub struct CustomUi {
     pub title: Entity<InputState>,
@@ -135,7 +136,7 @@ impl Settings {
             Status::Invalid(diagnostics) => line_ranges(&text, diagnostics),
             _ => Vec::new(),
         };
-        let color: Hsla = rgb(SIGNAL_HOVER).into();
+        let color: Hsla = rgb(ALERT).into();
         self.custom.error_lines.set(
             ranges
                 .iter()
@@ -358,20 +359,26 @@ impl Settings {
         let title = self.model.custom(&id).map_or_else(String::new, |shader| shader.title.clone());
         v_flex()
             .gap_3()
-            .child(label("CUSTOM SHADER"))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(glyph("code").size(px(16.)).text_color(rgb(SIGNAL)))
+                    .child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child("Custom shader")),
+            )
             .child(
                 h_flex()
                     .gap_2()
                     .items_center()
                     .child(div().flex_1().min_w_0().child(Input::new(&self.custom.title).small().aria_label("Shader name")))
                     .child(
-                        button("import-shader", "Import…")
+                        action("import-shader", "file-up", "Import…")
                             .tooltip("Replace the source with a GLSL file (up to 100 KB)")
                             .accessibility_label("Import a GLSL file")
                             .on_click(cx.listener(|this, _, window, cx| this.import_shader_file(window, cx))),
                     )
                     .child(
-                        button("delete-shader", "Delete")
+                        icon_button("delete-shader", "trash", "Delete shader")
                             .track_focus(&self.custom.delete_focus)
                             .accessibility_label(format!("Delete {title}"))
                             .on_click(cx.listener(|this, _, window, cx| this.ask_delete(window, cx))),
@@ -383,9 +390,12 @@ impl Settings {
                         .gap_2()
                         .items_center()
                         .flex_wrap()
-                        .child(note(format!("Delete “{title}”? It is also removed from favorites and shuffle.")))
+                        .p_3()
+                        .rounded(px(10.))
+                        .bg(rgb(RAISED))
+                        .child(div().flex_1().min_w(px(200.)).child(notice("custom-delete", format!("Delete “{title}”? It is also removed from favorites and shuffle."), ALERT)))
                         .child(
-                            button("confirm-delete", "Delete shader")
+                            Button::new("confirm-delete").small().danger().label("Delete shader")
                                 .track_focus(&self.custom.confirm_focus)
                                 .on_click(cx.listener(|this, _, window, cx| this.delete_custom_shader(window, cx))),
                         )
@@ -393,19 +403,21 @@ impl Settings {
                 )
             })
             .children(self.custom.message.clone().map(|message| {
-                live("custom-message", message).text_size(px(13.)).text_color(rgb(SIGNAL_HOVER))
+                notice("custom-message", message, ALERT)
             }))
             .child(
                 // Tab indents inside the editor, so Escape is the way out for keyboard users.
                 div()
                     .h(px(240.))
+                    .rounded(px(8.))
+                    .overflow_hidden()
                     .on_action(cx.listener(|_, _: &Escape, window, cx| {
                         window.focus_next(cx);
                         cx.stop_propagation();
                     }))
                     .child(Editor::new(&self.custom.editor).h(px(240.)).aria_label("Shader source (GLSL ES 1.00)")),
             )
-            .child(note("Single-pass GLSL ES 1.00 with mainImage or main. uTime, uResolution, iTime, iResolution, iMouse, iDate and uAudio are supplied. Esc leaves the editor; Tab indents."))
+            .child(div().text_size(px(12.)).text_color(rgb(QUIET)).child("Single-pass GLSL ES 1.00 with mainImage or main. uTime, uResolution, iTime, iResolution, iMouse, iDate and uAudio are supplied. Esc leaves the editor; Tab indents."))
             .child(self.editor_messages(&id, status_line, cx))
     }
 
@@ -413,13 +425,13 @@ impl Settings {
     fn editor_status(&self, id: &str, broken: bool) -> (SharedString, u32) {
         match self.custom.drafts.status(id) {
             Status::Saved if broken => {
-                ("This saved source does not pass the shader checks, so it is not shown. Fix it below.".into(), SIGNAL_HOVER)
+                ("This saved source does not pass the shader checks, so it is not shown. Fix it below.".into(), ALERT)
             }
             Status::Saved => ("Saved. Edits are checked and saved automatically.".into(), QUIET),
             Status::Checking => ("Checking…".into(), MUTED),
             Status::Applied => ("Compiled and saved. The preview shows this version.".into(), SAVED),
-            Status::Invalid(_) => ("Not saved. The preview keeps the last valid version.".into(), SIGNAL_HOVER),
-            Status::Unchecked(_) => ("Not saved: the GPU check could not run.".into(), SIGNAL_HOVER),
+            Status::Invalid(_) => ("Not saved. The preview keeps the last valid version.".into(), ALERT),
+            Status::Unchecked(_) => ("Not saved: the GPU check could not run.".into(), ALERT),
         }
     }
 

@@ -2,6 +2,7 @@
   "id": "lissajous-table",
   "title": "Lissajous Table",
   "category": "Geometric",
+  "collection": "Linework",
   "description": "A table of Lissajous figures traces every frequency ratio in unhurried harmony.",
   "fragment": "shader.glsl",
   "uniforms": [

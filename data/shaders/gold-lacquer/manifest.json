@@ -2,6 +2,7 @@
   "id": "gold-lacquer",
   "title": "Gold Lacquer",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Flecks of gold glint and fade within deep, glossy lacquer as the light drifts.",
   "fragment": "shader.glsl",
   "uniforms": [

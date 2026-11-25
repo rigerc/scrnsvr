@@ -2,6 +2,7 @@
   "id": "phosphor-garden",
   "title": "Phosphor Garden",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Luminous stems unfurl as gentle pulses travel toward their growing tips.",
   "fragment": "shader.glsl",
   "uniforms": [

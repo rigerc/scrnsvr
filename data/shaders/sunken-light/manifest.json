@@ -2,6 +2,7 @@
   "id": "sunken-light",
   "title": "Sunken Light",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Shafts of sunlight sway down through deep water, catching slow drifting motes.",
   "fragment": "shader.glsl",
   "uniforms": [

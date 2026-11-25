@@ -2,6 +2,7 @@
   "id": "tidal-caustics",
   "title": "Tidal Caustics",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Soft pools of refracted light wander across a tranquil seabed.",
   "fragment": "shader.glsl",
   "uniforms": [

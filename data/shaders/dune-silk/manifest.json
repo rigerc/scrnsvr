@@ -2,6 +2,7 @@
   "id": "dune-silk",
   "title": "Dune Silk",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Warm amber ribbons of light flow across a deep midnight blue.",
   "fragment": "shader.glsl",
   "uniforms": [

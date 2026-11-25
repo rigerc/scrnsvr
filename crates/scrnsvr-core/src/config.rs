@@ -25,9 +25,15 @@ pub struct Config {
     pub rotation: RotationConfig,
     pub colors: ColorConfig,
     pub custom_shaders: Vec<CustomShader>,
-    pub effects: EffectsConfig,
     pub shaders: BTreeMap<String, ShaderValues>,
     pub presets: BTreeMap<String, BTreeMap<String, ShaderValues>>,
+    /// The effect stack of each visual's current edits, by visual ID: `[effects.<visual>]`.
+    #[serde(serialize_with = "serialize_stacks")]
+    pub effects: BTreeMap<String, EffectsConfig>,
+    /// The effect stack saved with each look, by visual ID and look name:
+    /// `[look_effects.<visual>.<look>]`.
+    #[serde(serialize_with = "serialize_look_stacks")]
+    pub look_effects: BTreeMap<String, BTreeMap<String, EffectsConfig>>,
 }
 
 impl Default for Config {
@@ -39,9 +45,10 @@ impl Default for Config {
             rotation: RotationConfig::default(),
             colors: ColorConfig::default(),
             custom_shaders: Vec::new(),
-            effects: EffectsConfig::default(),
             shaders: BTreeMap::new(),
             presets: BTreeMap::new(),
+            effects: BTreeMap::new(),
+            look_effects: BTreeMap::new(),
         }
     }
 }
@@ -109,8 +116,36 @@ pub struct EffectsConfig {
 
 impl Default for EffectsConfig {
     fn default() -> Self {
-        Self { enabled: true, layers: Vec::new() }
+        Self::EMPTY
     }
+}
+
+impl EffectsConfig {
+    /// No layers, switched on: what a look without saved effects has.
+    pub const EMPTY: Self = Self { enabled: true, layers: Vec::new() };
+
+    pub fn is_empty(&self) -> bool {
+        self.enabled && self.layers.is_empty()
+    }
+}
+
+static NO_EFFECTS: EffectsConfig = EffectsConfig::EMPTY;
+
+/// Stacks equal to [`EffectsConfig::EMPTY`] are left out of the file.
+fn serialize_stacks<S: serde::Serializer>(stacks: &BTreeMap<String, EffectsConfig>, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.collect_map(stacks.iter().filter(|(_, stack)| !stack.is_empty()))
+}
+
+fn serialize_look_stacks<S: serde::Serializer>(
+    stacks: &BTreeMap<String, BTreeMap<String, EffectsConfig>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let kept: BTreeMap<&String, BTreeMap<&String, &EffectsConfig>> = stacks
+        .iter()
+        .map(|(shader, looks)| (shader, looks.iter().filter(|(_, stack)| !stack.is_empty()).collect::<BTreeMap<_, _>>()))
+        .filter(|(_, looks)| !looks.is_empty())
+        .collect();
+    serializer.collect_map(kept)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -178,13 +213,47 @@ impl Config {
                     None
                 }
             }),
-            effects: fields.section("effects", effects),
             shaders: fields.record("shaders", settings),
             presets: fields.record("presets", |value, fields| Some(fields.child(value)?.record_entries(settings))),
+            effects: BTreeMap::new(),
+            look_effects: fields.record("look_effects", |value, fields| Some(fields.child(value)?.record_entries(effect_stack))),
         };
+        // Before 1.2 one stack applied to every visual. It now belongs to the current edits of the
+        // visual that was last chosen, and every other visual and look starts without effects.
+        let mut legacy = None;
+        config.effects = fields.section("effects", |fields| {
+            let legacy_shape = fields.table.contains_key("layers") || fields.table.get("enabled").is_some_and(|value| !value.is_table());
+            if legacy_shape {
+                legacy = Some(effects(fields));
+                BTreeMap::new()
+            } else {
+                fields.record_entries(effect_stack)
+            }
+        });
         fields.finish();
         config.validate(&mut warnings);
+        if let Some(mut stack) = legacy.filter(|stack| !stack.is_empty()) {
+            if config.effects.contains_key(&config.shader) {
+                warnings.push("effects: the old shared effect stack was ignored because this visual already has its own".into());
+            } else {
+                repair_stack(&mut stack, "effects", &mut warnings);
+                warnings.push(format!(
+                    "effects: effects are now kept per look; the shared stack moved to the current edits of {:?}",
+                    config.shader
+                ));
+                config.effects.insert(config.shader.clone(), stack);
+            }
+        }
         ConfigLoad { config, warnings, error: None }
+    }
+
+    /// The effects shown with a visual: a look's own stack, or the visual's current edits.
+    pub fn effect_stack(&self, shader: &str, look: Option<&str>) -> &EffectsConfig {
+        let stack = match look.filter(|name| !name.is_empty()) {
+            Some(name) => self.look_effects.get(shader).and_then(|looks| looks.get(name)),
+            None => self.effects.get(shader),
+        };
+        stack.unwrap_or(&NO_EFFECTS)
     }
 
     fn validate(&mut self, warnings: &mut Vec<String>) {
@@ -224,12 +293,12 @@ impl Config {
                 }
             }
         }
-        for (index, layer) in self.effects.layers.iter_mut().enumerate() {
-            let path = format!("effects.layers[{index}]");
-            if let Some(effect) = catalog.effect(&layer.effect_id) {
-                repair_uniforms(&effect.uniforms, &mut layer.values, &format!("{path}.values"), true, warnings);
-            } else {
-                warnings.push(format!("{path}.effect_id: unavailable effect {:?}; skipped during rendering", layer.effect_id));
+        for (id, stack) in &mut self.effects {
+            repair_stack(stack, &format!("effects.{id}"), warnings);
+        }
+        for (id, looks) in &mut self.look_effects {
+            for (name, stack) in looks {
+                repair_stack(stack, &format!("look_effects.{id}.{name}"), warnings);
             }
         }
     }
@@ -453,6 +522,25 @@ fn effects(fields: &mut Fields<'_>) -> EffectsConfig {
     }
 }
 
+fn effect_stack(value: Value, fields: &mut Fields<'_>) -> Option<EffectsConfig> {
+    let mut child = fields.child(value)?;
+    let stack = effects(&mut child);
+    child.finish();
+    Some(stack)
+}
+
+fn repair_stack(stack: &mut EffectsConfig, path: &str, warnings: &mut Vec<String>) {
+    let catalog = Catalog::builtin();
+    for (index, layer) in stack.layers.iter_mut().enumerate() {
+        let path = format!("{path}.layers[{index}]");
+        if let Some(effect) = catalog.effect(&layer.effect_id) {
+            repair_uniforms(&effect.uniforms, &mut layer.values, &format!("{path}.values"), true, warnings);
+        } else {
+            warnings.push(format!("{path}.effect_id: unavailable effect {:?}; skipped during rendering", layer.effect_id));
+        }
+    }
+}
+
 fn settings(value: Value, fields: &mut Fields<'_>) -> Option<ShaderValues> {
     Some(fields.child(value)?.record_entries(setting))
 }
@@ -528,14 +616,20 @@ speed = 0.75
 color3 = "#123abc"
 [presets.plasma.Empty]
 
-[[effects.layers]]
+[[effects.plasma.layers]]
 id = "blur"
 effect_id = "bloom"
 values = { intensity = 0.5 }
-[[effects.layers]]
+[[effects.plasma.layers]]
 id = "film"
 effect_id = "vignette"
 enabled = false
+[effects.flow-field]
+enabled = false
+[[look_effects.plasma."Blue Sky".layers]]
+id = "effect-1"
+effect_id = "vignette"
+values = { intensity = 0.3 }
 "##
         .parse()
         .unwrap();
@@ -544,6 +638,10 @@ enabled = false
         assert_eq!(original.config.global.fade_seconds, 0.0);
         assert_eq!(original.config.clock.pattern.as_deref(), Some("%H:%M %z"));
         assert_eq!(original.config.shaders["plasma"]["speed"], SettingValue::Text("0.25".into()));
+        assert_eq!(original.config.effect_stack("plasma", None).layers.len(), 2);
+        assert_eq!(original.config.effect_stack("plasma", Some("Blue Sky")).layers[0].effect_id, "vignette");
+        assert!(!original.config.effect_stack("flow-field", None).enabled);
+        assert!(original.config.effect_stack("plasma", Some("Empty")).is_empty(), "a look without a stack has no effects");
         original.config.save(&path).unwrap();
         let reloaded = Config::load(&path);
         assert!(reloaded.error.is_none() && reloaded.warnings.is_empty(), "{reloaded:?}");
@@ -647,8 +745,12 @@ values = { intensity = 0.2 }
         assert_eq!(config.presets["plasma"]["Faulty"].len(), 1);
         assert_eq!(config.custom_shaders.len(), 1);
         assert_eq!(config.custom_shaders[0].title, "Trim me");
-        assert_eq!(config.effects.layers[1].id, "effect-2");
-        assert_eq!(config.effects.layers[2].values["intensity"], SettingValue::Number(0.2));
+        // The old shared stack moves to the current edits of the visual in use (here the default).
+        let moved = &config.effects[DEFAULT_SHADER];
+        assert_eq!(moved.layers[1].id, "effect-2");
+        assert_eq!(moved.layers[2].values["intensity"], SettingValue::Number(0.2));
+        assert!(config.effect_stack("plasma", None).is_empty());
+        assert!(loaded.warnings.iter().any(|warning| warning.contains("effects are now kept per look")));
         for field in [
             "shader",
             "fps",
@@ -664,6 +766,34 @@ values = { intensity = 0.2 }
         ] {
             assert!(loaded.warnings.iter().any(|warning| warning.starts_with(&format!("{field}:"))), "{field}: {:?}", loaded.warnings);
         }
+    }
+
+    #[test]
+    fn the_scene_takes_the_effects_of_the_look_it_shows() {
+        use crate::scene::SceneTarget;
+        let table = r##"
+shader = "plasma"
+[presets.plasma.Calm]
+speed = 0.2
+[[effects.plasma.layers]]
+id = "edits"
+effect_id = "bloom"
+[[look_effects.plasma.Calm.layers]]
+id = "calm"
+effect_id = "vignette"
+"##
+        .parse()
+        .unwrap();
+        let config = Config::from_table(table).config;
+        let catalog = Catalog::builtin();
+        let ids = |preset: Option<&str>| -> Vec<String> {
+            let target = SceneTarget { shader: "plasma".into(), preset: preset.map(Into::into) };
+            catalog.build_scene(&config, &target).unwrap().effects.into_iter().map(|effect| effect.id).collect()
+        };
+        assert_eq!(ids(None), ["edits"]);
+        assert_eq!(ids(Some("Calm")), ["calm"]);
+        let other = SceneTarget { shader: "flow-field".into(), preset: None };
+        assert!(catalog.build_scene(&config, &other).unwrap().effects.is_empty(), "other visuals have no effects");
     }
 
     #[test]

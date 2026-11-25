@@ -2,6 +2,7 @@
   "id": "crushed-velvet",
   "title": "Crushed Velvet",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Light slides across crushed velvet, catching the pile wherever it turns away.",
   "fragment": "shader.glsl",
   "uniforms": [

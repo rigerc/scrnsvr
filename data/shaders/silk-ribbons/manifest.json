@@ -2,6 +2,7 @@
   "id": "silk-ribbons",
   "title": "Silk Ribbons",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Pearlescent bands of rose and blue silk unfurl in the dark.",
   "fragment": "shader.glsl",
   "uniforms": [

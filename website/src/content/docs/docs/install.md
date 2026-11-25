@@ -15,12 +15,12 @@ sidebar:
 ## Install the AppImage
 
 1. Download the AppImage and its matching checksum file from [GitHub Releases](https://github.com/rigerc/scrnsvr/releases/latest). Keep the AppImage somewhere you can leave it, such as `~/Applications`.
-2. In that directory, verify the download, mark it executable, and install the command. These filenames are for v1.1.0. For a newer release, substitute its version.
+2. In that directory, verify the download, mark it executable, and install the command. These filenames are for v1.2.0. For a newer release, substitute its version.
 
    ```sh
-   sha256sum -c SHA256SUMS-1.1.0-native.txt &&
-   chmod +x Scrnsvr-1.1.0-x86_64.AppImage &&
-   ./Scrnsvr-1.1.0-x86_64.AppImage --install
+   sha256sum -c SHA256SUMS-1.2.0-native.txt &&
+   chmod +x Scrnsvr-1.2.0-x86_64.AppImage &&
+   ./Scrnsvr-1.2.0-x86_64.AppImage --install
    ```
 
    The installer runs after the checksum reports `OK`. It links `scrnsvr` into `~/.local/bin` or `$XDG_BIN_HOME` if set. Keep that directory on `PATH` and leave the AppImage at the location you installed it from.

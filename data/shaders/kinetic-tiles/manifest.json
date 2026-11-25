@@ -2,6 +2,7 @@
   "id": "kinetic-tiles",
   "title": "Kinetic Tiles",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Rounded tiles turn and slide in coordinated waves across a quiet grid.",
   "fragment": "shader.glsl",
   "uniforms": [

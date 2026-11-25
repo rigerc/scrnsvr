@@ -3,6 +3,7 @@
   "title": "Quiet Horizon",
   "description": "Lavender haze and a pale peach horizon breathe slowly through a deep navy landscape.",
   "category": "Reactive",
+  "collection": "Color Fields",
   "fragment": "shader.glsl",
   "uniforms": [
     {

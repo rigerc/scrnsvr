@@ -1,6 +1,6 @@
 //! Clock tab: every clock setting, edited live in the preview.
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable, Selectable, Sizable, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder;
@@ -11,7 +11,7 @@ use crate::app::Settings;
 use crate::controls::{Control, Target};
 use crate::model::Model;
 use crate::model::clock::{POSITIONS, PatternState, clock_defs};
-use crate::view::{LINE, MUTED, QUIET, SIGNAL, SIGNAL_HOVER, label, live, note};
+use crate::view::{ALERT, CANVAS, CONTROL_HOVER, INK, LINE, MUTED, QUIET, RAISED, SIGNAL, STRONG_LINE, dot, notice, section};
 
 pub struct ClockUi {
     pub controls: Vec<Control>,
@@ -73,24 +73,49 @@ impl Settings {
         self.simple_row(&Target::Clock, name, disabled, cx)
     }
 
-    pub(crate) fn clock_panel(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let enabled = self.model.config.clock.enabled;
-        let disabled = !enabled;
+    /// Placement as a miniature of the screen: nine spots, the chosen one holding a little clock.
+    fn placement(&self, disabled: bool, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let position = self.model.config.clock.position;
-        let custom = self.model.config.clock.font == ClockFont::Custom;
-        let now = chrono::Local::now();
-        let (time, date) = self.model.clock_example(&now);
-        let state = self.clock_ui.pattern_state;
-        let grid = (0..3).map(|row| {
-            h_flex().gap_1().children((0..3).map(|column| {
+        let cells = (0..3).map(|row| {
+            h_flex().flex_1().gap(px(3.)).children((0..3).map(|column| {
                 let index = row * 3 + column;
-                let (value, name, arrow) = POSITIONS[index];
+                let (value, name, _) = POSITIONS[index];
                 let selected = value == position;
+                let align = match column {
+                    0 => "start",
+                    1 => "center",
+                    _ => "end",
+                };
+                let marker = h_flex()
+                    .size_full()
+                    .px_2()
+                    .items_center()
+                    .when(align == "start", |this| this.justify_start())
+                    .when(align == "center", |this| this.justify_center())
+                    .when(align == "end", |this| this.justify_end())
+                    .child(if selected {
+                        h_flex()
+                            .gap(px(3.))
+                            .items_center()
+                            .child(dot(SIGNAL, 6.))
+                            .child(div().w(px(22.)).h(px(4.)).rounded_full().bg(rgb(INK)))
+                            .into_any_element()
+                    } else {
+                        dot(STRONG_LINE, 4.).into_any_element()
+                    });
                 Button::new(("clock-position", index))
-                    .small()
-                    .outline()
-                    .w(px(40.))
-                    .label(arrow)
+                    .custom(
+                        ButtonCustomVariant::new(cx)
+                            .color(if selected { rgba(0x23d5ab1f).into() } else { transparent_black() })
+                            .foreground(rgb(INK).into())
+                            .hover(rgb(CONTROL_HOVER).into())
+                            .active(rgb(CONTROL_HOVER).into()),
+                    )
+                    .flex_1()
+                    .h_full()
+                    .p_0()
+                    .rounded(px(4.))
+                    .child(marker)
                     .selected(selected)
                     .toggled(selected)
                     .disabled(disabled)
@@ -99,78 +124,117 @@ impl Settings {
                     .on_click(cx.listener(move |this, _, window, cx| this.set_clock_position(index, window, cx)))
             }))
         });
+        let name = POSITIONS.iter().find(|(value, ..)| *value == position).map_or("", |(_, name, _)| *name);
         v_flex()
-            .gap_4()
-            .flex_none()
-            .children(self.clock_row("enabled", false, cx))
+            .gap_2()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .child(div().font_weight(FontWeight::MEDIUM).child("Placement"))
+                    .child(div().text_size(px(12.)).text_color(rgb(QUIET)).child(name)),
+            )
             .child(
                 v_flex()
-                    .gap_4()
+                    .w_full()
+                    .max_w(px(320.))
+                    .h(px(150.))
+                    .p(px(4.))
+                    .gap(px(3.))
+                    .rounded(px(10.))
+                    .border_2()
+                    .border_color(rgb(STRONG_LINE))
+                    .bg(rgb(CANVAS))
+                    .children(cells),
+            )
+    }
+
+    pub(crate) fn clock_panel(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let enabled = self.model.config.clock.enabled;
+        let disabled = !enabled;
+        let custom = self.model.config.clock.font == ClockFont::Custom;
+        let now = chrono::Local::now();
+        let (time, date) = self.model.clock_example(&now);
+        let state = self.clock_ui.pattern_state;
+        v_flex()
+            .gap_6()
+            .flex_none()
+            .child(
+                v_flex()
+                    .gap_3()
+                    .p_3()
+                    .rounded(px(10.))
+                    .bg(rgb(RAISED))
+                    .children(self.clock_row("enabled", false, cx))
+                    .child(
+                        v_flex()
+                            .py_3()
+                            .items_center()
+                            .rounded(px(8.))
+                            .bg(rgb(CANVAS))
+                            .border_1()
+                            .border_color(rgb(if state == PatternState::Invalid { ALERT } else { LINE }))
+                            .when(disabled, |this| this.opacity(0.5))
+                            .child(div().text_size(px(26.)).line_height(px(32.)).child(time))
+                            .when(!date.is_empty(), |this| this.child(div().text_size(px(12.)).text_color(rgb(MUTED)).child(date))),
+                    ),
+            )
+            .child(
+                v_flex()
+                    .gap_6()
                     .when(disabled, |this| this.opacity(0.5))
+                    .child(section("POSITION").child(self.placement(disabled, cx)).children(self.clock_row("margin", disabled, cx)))
                     .child(
-                        v_flex()
-                            .gap_1()
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .child(div().font_weight(FontWeight::MEDIUM).child("Placement"))
-                                    .child(div().text_xs().text_color(rgb(QUIET)).child(POSITIONS.iter().find(|(value, ..)| *value == position).map_or("", |(_, name, _)| *name))),
-                            )
-                            .child(v_flex().gap_1().children(grid)),
+                        section("TYPE")
+                            .gap_4()
+                            .children(self.clock_row("font", disabled, cx))
+                            .when(custom, |this| {
+                                this.child(
+                                    v_flex()
+                                        .gap(px(6.))
+                                        .child(div().font_weight(FontWeight::MEDIUM).child("Installed font name"))
+                                        .child(Input::new(&self.clock_ui.custom_font).small().disabled(disabled).aria_label("Installed font name"))
+                                        .child(div().text_size(px(12.)).text_color(rgb(QUIET)).child("Uses a font installed on this computer.")),
+                                )
+                            })
+                            .children(self.clock_row("weight", disabled, cx))
+                            .children(self.clock_row("size", disabled, cx)),
                     )
-                    .children(self.clock_row("font", disabled, cx))
-                    .when(custom, |this| {
-                        this.child(
-                            v_flex()
-                                .gap_1()
-                                .child(div().font_weight(FontWeight::MEDIUM).child("Installed font name"))
-                                .child(Input::new(&self.clock_ui.custom_font).small().disabled(disabled).aria_label("Installed font name"))
-                                .child(note("Uses a font installed on this computer.")),
-                        )
-                    })
-                    .children(self.clock_row("weight", disabled, cx))
-                    .children(self.clock_row("size", disabled, cx))
-                    .children(self.clock_row("color", disabled, cx))
-                    .children(self.clock_row("opacity", disabled, cx))
-                    .children(self.clock_row("margin", disabled, cx))
                     .child(
-                        v_flex()
-                            .gap_3()
-                            .pt_3()
-                            .border_t_1()
-                            .border_color(rgb(LINE))
-                            .child(label("TIME AND DATE"))
-                            .children(self.clock_row("format", disabled, cx))
-                            .children(self.clock_row("show_seconds", disabled, cx))
-                            .children(self.clock_row("show_date", disabled, cx))
+                        section("APPEARANCE")
+                            .gap_4()
+                            .children(self.clock_row("color", disabled, cx))
+                            .children(self.clock_row("opacity", disabled, cx))
                             .children(self.clock_row("shadow", disabled, cx)),
                     )
                     .child(
-                        v_flex()
-                            .gap_2()
-                            .pt_3()
-                            .border_t_1()
-                            .border_color(rgb(LINE))
-                            .child(label("CUSTOM TIME PATTERN"))
-                            .child(Input::new(&self.clock_ui.pattern).small().disabled(disabled).cleanable(true).aria_label("Custom time pattern"))
-                            .child(note("Optional strftime-style pattern for the time line, for example %H:%M, %-I:%M %p or %a %H:%M:%S. Leave it empty to use the format above. The date line still follows Show date."))
-                            .child(match state {
-                                PatternState::Invalid => live("clock-status-1", "This pattern can’t be used, so the clock shows the default format until it is fixed.")
-                                    .text_size(px(13.))
-                                    .text_color(rgb(SIGNAL_HOVER)),
-                                PatternState::Valid => live("clock-status-2", "Using your pattern.").text_size(px(13.)).text_color(rgb(MUTED)),
-                                PatternState::Default => live("clock-status-3", "Using the default format.").text_size(px(13.)).text_color(rgb(MUTED)),
-                            })
+                        section("TIME AND DATE")
+                            .gap_4()
+                            .children(self.clock_row("format", disabled, cx))
+                            .children(self.clock_row("show_seconds", disabled, cx))
+                            .children(self.clock_row("show_date", disabled, cx))
                             .child(
                                 v_flex()
-                                    .gap_1()
-                                    .p_2()
-                                    .rounded(px(5.))
-                                    .border_1()
-                                    .border_color(rgb(if state == PatternState::Invalid { SIGNAL } else { LINE }))
-                                    .child(div().text_xs().text_color(rgb(QUIET)).child("EXAMPLE NOW"))
-                                    .child(div().text_size(px(20.)).child(time))
-                                    .when(!date.is_empty(), |this| this.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(date))),
+                                    .gap(px(6.))
+                                    .child(div().font_weight(FontWeight::MEDIUM).child("Custom time pattern"))
+                                    .child(div().text_size(px(12.)).text_color(rgb(QUIET)).child(
+                                        "Optional strftime pattern for the time line, such as %H:%M, %-I:%M %p or %a %H:%M:%S. Leave it empty to use the format above. The date line still follows Show date.",
+                                    ))
+                                    .child(
+                                        Input::new(&self.clock_ui.pattern)
+                                            .small()
+                                            .disabled(disabled)
+                                            .cleanable(true)
+                                            .aria_label("Custom time pattern"),
+                                    )
+                                    .child(match state {
+                                        PatternState::Invalid => notice(
+                                            "clock-status-1",
+                                            "This pattern can’t be used, so the clock shows the default format until it is fixed.",
+                                            ALERT,
+                                        ),
+                                        PatternState::Valid => notice("clock-status-2", "Using your pattern.", SIGNAL),
+                                        PatternState::Default => notice("clock-status-3", "Using the default format.", QUIET),
+                                    }),
                             ),
                     ),
             )

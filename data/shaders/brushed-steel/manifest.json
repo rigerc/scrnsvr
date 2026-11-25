@@ -2,6 +2,7 @@
   "id": "brushed-steel",
   "title": "Brushed Steel",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "A brushed steel dial turns its fine grain through a slow sweep of studio light.",
   "fragment": "shader.glsl",
   "uniforms": [

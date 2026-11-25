@@ -2,6 +2,7 @@
   "id": "glow-wire",
   "title": "Glow Wire",
   "category": "Ambient",
+  "collection": "Light",
   "description": "A single filament of light traces a slowly tumbling knot in the dark.",
   "fragment": "shader.glsl",
   "uniforms": [

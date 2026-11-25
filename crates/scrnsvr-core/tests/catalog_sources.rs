@@ -28,6 +28,14 @@ fn assembled_catalog_equals_the_frozen_v0_10_0_catalog() {
 fn builtin_catalog_has_the_expected_content() {
     let catalog = Catalog::builtin();
     assert_eq!(catalog.shaders.len(), 54);
+    // Every visual belongs to exactly one known collection, and every collection is used.
+    for shader in &catalog.shaders {
+        let collection = shader.collection.as_deref().unwrap_or_else(|| panic!("{} has no collection", shader.id));
+        assert!(catalog.collections.iter().any(|known| known == collection), "{}: unknown collection {collection:?}", shader.id);
+    }
+    for collection in &catalog.collections {
+        assert!(catalog.shaders.iter().any(|shader| shader.collection.as_ref() == Some(collection)), "{collection} is empty");
+    }
     assert_eq!(catalog.effects.len(), 17);
     assert_eq!(catalog.palettes.len(), 30);
     assert_eq!(catalog.color_families.len(), 5);

@@ -31,7 +31,7 @@ The media in `assets/` was captured by the 0.x releases at 1280×720 (stills) an
 
 - 54 GLSL shaders, from quiet ambient gradients and fine line art to material studies and the three audio-themed visuals (see [Fresh start](#fresh-start-coming-from-0x))
 - 10–17 controls per shader, grouped into Motion, Shape and Color, with Advanced adjustments, exact numeric entry, per-control reset, locks, conservative Randomize, Undo and saved looks
-- Global GPU effect stack: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom and persistent datamosh/trails; up to eight independent layers, reorder and bypass, live preview
+- A GPU effect stack per look: 17 adjustable effects, including VHS/CRT, film, pixel/dither, optics, bloom and persistent datamosh/trails; up to eight independent layers, reorder and bypass, live preview
 - Clock overlay: 12h/24h, seconds and date, nine positions, font/weight/size/color/opacity/margin/shadow, and an optional strftime pattern
 - 30 color schemes and Noctalia color import (`mPrimary`, `mSecondary`, `mTertiary`, `mSurface`, `mOnSurface` onto shader color controls)
 - Custom GLSL shader editor with live compile errors on the offending line
@@ -123,11 +123,10 @@ Set `SCRNSVR_RENDERER_DEBUG=1` for per-second frame statistics on stderr.
 
 ### Settings
 
-`scrnsvr --settings` opens the settings window. A live preview, a shader bank and an inspector built from each shader's manifest sit in the Visuals tab: thumbnail tiles with search, favorites and categories, sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset shader, Randomize with locks, Undo, and saved looks. Edits save automatically with a visible status and a Retry that keeps your edits after a failed save. It needs Wayland and Vulkan; with reduced animations set on the desktop, the preview starts paused. Tabs move with Left/Right/Home/End.
+`scrnsvr --settings` opens the settings window: the library of visuals on the left, the open section in the middle, and a live preview on the right that folds away to a slim rail. The Visuals section edits the selected visual: a look bar to switch between its current edits and saved looks, then its parameters (built from the shader's manifest: sliders with exact entry, color pickers, selects, switches, an Advanced section, per-control Reset, Reset parameters, Randomize with locks, Undo) or its effects. Edits save automatically with a visible status and a Retry that keeps your edits after a failed save. It needs Wayland and Vulkan; with reduced animations set on the desktop, the preview starts paused. Tabs move with Left/Right/Home/End.
 
-- **Visuals:** shader bank, inspector, per-visual color scheme, Noctalia color import.
-- **Effects:** one global stack of up to eight layers (add, remove, reorder with buttons or Alt+Up/Down, enable per layer or globally), live in the preview.
-- **Looks & Shuffle:** saved looks, the shuffle list and its timing.
+- **Visuals:** the look bar (current edits and saved looks, each edited in place, with its own shuffle toggle), Parameters (per-visual color scheme, Noctalia color import) and Effects (the open look's stack of up to eight layers: add, remove, reorder with buttons or Alt+Up/Down, enable per layer or for the whole look).
+- **Shuffle:** the shuffle set (tick visuals in the library, refine with a chip per look), Add favorites, Clear, and the timing.
 - **Clock:** every clock option, a placement grid, and an optional strftime pattern with a live example.
 - **Settings:** frame rate, fade, monitors, global color scheme and the Idle section. It shows whether Noctalia launches scrnsvr, edits Noctalia's timeout, and offers "Set up…", which lists the `noctalia msg config-set` changes and applies them only after you confirm. Without Noctalia it shows hypridle and hot-corner instructions.
 
@@ -143,9 +142,9 @@ Choose a shader and adjust its sliders for a live preview. Numeric fields accept
 
 Every shader supports speed, brightness and saturation. Speed at zero freezes animation; saturation at zero produces grayscale. Plasma's **Custom** palette exposes three color controls, and Flow Field's **Duotone** palette exposes a secondary color.
 
-### Global effects
+### Effects
 
-Open **Effects**, choose an effect and click **Add effect** to process any built-in or custom visual. Every effect has an **Intensity** control to blend with the original image; zero bypasses that layer. Effects start empty.
+In **Visuals**, open the **Effects** pane, choose an effect and click **Add** to process the look you are editing, built-in or custom. Every effect has an **Intensity** control to blend with the original image; zero bypasses that layer. Effects start empty.
 
 | Effect | Treatment and adjustments |
 | --- | --- |
@@ -167,9 +166,9 @@ Open **Effects**, choose an effect and click **Add effect** to process any built
 | Datamosh / Trails | Persistent frame feedback with smooth-trail/block-displacement modes, persistence, decay, and displacement |
 | Palette Mapping | Luminance mapped to Neon, Ember, Ocean, or Monochrome ramps |
 
-Stack up to eight layers, including several independently adjusted instances of the same effect. They run top to bottom; order matters (blur before pixelation differs from pixelation before blur). Each layer can be disabled, reset or removed, and **Enable effects** bypasses the whole stack without deleting your adjustments.
+Stack up to eight layers, including several independently adjusted instances of the same effect. They run top to bottom; order matters (blur before pixelation differs from pixelation before blur). Each layer can be disabled, reset or removed, and the look's effects switch bypasses its whole stack without deleting your adjustments.
 
-The stack is global: changing visuals, applying saved looks, randomizing, changing color schemes or shuffling keeps the same effects. The live preview, fullscreen preview and saver show the result; thumbnails stay clean. The clock stays crisp above the processed image. Animated effects use their own timeline, so VHS, film, glitch and refraction continue when a visual's Speed is zero; **Pause animation** freezes both, including temporal history. Unavailable or failed effects are skipped rather than blanking the visual.
+Every look has its own stack, and so do each visual's current edits. **Save as look** copies the stack along with the parameters; another visual or look starts without effects. The saver uses the stack of whatever it shows, including the look a shuffle entry names. Configs from before 1.2 had one shared stack: it moves to the current edits of the visual last chosen in settings. The live preview, fullscreen preview and saver show the result; thumbnails stay clean. The clock stays crisp above the processed image. Animated effects use their own timeline, so VHS, film, glitch and refraction continue when a visual's Speed is zero; **Pause animation** freezes both, including temporal history. Unavailable or failed effects are skipped rather than blanking the visual.
 
 Bloom uses multiple GPU passes, and Datamosh / Trails keeps previous-frame textures for each instance, so they cost more GPU time and memory than single-pass effects, especially at high resolutions. History resets when its input stack, settings or dimensions change, and disabling effects or setting Intensity to zero releases unused targets.
 
@@ -206,18 +205,22 @@ interval_minutes = 10.0
 shader = "plasma"
 preset = "Evening"            # optional saved look
 
-[[effects.layers]]
-id = "tape-1"
-effect_id = "vhs-distortion"
-enabled = true
-values = { intensity = 0.5, grain = 0.2 }
-
 [shaders.plasma]
 speed = 0.65
 
 [presets.plasma.Evening]      # saved looks
 speed = 0.25
 color1 = "#1122ff"
+
+[[effects.plasma.layers]]     # effects of plasma's current edits
+id = "tape-1"
+effect_id = "vhs-distortion"
+enabled = true
+values = { intensity = 0.5, grain = 0.2 }
+
+[[look_effects.plasma.Evening.layers]]   # effects saved with a look
+id = "effect-1"
+effect_id = "bloom"
 ```
 
 ## Building
@@ -243,7 +246,7 @@ scripts/check-appimage.sh <AppImage>   # smoke test on a live Hyprland session (
 
 The built-in catalog is plain files under `data/`, assembled at compile time by `crates/scrnsvr-core/build.rs`:
 
-- `data/shaders/<id>/manifest.json` (id, title, category, description, controls) and `shader.glsl` (exports `mainImage`)
+- `data/shaders/<id>/manifest.json` (id, title, category, collection, description, controls) and `shader.glsl` (exports `mainImage`); `data/collections.json` lists the library collections in display order
 - `data/effects/<id>/manifest.json` with `effect.glsl` (and `pass-*.glsl` for multipass effects); `data/effects/order.json` sets the effect order
 - `data/palettes.json` and `data/color-families.json` for the color schemes
 

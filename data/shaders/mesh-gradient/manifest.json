@@ -2,6 +2,7 @@
   "id": "mesh-gradient",
   "title": "Mesh Gradient",
   "category": "Ambient",
+  "collection": "Color Fields",
   "description": "Four floating pools of color blend into a soft, shifting mesh.",
   "fragment": "shader.glsl",
   "uniforms": [

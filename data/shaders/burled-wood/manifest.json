@@ -2,6 +2,7 @@
   "id": "burled-wood",
   "title": "Burled Wood",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Polished burl wood shimmers as light slides through its swirling grain.",
   "fragment": "shader.glsl",
   "uniforms": [

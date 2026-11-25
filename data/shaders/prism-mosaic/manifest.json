@@ -2,6 +2,7 @@
   "id": "prism-mosaic",
   "title": "Prism Mosaic",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Drifting glass facets catch colored light along their beveled edges.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "ridgelines",
   "title": "Ridgelines",
   "category": "Ambient",
+  "collection": "Linework",
   "description": "Layered mountain ridgelines drift past in quiet, hand-plotted strokes.",
   "fragment": "shader.glsl",
   "uniforms": [

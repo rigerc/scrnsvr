@@ -2,6 +2,7 @@
   "id": "aurora-veil",
   "title": "Aurora Veil",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Translucent ribbons of light ripple across a midnight gradient.",
   "fragment": "shader.glsl",
   "uniforms": [

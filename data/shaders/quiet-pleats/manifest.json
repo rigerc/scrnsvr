@@ -2,6 +2,7 @@
   "id": "quiet-pleats",
   "title": "Quiet Pleats",
   "category": "Geometric",
+  "collection": "Paper & Cutouts",
   "description": "Wide bands of lavender, slate, and cream compress and expand like gently folded paper.",
   "fragment": "shader.glsl",
   "uniforms": [

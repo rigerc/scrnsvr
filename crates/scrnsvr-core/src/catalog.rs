@@ -179,6 +179,8 @@ pub struct ShaderDef {
     pub id: String,
     pub title: String,
     pub category: Option<String>,
+    /// The library collection the settings window and website group this visual under.
+    pub collection: Option<String>,
     pub description: Option<String>,
     pub fragment: String,
     pub scheme_palette: Option<String>,
@@ -267,6 +269,8 @@ pub struct Catalog {
     pub effects: Vec<EffectDef>,
     pub palettes: Vec<Palette>,
     pub color_families: Vec<ColorFamily>,
+    /// Library collections in display order, from `data/collections.json`.
+    pub collections: Vec<String>,
 }
 
 impl Catalog {

@@ -3,6 +3,7 @@
   "title": "Velvet Cloud",
   "description": "A softly lit volume of smoky plum and copper folds through darkness, stirred by sustained sound.",
   "category": "Reactive",
+  "collection": "Night & Water",
   "fragment": "shader.glsl",
   "uniforms": [
     {

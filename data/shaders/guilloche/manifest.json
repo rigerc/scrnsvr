@@ -2,6 +2,7 @@
   "id": "guilloche",
   "title": "Guilloché",
   "category": "Geometric",
+  "collection": "Linework",
   "description": "Fine interwoven curves slowly evolve like intricate ornamental engravings.",
   "fragment": "shader.glsl",
   "uniforms": [

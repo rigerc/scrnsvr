@@ -2,6 +2,7 @@
   "id": "paper-lanterns",
   "title": "Paper Lanterns",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Warm translucent lanterns float upward through a deep, quiet night.",
   "fragment": "shader.glsl",
   "uniforms": [

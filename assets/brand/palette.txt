@@ -1,0 +1,4 @@
+NIGHT #101522
+TEAL #23d5ab
+BLUE #3268ff
+WHITE #ffffff

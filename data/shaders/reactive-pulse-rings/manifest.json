@@ -3,6 +3,7 @@
   "title": "Lightwell",
   "description": "Defocused ivory and amber light drifts over charcoal, gently warmed by sustained sound.",
   "category": "Reactive",
+  "collection": "Light",
   "fragment": "shader.glsl",
   "uniforms": [
     {

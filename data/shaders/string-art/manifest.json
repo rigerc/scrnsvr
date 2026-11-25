@@ -2,6 +2,7 @@
   "id": "string-art",
   "title": "String Art",
   "category": "Geometric",
+  "collection": "Linework",
   "description": "Taut threads stretched between pins weave slowly shifting curves of light.",
   "fragment": "shader.glsl",
   "uniforms": [

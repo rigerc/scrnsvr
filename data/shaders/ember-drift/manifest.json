@@ -2,6 +2,7 @@
   "id": "ember-drift",
   "title": "Ember Drift",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Warm motes rise and softly fade against a smoky night.",
   "fragment": "shader.glsl",
   "uniforms": [

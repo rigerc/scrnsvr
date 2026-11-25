@@ -2,6 +2,7 @@
   "id": "quiet-arches",
   "title": "Quiet Arches",
   "category": "Geometric",
+  "collection": "Paper & Cutouts",
   "description": "Nested arches in clay, rose, and plum slowly widen and slide across one another.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "star-drift",
   "title": "Star Drift",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Layers of softly glowing stars glide through a deep night sky.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "plasma",
   "title": "Chromatic Plasma",
   "category": "Ambient",
+  "collection": "Light",
   "fragment": "shader.glsl",
   "uniforms": [
     {

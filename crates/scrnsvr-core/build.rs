@@ -22,6 +22,7 @@ fn main() {
         "effects": effects(&data.join("effects")),
         "palettes": read_json(&data.join("palettes.json")),
         "colorFamilies": read_json(&data.join("color-families.json")),
+        "collections": read_json(&data.join("collections.json")),
     });
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("cargo sets OUT_DIR")).join("catalog.json");
     fs::write(&out, serde_json::to_string(&catalog).expect("catalog serializes"))

@@ -2,6 +2,7 @@
   "id": "flow-field",
   "title": "Flow Field",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Slow currents of luminous color.",
   "fragment": "shader.glsl",
   "uniforms": [

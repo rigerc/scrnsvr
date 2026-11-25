@@ -1,7 +1,7 @@
-//! The global ordered effect stack.
+//! The ordered effect stack of the look being edited (or the visual's current edits).
 
 use scrnsvr_core::catalog::{Catalog, EffectDef, SettingValue, ShaderValues};
-use scrnsvr_core::config::{EffectLayer, MAX_EFFECT_LAYERS};
+use scrnsvr_core::config::{EffectLayer, EffectsConfig, MAX_EFFECT_LAYERS};
 
 use super::{Model, snap};
 
@@ -26,34 +26,57 @@ pub fn catalog() -> &'static [EffectDef] {
 }
 
 impl Model {
+    /// The stack of the target being edited.
+    pub fn effects(&self) -> &EffectsConfig {
+        self.config.effect_stack(&self.visual().id, self.look.as_deref())
+    }
+
+    /// The target's stack, created when it has none yet. Restoring an undo uses this directly.
+    pub(super) fn stack_slot(&mut self) -> &mut EffectsConfig {
+        let id = self.visual().id.clone();
+        match self.look.clone() {
+            Some(name) => self.config.look_effects.entry(id).or_default().entry(name).or_default(),
+            None => self.config.effects.entry(id).or_default(),
+        }
+    }
+
+    /// The target's stack for an edit, which also retires the target's pending undo.
+    fn stack_mut(&mut self) -> &mut EffectsConfig {
+        let key = self.target_key();
+        self.undo.remove(&key);
+        self.stack_slot()
+    }
+
     pub fn effect_def(&self, layer: &EffectLayer) -> Option<&'static EffectDef> {
         Catalog::builtin().effect(&layer.effect_id)
     }
 
     pub fn effect_index(&self, id: &str) -> Option<usize> {
-        self.config.effects.layers.iter().position(|layer| layer.id == id)
+        self.effects().layers.iter().position(|layer| layer.id == id)
     }
 
     /// `Bloom, layer 2`: how a layer is named in labels and messages.
     pub fn effect_label(&self, index: usize) -> String {
-        let layer = &self.config.effects.layers[index];
+        let layer = &self.effects().layers[index];
         let title = self.effect_def(layer).map_or(layer.effect_id.as_str(), |def| def.title.as_str());
         format!("{title}, layer {}", index + 1)
     }
 
     pub fn effect_title(&self, index: usize) -> String {
-        let layer = &self.config.effects.layers[index];
+        let layer = &self.effects().layers[index];
         self.effect_def(layer).map_or_else(|| layer.effect_id.clone(), |def| def.title.clone())
     }
 
     pub fn effects_full(&self) -> bool {
-        self.config.effects.layers.len() >= MAX_EFFECT_LAYERS
+        self.effects().layers.len() >= MAX_EFFECT_LAYERS
     }
 
     pub fn set_effects_enabled(&mut self, enabled: bool) -> bool {
-        let changed = self.config.effects.enabled != enabled;
-        self.config.effects.enabled = enabled;
-        changed
+        if self.effects().enabled == enabled {
+            return false;
+        }
+        self.stack_mut().enabled = enabled;
+        true
     }
 
     fn next_layer_id(&self) -> String {
@@ -69,41 +92,43 @@ impl Model {
             return Err(EffectError::Unknown);
         }
         let layer = EffectLayer { id: self.next_layer_id(), effect_id: effect_id.into(), enabled: true, values: ShaderValues::new() };
-        self.config.effects.layers.push(layer);
-        Ok(self.config.effects.layers.len() - 1)
+        self.stack_mut().layers.push(layer);
+        Ok(self.effects().layers.len() - 1)
     }
 
     pub fn remove_effect(&mut self, index: usize) -> Option<EffectLayer> {
-        (index < self.config.effects.layers.len()).then(|| self.config.effects.layers.remove(index))
+        (index < self.effects().layers.len()).then(|| self.stack_mut().layers.remove(index))
     }
 
     /// Swap a layer with its neighbor. Returns its new index, or `None` at either end.
     pub fn move_effect(&mut self, index: usize, up: bool) -> Option<usize> {
         let target = if up { index.checked_sub(1)? } else { index + 1 };
-        if index >= self.config.effects.layers.len() || target >= self.config.effects.layers.len() {
+        let len = self.effects().layers.len();
+        if index >= len || target >= len {
             return None;
         }
-        self.config.effects.layers.swap(index, target);
+        self.stack_mut().layers.swap(index, target);
         Some(target)
     }
 
     pub fn set_effect_enabled(&mut self, index: usize, enabled: bool) -> bool {
-        let Some(layer) = self.config.effects.layers.get_mut(index) else { return false };
-        let changed = layer.enabled != enabled;
-        layer.enabled = enabled;
-        changed
+        if self.effects().layers.get(index).is_none_or(|layer| layer.enabled == enabled) {
+            return false;
+        }
+        self.stack_mut().layers[index].enabled = enabled;
+        true
     }
 
     /// Every control value of a layer with defaults resolved, keyed by uniform name.
     pub fn effective_effect(&self, layer_id: &str) -> ShaderValues {
-        let Some(layer) = self.effect_index(layer_id).map(|index| &self.config.effects.layers[index]) else { return ShaderValues::new() };
+        let Some(layer) = self.effect_index(layer_id).map(|index| &self.effects().layers[index]) else { return ShaderValues::new() };
         let Some(def) = self.effect_def(layer) else { return ShaderValues::new() };
         def.uniforms.iter().map(|uniform| (uniform.name.clone(), uniform.resolve_effect_value(layer.values.get(&uniform.name)))).collect()
     }
 
     pub fn set_effect_value(&mut self, layer_id: &str, name: &str, value: SettingValue) -> bool {
         let Some(index) = self.effect_index(layer_id) else { return false };
-        let layer = &self.config.effects.layers[index];
+        let layer = &self.effects().layers[index];
         let Some(def) = self.effect_def(layer).and_then(|def| def.uniforms.iter().find(|uniform| uniform.name == name)) else {
             return false;
         };
@@ -111,25 +136,25 @@ impl Model {
             SettingValue::Number(n) if def.is_slider() => SettingValue::Number(snap(def, n)),
             value => def.resolve_effect_value(Some(&value)),
         };
-        let layer = &mut self.config.effects.layers[index];
-        if layer.values.get(name) == Some(&value) {
+        if self.effects().layers[index].values.get(name) == Some(&value) {
             return false;
         }
-        layer.values.insert(name.into(), value);
+        self.stack_mut().layers[index].values.insert(name.into(), value);
         true
     }
 
     /// Return a layer's controls to their defaults. Order and the enable switch stay as they are.
     pub fn reset_effect(&mut self, layer_id: &str) -> bool {
         let Some(index) = self.effect_index(layer_id) else { return false };
-        let layer = &mut self.config.effects.layers[index];
-        let changed = !layer.values.is_empty();
-        layer.values.clear();
-        changed
+        if self.effects().layers[index].values.is_empty() {
+            return false;
+        }
+        self.stack_mut().layers[index].values.clear();
+        true
     }
 
     pub fn effect_edited(&self, layer_id: &str) -> bool {
-        self.effect_index(layer_id).is_some_and(|index| !self.config.effects.layers[index].values.is_empty())
+        self.effect_index(layer_id).is_some_and(|index| !self.effects().layers[index].values.is_empty())
     }
 }
 
@@ -146,13 +171,13 @@ mod tests {
     }
 
     fn ids(model: &Model) -> Vec<&str> {
-        model.config.effects.layers.iter().map(|layer| layer.id.as_str()).collect()
+        model.effects().layers.iter().map(|layer| layer.id.as_str()).collect()
     }
 
     #[test]
     fn layers_add_with_stable_unique_ids_up_to_the_limit_and_repeat_effects() {
         let mut model = model();
-        assert!(model.config.effects.enabled && model.config.effects.layers.is_empty());
+        assert!(model.effects().enabled && model.effects().layers.is_empty());
         let bloom = catalog().iter().find(|def| def.id == "bloom").expect("bloom").id.clone();
         for expected in 0..8 {
             assert_eq!(model.add_effect(&bloom), Ok(expected));
@@ -165,7 +190,7 @@ mod tests {
         assert!(!model.effects_full());
         assert_eq!(model.add_effect("nope"), Err(EffectError::Unknown));
         assert_eq!(model.add_effect(&bloom), Ok(7));
-        assert_eq!(model.config.effects.layers[7].id, "effect-3", "the first unused id is reused only after its layer is gone");
+        assert_eq!(model.effects().layers[7].id, "effect-3", "the first unused id is reused only after its layer is gone");
         assert!(model.remove_effect(99).is_none());
     }
 
@@ -190,7 +215,7 @@ mod tests {
         let def = catalog().iter().find(|def| def.uniforms.iter().any(|u| u.name == "intensity" && u.is_slider())).unwrap();
         let uniform = def.uniforms.iter().find(|u| u.name == "intensity").unwrap();
         let index = model.add_effect(&def.id).unwrap();
-        let id = model.config.effects.layers[index].id.clone();
+        let id = model.effects().layers[index].id.clone();
         assert!(!model.effect_edited(&id));
         assert!(model.set_effect_value(&id, "intensity", SettingValue::Number(500.0)));
         let SettingValue::Number(top) = model.effective_effect(&id)["intensity"] else { panic!("numeric") };
@@ -202,10 +227,10 @@ mod tests {
         assert!(model.effect_edited(&id));
         assert!(model.reset_effect(&id));
         assert!(!model.reset_effect(&id));
-        assert!(!model.config.effects.layers[index].enabled, "reset keeps the layer disabled");
+        assert!(!model.effects().layers[index].enabled, "reset keeps the layer disabled");
         assert_eq!(model.effective_effect(&id)["intensity"], uniform.default);
         assert!(model.set_effects_enabled(false) && !model.set_effects_enabled(false));
-        assert_eq!(model.config.effects.layers.len(), 1, "a global bypass keeps the stack");
+        assert_eq!(model.effects().layers.len(), 1, "a global bypass keeps the stack");
     }
 
     #[test]
@@ -221,9 +246,33 @@ mod tests {
         assert_eq!(model.scene().unwrap().effects.iter().map(|effect| effect.id.as_str()).collect::<Vec<_>>(), ["effect-2"]);
         model.set_effects_enabled(false);
         assert!(model.scene().unwrap().effects.is_empty());
-        // The stack is global: choosing another visual keeps it.
+        // Each visual has its own stack: another visual starts without effects, and coming back
+        // finds the first one's stack where it was.
+        let first_visual = model.selected;
         let other = model.visuals.iter().position(|visual| visual.id == "plasma").unwrap();
         model.select(other);
-        assert_eq!(model.config.effects.layers.len(), 2);
+        assert!(model.effects().layers.is_empty() && model.scene().unwrap().effects.is_empty());
+        model.select(first_visual);
+        assert_eq!(model.effects().layers.len(), 2);
+    }
+
+    #[test]
+    fn a_look_carries_its_own_stack_and_edits_it_in_place() {
+        let mut model = model();
+        let (first, second) = (&catalog()[0].id, &catalog()[1].id);
+        model.add_effect(first).unwrap();
+        model.save_look("Night", false).unwrap();
+        assert_eq!(model.look.as_deref(), Some("Night"), "saving opens the new look");
+        assert_eq!(model.effects().layers.len(), 1, "the look starts with a copy of the stack");
+        model.add_effect(second).unwrap();
+        assert_eq!(model.scene().unwrap().effects.len(), 2, "the preview shows the look's stack");
+        assert!(model.open_look(None));
+        assert_eq!(model.effects().layers.len(), 1, "current edits keep their own stack");
+        assert!(model.open_look(Some("Night")) && !model.open_look(Some("Missing")));
+        assert_eq!(model.effects().layers.len(), 2);
+        model.rename_look("Night", "Dusk").unwrap();
+        assert_eq!((model.look.as_deref(), model.effects().layers.len()), (Some("Dusk"), 2));
+        assert!(model.delete_look("Dusk"));
+        assert!(model.look.is_none() && !model.config.look_effects.contains_key(&model.visual().id));
     }
 }

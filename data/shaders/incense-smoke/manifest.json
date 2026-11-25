@@ -2,6 +2,7 @@
   "id": "incense-smoke",
   "title": "Incense Smoke",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Thin ribbons of smoke curl upward from unseen embers and dissolve into the dark.",
   "fragment": "shader.glsl",
   "uniforms": [

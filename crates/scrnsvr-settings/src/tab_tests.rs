@@ -13,7 +13,7 @@ use scrnsvr_core::catalog::SettingValue;
 use scrnsvr_core::clock::ClockPosition;
 use scrnsvr_core::config::Config;
 
-use crate::app::{Settings, Tab};
+use crate::app::{LookAction, Pane, Settings, Tab};
 use crate::controls::Target;
 use crate::idle::{Idle, IdleSource, testing::fake};
 use crate::persistence::Paths;
@@ -73,6 +73,15 @@ impl Harness {
         self.act(cx, |settings, window, cx| settings.show_tab(tab, window, cx));
         self.draw(cx);
     }
+
+    /// The Effects pane of the visual editor.
+    fn show_effects(&self, cx: &mut TestAppContext) {
+        self.act(cx, |settings, window, cx| {
+            settings.show_tab(Tab::Visuals, window, cx);
+            settings.pane = Pane::Effects;
+        });
+        self.draw(cx);
+    }
 }
 
 fn value(cx: &mut TestAppContext, input: &Entity<InputState>) -> String {
@@ -80,7 +89,7 @@ fn value(cx: &mut TestAppContext, input: &Entity<InputState>) -> String {
 }
 
 fn ids(settings: &Settings) -> Vec<String> {
-    settings.model.config.effects.layers.iter().map(|layer| layer.id.clone()).collect()
+    settings.model.effects().layers.iter().map(|layer| layer.id.clone()).collect()
 }
 
 #[gpui::test]
@@ -94,8 +103,8 @@ fn tabs_use_roving_focus_with_wrap_around_and_every_tab_draws(cx: &mut TestAppCo
     app.act(cx, |settings, window, cx| settings.step_tab(Tab::Visuals, window, cx));
     app.draw(cx);
     for (keys, expected) in [
-        ("right", Tab::Effects),
-        ("right", Tab::Looks),
+        ("right", Tab::Shuffle),
+        ("right", Tab::Clock),
         ("end", Tab::Settings),
         ("right", Tab::Visuals),
         ("left", Tab::Settings),
@@ -111,9 +120,37 @@ fn tabs_use_roving_focus_with_wrap_around_and_every_tab_draws(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn collections_filter_and_fold_and_the_fold_is_remembered(cx: &mut TestAppContext) {
+    let app = Harness::open(cx);
+    app.act(cx, |settings, _, cx| settings.filter_collection("Linework", cx));
+    app.draw(cx);
+    let shown = app.read(cx, |settings| settings.model.matches());
+    assert_eq!(shown.len(), 1);
+    assert_eq!((shown[0].0.as_str(), shown[0].1.len()), ("Linework", 7));
+    // Picking the same collection again goes back to everything; Favorites clears it.
+    app.act(cx, |settings, _, cx| settings.filter_collection("Linework", cx));
+    assert!(app.read(cx, |settings| settings.model.collection.is_none()));
+    app.act(cx, |settings, _, cx| {
+        settings.filter_collection("Materials", cx);
+        settings.filter(true, cx);
+    });
+    assert!(app.read(cx, |settings| settings.model.collection.is_none() && settings.model.favorites_only));
+    app.act(cx, |settings, _, cx| settings.filter(false, cx));
+
+    app.act(cx, |settings, window, cx| settings.toggle_collection("Shapes", window, cx));
+    app.draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(500));
+    cx.run_until_parked();
+    let saved = fs::read_to_string(app.root.path().join("ui.toml")).unwrap();
+    assert!(saved.contains("Shapes"), "{saved}");
+    app.act(cx, |settings, window, cx| settings.toggle_collection("Shapes", window, cx));
+    assert!(app.read(cx, |settings| settings.model.ui.collapsed.is_empty()));
+}
+
+#[gpui::test]
 fn the_effect_stack_adds_reorders_removes_and_saves_in_order(cx: &mut TestAppContext) {
     let app = Harness::open(cx);
-    app.show(cx, Tab::Effects);
+    app.show_effects(cx);
     for effect in ["vhs-distortion", "vignette", "bloom"] {
         app.act(cx, |settings, window, cx| {
             settings.effects_ui.chosen = effect.into();
@@ -145,29 +182,31 @@ fn the_effect_stack_adds_reorders_removes_and_saves_in_order(cx: &mut TestAppCon
     app.act(cx, |settings, window, cx| settings.set_effect_enabled(0, false, window, cx));
     app.act(cx, |settings, window, cx| settings.remove_effect(2, window, cx));
     let saved = app.saved(cx);
-    let layers: Vec<_> = saved.effects.layers.iter().map(|layer| (layer.id.as_str(), layer.effect_id.as_str(), layer.enabled)).collect();
+    let stack = saved.effect_stack("flow-field", None);
+    let layers: Vec<_> = stack.layers.iter().map(|layer| (layer.id.as_str(), layer.effect_id.as_str(), layer.enabled)).collect();
     assert_eq!(layers, [("effect-2", "vignette", false), ("effect-1", "vhs-distortion", true)]);
-    assert_eq!(saved.effects.layers[1].values["intensity"], SettingValue::Number(0.35));
+    assert_eq!(stack.layers[1].values["intensity"], SettingValue::Number(0.35));
 
     // Bypassing keeps the stack, and reset returns only that layer's values.
     app.act(cx, |settings, window, cx| settings.set_effects_enabled(false, window, cx));
     app.act(cx, |settings, window, cx| settings.reset_effect(1, window, cx));
     let saved = app.saved(cx);
-    assert!(!saved.effects.enabled && saved.effects.layers.len() == 2 && saved.effects.layers[1].values.is_empty());
+    let stack = saved.effect_stack("flow-field", None);
+    assert!(!stack.enabled && stack.layers.len() == 2 && stack.layers[1].values.is_empty());
     assert!(app.read(cx, |settings| settings.effects_ui.controls.contains_key("effect-1")));
 }
 
 #[gpui::test]
 fn the_eight_layer_limit_holds_and_every_catalog_effect_draws_its_controls(cx: &mut TestAppContext) {
     let app = Harness::open(cx);
-    app.show(cx, Tab::Effects);
+    app.show_effects(cx);
     let catalog: Vec<_> =
         scrnsvr_core::catalog::Catalog::builtin().effects.iter().map(|effect| (effect.id.clone(), effect.uniforms.len())).collect();
     for (id, uniforms) in &catalog {
         app.act(cx, |settings, window, cx| {
             settings.effects_ui.chosen = id.clone();
             settings.add_effect(window, cx);
-            let layer = settings.model.config.effects.layers.last().unwrap().id.clone();
+            let layer = settings.model.effects().layers.last().unwrap().id.clone();
             assert_eq!(settings.effects_ui.controls[&layer].len(), *uniforms, "{id}");
             assert!(settings.effects_ui.expanded.contains(&layer), "a new layer opens its controls");
         });
@@ -182,12 +221,41 @@ fn the_eight_layer_limit_holds_and_every_catalog_effect_draws_its_controls(cx: &
     }
     app.act(cx, |settings, window, cx| settings.add_effect(window, cx));
     app.draw(cx);
-    assert_eq!(app.read(cx, |settings| settings.model.config.effects.layers.len()), 8);
+    assert_eq!(app.read(cx, |settings| settings.model.effects().layers.len()), 8);
     assert!(app.read(cx, |settings| settings.effects_ui.message.clone()).unwrap().contains("limit"));
     app.act(cx, |settings, window, cx| settings.remove_effect(3, window, cx));
     app.act(cx, |settings, window, cx| settings.add_effect(window, cx));
-    assert_eq!(app.read(cx, |settings| settings.model.config.effects.layers.len()), 8);
+    assert_eq!(app.read(cx, |settings| settings.model.effects().layers.len()), 8);
     assert!(app.read(cx, |settings| settings.effect_warnings()).is_empty());
+}
+
+#[gpui::test]
+fn each_look_keeps_its_own_stack_and_the_editor_follows_the_open_look(cx: &mut TestAppContext) {
+    let app = Harness::open(cx);
+    app.show_effects(cx);
+    app.act(cx, |settings, window, cx| {
+        settings.effects_ui.chosen = "bloom".into();
+        settings.add_effect(window, cx);
+        settings.start_look_action(LookAction::New, window, cx);
+        settings.look_name.update(cx, |input, cx| input.set_value("Glow", window, cx));
+        settings.submit_look(window, cx);
+        // The new look is open: a second layer goes to it, not to current edits.
+        settings.effects_ui.chosen = "vignette".into();
+        settings.add_effect(window, cx);
+    });
+    app.draw(cx);
+    assert_eq!(app.read(cx, |settings| settings.model.look.clone()), Some("Glow".into()));
+    assert_eq!(app.read(cx, |settings| settings.effects_ui.controls.len()), 2);
+    app.act(cx, |settings, window, cx| settings.open_look(None, window, cx));
+    app.draw(cx);
+    assert_eq!(app.read(cx, ids), ["effect-1"], "current edits keep one layer");
+    assert_eq!(app.read(cx, |settings| settings.effects_ui.controls.len()), 1, "the controls follow the open look");
+    let saved = app.saved(cx);
+    assert_eq!(saved.effect_stack("flow-field", Some("Glow")).layers.len(), 2);
+    assert_eq!(saved.effect_stack("flow-field", None).layers.len(), 1);
+    // Another visual starts without effects.
+    app.act(cx, |settings, window, cx| settings.select(settings.model.visual_index("plasma").unwrap(), window, cx));
+    assert!(app.read(cx, |settings| settings.effects_ui.controls.is_empty() && settings.model.look.is_none()));
 }
 
 #[gpui::test]
@@ -197,18 +265,18 @@ fn a_layer_of_an_unavailable_effect_is_kept_skipped_and_reported(cx: &mut TestAp
     fs::write(&config, "[effects]\nenabled = true\n[[effects.layers]]\nid = \"old\"\neffect_id = \"retired\"\nenabled = true\n").unwrap();
     let idle = fake(root.path(), BEFORE, AFTER);
     let app = Harness::with(cx, root, idle, None);
-    app.show(cx, Tab::Effects);
+    app.show_effects(cx);
     let warnings = app.read(cx, |settings| settings.effect_warnings());
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert!(warnings[0].contains("unavailable"));
     app.act(cx, |settings, window, cx| settings.set_effect_enabled(0, false, window, cx));
-    assert_eq!(app.saved(cx).effects.layers[0].effect_id, "retired", "its settings are kept");
+    assert_eq!(app.saved(cx).effect_stack("flow-field", None).layers[0].effect_id, "retired", "its settings are kept");
 }
 
 #[gpui::test]
 fn shuffle_entries_toggle_reorder_remove_and_the_interval_clamps(cx: &mut TestAppContext) {
     let app = Harness::open(cx);
-    app.show(cx, Tab::Looks);
+    app.show(cx, Tab::Shuffle);
     app.act(cx, |settings, window, cx| {
         settings.toggle_shuffle_entry("flow-field", None, window, cx);
         settings.toggle_shuffle_entry("plasma", None, window, cx);
@@ -250,7 +318,8 @@ fn shuffle_entries_toggle_reorder_remove_and_the_interval_clamps(cx: &mut TestAp
     });
     assert!(!app.saved(cx).rotation.enabled);
 
-    // A look is its own entry and loading it applies it in Visuals.
+    // A look is its own entry. The first entry into an empty set turns shuffle on, and a library
+    // tick takes the whole visual out again, look and current edits alike.
     app.act(cx, |settings, window, cx| {
         let plasma = settings.model.visual_index("plasma").unwrap();
         settings.select(plasma, window, cx);
@@ -258,10 +327,31 @@ fn shuffle_entries_toggle_reorder_remove_and_the_interval_clamps(cx: &mut TestAp
         settings.look_name.update(cx, |input, cx| input.set_value("Fast", window, cx));
         settings.submit_look(window, cx);
         settings.toggle_shuffle_entry("plasma", Some("Fast"), window, cx);
-        settings.model.select(0);
-        settings.load_shuffle_entry(0, window, cx);
     });
-    assert_eq!(app.read(cx, |settings| (settings.tab, settings.model.visual().id.clone())), (Tab::Visuals, "plasma".into()));
+    app.draw(cx);
+    assert!(app.saved(cx).rotation.enabled, "the first entry starts shuffling");
+    app.act(cx, |settings, window, cx| {
+        settings.toggle_shuffle_visual("plasma", window, cx);
+        settings.toggle_shuffle_entry("plasma", None, window, cx);
+        settings.toggle_shuffle_visual("plasma", window, cx);
+    });
+    let saved = app.saved(cx);
+    assert!(saved.rotation.entries.is_empty() && !saved.rotation.enabled);
+
+    // Favorites join with their current edits; Clear empties the set.
+    app.act(cx, |settings, window, cx| {
+        settings.favorite(settings.model.visual_index("plasma").unwrap(), window, cx);
+        settings.favorite(settings.model.visual_index("aurora-veil").unwrap(), window, cx);
+        settings.add_favorites_to_shuffle(window, cx);
+    });
+    app.draw(cx);
+    let saved = app.saved(cx);
+    let set: Vec<_> = saved.rotation.entries.iter().map(|entry| (entry.shader.as_str(), entry.preset.is_none())).collect();
+    assert_eq!(set.len(), 2);
+    assert!(set.iter().all(|(_, current)| *current) && saved.rotation.enabled);
+    app.act(cx, |settings, window, cx| settings.clear_shuffle(window, cx));
+    let saved = app.saved(cx);
+    assert!(saved.rotation.entries.is_empty() && !saved.rotation.enabled);
 }
 
 #[gpui::test]

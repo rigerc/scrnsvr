@@ -4,7 +4,7 @@
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::searchable_list::{SearchableListItem, SearchableVec};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
-use gpui_kit::component::{Disableable, Sizable, v_flex};
+use gpui_kit::component::{Disableable, Sizable, h_flex, v_flex};
 use gpui_kit::*;
 use scrnsvr_core::noctalia;
 
@@ -14,7 +14,7 @@ use crate::idle_ui::IdleUi;
 use crate::model::Model;
 use crate::model::clock::global_defs;
 use crate::model::colors::{self, NONE};
-use crate::view::{LINE, MUTED, button, label, live, note};
+use crate::view::{CANVAS, INK, MUTED, QUIET, RAISED, action, live, section};
 
 #[derive(Clone)]
 pub struct SchemeItem {
@@ -180,13 +180,7 @@ impl Settings {
     /// Per-visual scheme and Noctalia import, at the end of the Visuals inspector.
     pub(crate) fn color_section(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let colored = self.model.has_color_controls();
-        v_flex()
-            .gap_2()
-            .flex_none()
-            .pt_3()
-            .border_t_1()
-            .border_color(rgb(LINE))
-            .child(label("COLOR SCHEME"))
+        section("COLOR SCHEME")
             .child(
                 Select::new(&self.system_ui.shader_scheme)
                     .small()
@@ -194,49 +188,100 @@ impl Settings {
                     .menu_max_h(px(320.))
                     .accessibility_label("Color scheme for this visual"),
             )
-            .child(live("system-status-11", self.model.color_hint()).text_size(px(13.)).text_color(rgb(MUTED)))
+            .child(live("system-status-11", self.model.color_hint()).text_size(px(12.)).text_color(rgb(QUIET)))
             .child(
-                button("import-noctalia", if self.system_ui.importing { "Importing…" } else { "Import Noctalia colors" })
-                    .disabled(!colored || self.system_ui.importing)
-                    .on_click(cx.listener(|this, _, window, cx| this.import_noctalia_colors(window, cx))),
-            )
-            .child(
-                live(
-                    "system-status-12",
-                    self.system_ui.import_message.clone().unwrap_or_else(|| {
-                        if colored {
-                            "Apply your desktop palette to this visual.".into()
-                        } else {
-                            "This visual uses a built-in palette. Choose one with color controls to import colors.".into()
-                        }
-                    }),
-                )
-                .text_size(px(13.))
-                .text_color(rgb(MUTED)),
+                v_flex()
+                    .gap_2()
+                    .p_3()
+                    .rounded(px(10.))
+                    .bg(rgb(RAISED))
+                    .child(
+                        action(
+                            "import-noctalia",
+                            "palette",
+                            if self.system_ui.importing { "Importing…" } else { "Import Noctalia colors" },
+                        )
+                        .disabled(!colored || self.system_ui.importing)
+                        .on_click(cx.listener(|this, _, window, cx| this.import_noctalia_colors(window, cx))),
+                    )
+                    .child(
+                        live(
+                            "system-status-12",
+                            self.system_ui.import_message.clone().unwrap_or_else(|| {
+                                if colored {
+                                    "Apply your desktop palette to this visual.".into()
+                                } else {
+                                    "This visual uses a built-in palette. Choose one with color controls to import colors.".into()
+                                }
+                            }),
+                        )
+                        .text_size(px(12.))
+                        .text_color(rgb(MUTED)),
+                    ),
             )
     }
 
     pub(crate) fn system_panel(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         v_flex()
-            .gap_4()
+            .gap_6()
             .flex_none()
             .child(
-                v_flex()
-                    .gap_3()
-                    .child(label("PLAYBACK"))
+                section("PLAYBACK")
+                    .gap_4()
                     .children(["fps", "fade_seconds", "monitors"].into_iter().filter_map(|name| self.simple_row(&Target::Global, name, false, cx))),
             )
             .child(
-                v_flex()
-                    .gap_2()
-                    .pt_3()
-                    .border_t_1()
-                    .border_color(rgb(LINE))
-                    .child(label("COLORS"))
+                section("COLORS")
                     .child(div().font_weight(FontWeight::MEDIUM).child("Global color scheme"))
                     .child(Select::new(&self.system_ui.global_scheme).small().menu_max_h(px(320.)).accessibility_label("Global color scheme"))
-                    .child(note("Applies to every visual that does not choose its own scheme. Choosing a scheme replaces custom colors you set on visuals.")),
+                    .child(div().text_size(px(12.)).text_color(rgb(QUIET)).child(
+                        "Applies to every visual that does not choose its own scheme. Choosing a scheme replaces custom colors you set on visuals.",
+                    )),
             )
             .child(self.idle_section(cx))
+            .child(self.about())
+    }
+
+    /// The app's identity and where its files live.
+    fn about(&self) -> impl IntoElement + use<> {
+        let config = self.paths.config.as_ref().map_or_else(|| "Not available".to_owned(), |path| tilde(path));
+        section("ABOUT").child(
+            h_flex()
+                .gap_4()
+                .items_center()
+                .p_4()
+                .rounded(px(10.))
+                .bg(rgb(CANVAS))
+                .child(img("brand/appicon.svg").size(px(56.)).flex_none())
+                .child(
+                    v_flex()
+                        .min_w_0()
+                        .gap(px(6.))
+                        .child(svg().path("brand/wordmark.svg").w(px(105.)).h(px(15.)).text_color(rgb(INK)))
+                        .child(
+                            div()
+                                .text_size(px(12.))
+                                .text_color(rgb(MUTED))
+                                .child(format!("Version {}  ·  shader screensaver for Wayland", env!("CARGO_PKG_VERSION"))),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(11.))
+                                .text_color(rgb(QUIET))
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .whitespace_nowrap()
+                                .child(format!("Settings file: {config}")),
+                        ),
+                ),
+        )
+    }
+}
+
+/// A path with the home directory written as `~`.
+fn tilde(path: &std::path::Path) -> String {
+    match dirs::home_dir().and_then(|home| path.strip_prefix(home).ok().map(|rest| rest.to_path_buf())) {
+        Some(rest) => format!("~/{}", rest.display()),
+        None => path.display().to_string(),
     }
 }

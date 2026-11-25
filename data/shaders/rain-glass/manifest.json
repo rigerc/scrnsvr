@@ -2,6 +2,7 @@
   "id": "rain-glass",
   "title": "Rain Glass",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Slow droplets trail down glass over blurred pools of nighttime color.",
   "fragment": "shader.glsl",
   "uniforms": [

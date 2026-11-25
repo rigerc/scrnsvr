@@ -51,10 +51,14 @@ shader = "flow-field"
 shader = "flow-field"
 preset = "Midnight drift"
 
-[[effects.layers]]
+[[effects.flow-field.layers]]
 id = "tape-1"
 effect_id = "vhs-distortion"
 values = { intensity = 0.25 }
+
+[[look_effects.flow-field."Midnight drift".layers]]
+id = "effect-1"
+effect_id = "bloom"
 ```
 
 ## Visuals and display
@@ -97,5 +101,5 @@ These keys go under `[clock]`. Size and margin are percentages of the screen's s
 ## Shuffle, effects, and custom shaders
 
 - `[rotation]` defaults to `enabled = false` and an empty list. Add `[[rotation.entries]]` tables with `shader` and an optional `preset` name. With shuffle enabled, `interval_minutes = 0.0` picks once per launch. A positive interval up to `180.0` also changes the visual while the saver runs.
-- `[effects]` defaults to `enabled = true` with an empty stack. Add up to eight `[[effects.layers]]` tables. Each takes an `effect_id`, a unique instance `id`, `enabled` (defaults to `true`), and a `values` table for control overrides. The app generates an instance ID if you omit `id`.
+- Effects belong to looks. `[effects.<id>]` is the stack of a visual's current edits and `[look_effects.<id>.<look>]` the stack saved with a look; a visual or look without one has no effects. Each stack has `enabled` (defaults to `true`) and up to eight `[[...layers]]` tables. Each layer takes an `effect_id`, an `id` unique within its stack, `enabled` (defaults to `true`), and a `values` table for control overrides. The app generates an instance ID if you omit `id`. A pre-1.2 top-level `[effects]` stack with `[[effects.layers]]` is moved to the current edits of the `shader` visual when the file is loaded.
 - Add `[[custom_shaders]]` entries with `id`, `title`, and GLSL `source`. Each ID starts with `custom-` followed by 1–80 lowercase ASCII letters, digits, or hyphens. The [shader editor](../custom-shaders/) handles IDs, validation, and saving for you.

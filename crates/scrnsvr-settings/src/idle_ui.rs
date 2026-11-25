@@ -5,16 +5,17 @@
 //! `scrnsvr --setup-noctalia`. Every `noctalia` call runs on the background executor, and nothing
 //! is written to Noctalia until the user confirms the listed changes.
 
-use gpui_kit::component::button::ButtonVariants;
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable, Selectable, Sizable, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use scrnsvr_core::noctalia::Plan;
 
 use crate::app::Settings;
 use crate::idle::{Idle, Ready, apply, apply_timeout, duration_text, hypridle_snippet, probe};
-use crate::view::{LINE, MUTED, QUIET, SAVED, SIGNAL_HOVER, button, label, live, note};
+use crate::view::{ALERT, CANVAS, MUTED, QUIET, RAISED, SAVED, SIGNAL, action, button, dot, glyph, live, note, section};
 
 pub struct IdleUi {
     pub state: Idle,
@@ -227,13 +228,7 @@ impl Settings {
         let ui = &self.system_ui.idle;
         let busy = ui.busy.is_some();
         let seconds = parse_seconds(ui.timeout.read(cx).value().as_ref()).unwrap_or(600.0);
-        v_flex()
-            .gap_3()
-            .flex_none()
-            .pt_3()
-            .border_t_1()
-            .border_color(rgb(LINE))
-            .child(label("IDLE"))
+        section("IDLE")
             .child(note(
                 "scrnsvr does not watch for idle itself. Noctalia, or hypridle, runs scrnsvr --open when the system has been idle.",
             ))
@@ -244,26 +239,21 @@ impl Settings {
                 }
                 Idle::Failed(error) => v_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .id("idle-status-alert")
-                            .role(Role::Alert)
-                            .text_size(px(13.))
-                            .text_color(rgb(SIGNAL_HOVER))
-                            .child(error.clone()),
-                    )
+                    .child(div().id("idle-status-alert").role(Role::Alert).text_size(px(13.)).text_color(rgb(ALERT)).child(error.clone()))
                     .into_any_element(),
                 Idle::Ready(ready) => self.idle_ready(ready, cx).into_any_element(),
             })
             .children(
                 ui.busy.filter(|_| ui.state != Idle::Unchecked).map(|text| live("idle-status-5", text).text_xs().text_color(rgb(MUTED))),
             )
-            .children(ui.message.as_ref().map(|(ok, text)| {
-                live("idle-status-6", text.clone()).text_size(px(13.)).text_color(rgb(if *ok { SAVED } else { SIGNAL_HOVER }))
-            }))
+            .children(
+                ui.message.as_ref().map(|(ok, text)| {
+                    live("idle-status-6", text.clone()).text_size(px(13.)).text_color(rgb(if *ok { SAVED } else { ALERT }))
+                }),
+            )
             .child(
                 h_flex().gap_2().child(
-                    button("idle-refresh", if ui.state == Idle::Unchecked { "Check Noctalia" } else { "Check again" })
+                    action("idle-refresh", "refresh-cw", if ui.state == Idle::Unchecked { "Check Noctalia" } else { "Check again" })
                         .disabled(busy)
                         .on_click(cx.listener(|this, _, window, cx| this.refresh_idle(window, cx))),
                 ),
@@ -286,7 +276,7 @@ impl Settings {
         let launching = behavior.is_some_and(|behavior| behavior.enabled != Some(false));
         v_flex()
             .gap_2()
-            .child(live("idle-status-7", headline).font_weight(FontWeight::MEDIUM).text_color(rgb(if launching { SAVED } else { SIGNAL_HOVER })))
+            .child(h_flex().gap_2().items_center().child(dot(if launching { SIGNAL } else { ALERT }, 7.)).child(live("idle-status-7", headline).font_weight(FontWeight::MEDIUM)))
             .children(behavior.map(|behavior| {
                 note(format!(
                     "Behavior “{}”, {}. Command: {}",
@@ -327,10 +317,9 @@ impl Settings {
             .child(match &ui.proposal {
                 Some(plan) => v_flex()
                     .gap_2()
-                    .p_2()
-                    .rounded(px(5.))
-                    .border_1()
-                    .border_color(rgb(LINE))
+                    .p_3()
+                    .rounded(px(10.))
+                    .bg(rgb(RAISED))
                     .child(div().font_weight(FontWeight::MEDIUM).child("These changes will be sent to Noctalia"))
                     .child(note("Each one is applied with noctalia msg config-set. Noctalia’s own files are not edited."))
                     .children(plan.changes.iter().map(|change| div().text_xs().font_family("monospace").child(change.describe())))
@@ -344,7 +333,7 @@ impl Settings {
                         h_flex()
                             .gap_2()
                             .child(
-                                button("idle-confirm", "Apply changes")
+                                Button::new("idle-confirm").small().primary().label("Apply changes")
                                     .track_focus(&ui.confirm_focus)
                                     .disabled(busy)
                                     .on_click(cx.listener(|this, _, window, cx| this.confirm_idle_setup(window, cx))),
@@ -355,7 +344,7 @@ impl Settings {
                 None => h_flex()
                     .gap_2()
                     .child(
-                        button("idle-setup", if matches { "Set up (nothing to change)" } else { "Set up…" })
+                        Button::new("idle-setup").small().primary().icon(glyph("power")).label(if matches { "Set up (nothing to change)" } else { "Set up…" })
                             .track_focus(&ui.setup_focus)
                             .disabled(busy || matches)
                             .on_click(cx.listener(|this, _, window, cx| this.review_idle_setup(window, cx))),
@@ -371,7 +360,7 @@ impl Settings {
         v_flex()
             .gap_2()
             .child(
-                button("idle-others", if open { "Hide other setups" } else { "Other setups (hypridle, hot corner)" })
+                Button::new("idle-others").small().ghost().icon(Icon::new(if open { IconName::ChevronDown } else { IconName::ChevronRight })).label(if open { "Hide other setups" } else { "Other setups (hypridle, hot corner)" })
                     .selected(open)
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.idle_ui().others_open = !this.system_ui.idle.others_open;
@@ -381,8 +370,8 @@ impl Settings {
             .when(open, |this| {
                 this.child(div().font_weight(FontWeight::MEDIUM).child("hypridle"))
                     .child(note("Add a listener to hypridle.conf. Run scrnsvr --install once so the name resolves."))
-                    .child(div().p_2().rounded(px(5.)).border_1().border_color(rgb(LINE)).text_xs().font_family("monospace").child(snippet))
-                    .child(button("idle-copy", "Copy hypridle listener").ghost().on_click(cx.listener(move |_, _, _, cx| {
+                    .child(div().p_3().rounded(px(8.)).bg(rgb(CANVAS)).text_xs().font_family("monospace").child(snippet))
+                    .child(action("idle-copy", "copy", "Copy hypridle listener").ghost().on_click(cx.listener(move |_, _, _, cx| {
                         cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
                     })))
                     .child(div().font_weight(FontWeight::MEDIUM).child("Hot corner or key binding"))

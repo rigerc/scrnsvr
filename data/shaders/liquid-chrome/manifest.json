@@ -2,6 +2,7 @@
   "id": "liquid-chrome",
   "title": "Liquid Chrome",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Broad studio lights ripple across a slowly undulating metallic surface.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "gradient-blobs",
   "title": "Gradient Blobs",
   "category": "Ambient",
+  "collection": "Color Fields",
   "description": "Glowing gradient blobs float, merge, and gently pull apart.",
   "fragment": "shader.glsl",
   "uniforms": [

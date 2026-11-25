@@ -2,6 +2,7 @@
   "id": "floating-windows",
   "title": "Floating Windows",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Drifting circles and rounded windows reveal a shared wash of slowly moving color.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "paper-fans",
   "title": "Paper Fans",
   "category": "Geometric",
+  "collection": "Paper & Cutouts",
   "description": "Broad fans of terracotta, peach, and aubergine slowly open and overlap.",
   "fragment": "shader.glsl",
   "uniforms": [

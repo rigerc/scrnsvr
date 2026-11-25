@@ -2,6 +2,7 @@
   "id": "gradient-loom",
   "title": "Gradient Loom",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Wide translucent strips slide across one another, weaving softly blended patches of color.",
   "fragment": "shader.glsl",
   "uniforms": [

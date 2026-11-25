@@ -2,6 +2,7 @@
   "id": "contour-dunes",
   "title": "Contour Dunes",
   "category": "Ambient",
+  "collection": "Linework",
   "description": "Copper and indigo contour lines flow like wind-shaped dunes.",
   "fragment": "shader.glsl",
   "uniforms": [

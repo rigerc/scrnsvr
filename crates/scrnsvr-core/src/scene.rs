@@ -94,9 +94,10 @@ impl Catalog {
             let source = custom_source(config, &target.shader).ok_or_else(|| UnknownShader(target.shader.clone()))?;
             (source, Vec::new(), false)
         };
-        let effects = if config.effects.enabled {
-            config
-                .effects
+        // Each look carries its own stack; without a look, the visual's current edits do.
+        let stack = config.effect_stack(&target.shader, target.preset.as_deref());
+        let effects = if stack.enabled {
+            stack
                 .layers
                 .iter()
                 .take(MAX_EFFECT_LAYERS)

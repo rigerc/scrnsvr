@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use scrnsvr_core::SceneSpec;
 use scrnsvr_core::catalog::{Catalog, ColorRole, RandomRule, SettingValue, ShaderValues, UniformDef, UniformKind};
-use scrnsvr_core::config::Config;
+use scrnsvr_core::config::{Config, EffectsConfig};
 use scrnsvr_core::scene::{SceneTarget, UnknownShader, shader_color_values};
 
 use crate::catalog::{self, Visual};
@@ -22,12 +22,15 @@ pub struct Model {
     pub visuals: Vec<Visual>,
     pub selected: usize,
     pub favorites_only: bool,
+    /// Show only this library collection.
+    pub collection: Option<String>,
     pub query: String,
-    featured: Vec<usize>,
-    /// The shader selected at startup, which the featured row leads with.
-    initial_shader: String,
+    /// The saved look being edited, or `None` for the visual's current edits. Parameters and
+    /// effects read from and write to this target, and the preview shows it.
+    pub look: Option<String>,
     locks: BTreeMap<String, BTreeSet<String>>,
-    undo: BTreeMap<String, (&'static str, ShaderValues)>,
+    /// One single-step undo per target (visual and look), restoring parameters and effects.
+    undo: BTreeMap<String, Undo>,
     /// The shuffle interval to restore when cycling is switched back on (this session).
     last_interval: f64,
 }
@@ -36,8 +39,6 @@ impl Model {
     pub fn new(config: Config, ui: UiState) -> Self {
         let visuals = catalog::visuals(&config);
         let selected = visuals.iter().position(|visual| visual.id == config.shader).unwrap_or(0);
-        let featured = catalog::featured(&visuals, &visuals[selected].id);
-        let config_shader = visuals[selected].id.clone();
         let config_interval = config.rotation.interval_minutes;
         Self {
             config,
@@ -45,9 +46,9 @@ impl Model {
             visuals,
             selected,
             favorites_only: false,
+            collection: None,
             query: String::new(),
-            featured,
-            initial_shader: config_shader,
+            look: None,
             locks: BTreeMap::new(),
             undo: BTreeMap::new(),
             last_interval: if config_interval > 0.0 { config_interval } else { rotation::DEFAULT_INTERVAL_MINUTES },
@@ -63,28 +64,51 @@ impl Model {
             return false;
         }
         self.selected = index;
+        self.look = None;
         self.config.shader = self.visual().id.clone();
         true
     }
 
-    pub fn matches(&self) -> Vec<(&'static str, Vec<usize>)> {
+    /// Undo entries are kept per visual and look.
+    fn target_key(&self) -> String {
+        format!("{}\u{1f}{}", self.visual().id, self.look.as_deref().unwrap_or(""))
+    }
+
+    /// Edit a saved look of the selected visual in place, or its current edits with `None`.
+    pub fn open_look(&mut self, name: Option<&str>) -> bool {
+        if name.is_some_and(|name| !self.looks().any(|look| look == name)) || self.look.as_deref() == name {
+            return false;
+        }
+        self.look = name.map(Into::into);
+        true
+    }
+
+    /// The library's collections in display order, custom shaders last.
+    pub fn collections(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = Catalog::builtin().collections.iter().map(String::as_str).collect();
+        names.push(catalog::CUSTOM);
+        names
+    }
+
+    /// Visible visuals, grouped by collection in display order. Each visual appears once, and
+    /// the collection filter, favorites and search narrow the list together.
+    pub fn matches(&self) -> Vec<(String, Vec<usize>)> {
         let query = self.query.trim().to_lowercase();
         let matches = |index: &usize| {
             let visual = &self.visuals[*index];
             (!self.favorites_only || self.ui.favorites.contains(&visual.id))
+                && self.collection.as_ref().is_none_or(|collection| *collection == visual.collection)
                 && (query.is_empty()
-                    || format!("{} {} {}", visual.title, visual.description, visual.category).to_lowercase().contains(&query))
+                    || format!("{} {} {}", visual.title, visual.description, visual.collection).to_lowercase().contains(&query))
         };
-        let mut groups = vec![("Featured", self.featured.iter().copied().filter(matches).collect::<Vec<_>>())];
-        for category in ["Ambient", "Geometric", "Custom"] {
-            let rows = (0..self.visuals.len())
-                .filter(|index| self.visuals[*index].category == category && !self.featured.contains(index))
-                .filter(matches)
-                .collect();
-            groups.push((category, rows));
-        }
-        groups.retain(|(_, rows)| !rows.is_empty());
-        groups
+        self.collections()
+            .into_iter()
+            .map(|collection| {
+                let rows = (0..self.visuals.len()).filter(|index| self.visuals[*index].collection == collection).filter(matches).collect();
+                (collection.to_owned(), rows)
+            })
+            .filter(|(_, rows): &(String, Vec<usize>)| !rows.is_empty())
+            .collect()
     }
 
     pub fn toggle_favorite(&mut self, index: usize) {
@@ -95,11 +119,25 @@ impl Model {
     }
 
     pub fn scene(&self) -> Result<SceneSpec, UnknownShader> {
-        Catalog::builtin().build_scene(&self.config, &SceneTarget::shader(&self.visual().id))
+        let target = SceneTarget { shader: self.visual().id.clone(), preset: self.look.clone() };
+        Catalog::builtin().build_scene(&self.config, &target)
     }
 
+    /// The edited parameters of the target: a look's saved values, or the current edits.
     pub fn stored(&self) -> Option<&ShaderValues> {
-        self.config.shaders.get(&self.visual().id)
+        let id = &self.visual().id;
+        match &self.look {
+            Some(name) => self.config.presets.get(id).and_then(|looks| looks.get(name)),
+            None => self.config.shaders.get(id),
+        }
+    }
+
+    fn stored_mut(&mut self) -> &mut ShaderValues {
+        let id = self.visual().id.clone();
+        match self.look.clone() {
+            Some(name) => self.config.presets.entry(id).or_default().entry(name).or_default(),
+            None => self.config.shaders.entry(id).or_default(),
+        }
     }
 
     fn inherited(&self) -> ShaderValues {
@@ -131,26 +169,24 @@ impl Model {
             SettingValue::Number(n) if def.is_slider() => SettingValue::Number(snap(def, n)),
             value => def.resolve_shader_value(Some(&value)),
         };
-        let id = self.visual().id.clone();
-        let values = self.config.shaders.entry(id.clone()).or_default();
-        if values.get(name) == Some(&value) {
+        if self.stored().and_then(|values| values.get(name)) == Some(&value) {
             return false;
         }
-        values.insert(name.into(), value);
-        self.undo.remove(&id);
+        self.stored_mut().insert(name.into(), value);
+        let key = self.target_key();
+        self.undo.remove(&key);
         true
     }
 
     pub fn reset_control(&mut self, name: &str) -> bool {
-        let id = self.visual().id.clone();
-        let Some(values) = self.config.shaders.get_mut(&id) else { return false };
-        if values.remove(name).is_none() {
+        if !self.stored().is_some_and(|values| values.contains_key(name)) {
             return false;
         }
-        if values.is_empty() {
-            self.config.shaders.remove(&id);
-        }
-        self.undo.remove(&id);
+        let mut values = self.stored().cloned().unwrap_or_default();
+        values.remove(name);
+        self.write_values(values);
+        let key = self.target_key();
+        self.undo.remove(&key);
         true
     }
 
@@ -159,17 +195,26 @@ impl Model {
         if values == old {
             return false;
         }
-        self.undo.insert(self.visual().id.clone(), (label, old));
+        let effects = self.effects().clone();
+        self.undo.insert(self.target_key(), Undo { label, values: old, effects });
         self.write_values(values);
         true
     }
 
+    /// Replace the target's parameters. A look keeps its (possibly empty) entry; current edits
+    /// with nothing left are removed from the file.
     fn write_values(&mut self, values: ShaderValues) {
         let id = self.visual().id.clone();
-        if values.is_empty() {
-            self.config.shaders.remove(&id);
-        } else {
-            self.config.shaders.insert(id, values);
+        match self.look.clone() {
+            Some(name) => {
+                self.config.presets.entry(id).or_default().insert(name, values);
+            }
+            None if values.is_empty() => {
+                self.config.shaders.remove(&id);
+            }
+            None => {
+                self.config.shaders.insert(id, values);
+            }
         }
     }
 
@@ -178,12 +223,13 @@ impl Model {
     }
 
     pub fn undo_label(&self) -> Option<&'static str> {
-        self.undo.get(&self.visual().id).map(|(label, _)| *label)
+        self.undo.get(&self.target_key()).map(|undo| undo.label)
     }
 
     pub fn undo(&mut self) -> bool {
-        let Some((_, values)) = self.undo.remove(&self.visuals[self.selected].id) else { return false };
-        self.write_values(values);
+        let Some(undo) = self.undo.remove(&self.target_key()) else { return false };
+        self.write_values(undo.values);
+        *self.stack_slot() = undo.effects;
         true
     }
 
@@ -245,19 +291,21 @@ impl Model {
         self.config.presets.get(&self.visual().id).into_iter().flat_map(|looks| looks.keys())
     }
 
+    /// Save the target's parameters and effects as a look, then edit that look. `overwrite`
+    /// replaces a look that already has the name.
     pub fn save_look(&mut self, name: &str, overwrite: bool) -> Result<(), &'static str> {
         let name = checked_name(name)?;
         if !overwrite && self.looks().any(|old| old == name) {
             return Err("A look already uses that name.");
         }
-        let edits = self.stored().cloned().unwrap_or_default();
-        self.config.presets.entry(self.visual().id.clone()).or_default().insert(name.into(), edits);
+        let id = self.visual().id.clone();
+        let (values, effects) = (self.stored().cloned().unwrap_or_default(), self.effects().clone());
+        self.config.presets.entry(id.clone()).or_default().insert(name.into(), values);
+        self.config.look_effects.entry(id).or_default().insert(name.into(), effects);
+        self.look = Some(name.into());
+        let key = self.target_key();
+        self.undo.remove(&key);
         Ok(())
-    }
-
-    pub fn apply_look(&mut self, name: &str) -> bool {
-        let Some(values) = self.config.presets.get(&self.visual().id).and_then(|looks| looks.get(name)).cloned() else { return false };
-        self.replace(values, "Undo apply look")
     }
 
     pub fn rename_look(&mut self, old: &str, name: &str) -> Result<(), &'static str> {
@@ -272,6 +320,15 @@ impl Model {
         }
         let values = looks.remove(old).ok_or("This look is unavailable.")?;
         looks.insert(name.into(), values);
+        if let Some(stacks) = self.config.look_effects.get_mut(&id)
+            && let Some(stack) = stacks.remove(old)
+        {
+            stacks.insert(name.into(), stack);
+        }
+        if self.look.as_deref() == Some(old) {
+            self.look = Some(name.into());
+        }
+        self.undo.remove(&format!("{id}\u{1f}{old}"));
         for entry in &mut self.config.rotation.entries {
             if entry.shader == id && entry.preset.as_deref() == Some(old) {
                 entry.preset = Some(name.into());
@@ -289,12 +346,28 @@ impl Model {
         if looks.is_empty() {
             self.config.presets.remove(&id);
         }
+        if let Some(stacks) = self.config.look_effects.get_mut(&id) {
+            stacks.remove(name);
+            if stacks.is_empty() {
+                self.config.look_effects.remove(&id);
+            }
+        }
+        self.undo.remove(&format!("{id}\u{1f}{name}"));
+        if self.look.as_deref() == Some(name) {
+            self.look = None;
+        }
         self.config.rotation.entries.retain(|entry| entry.shader != id || entry.preset.as_deref() != Some(name));
         if self.config.rotation.entries.is_empty() {
             self.config.rotation.enabled = false;
         }
         true
     }
+}
+
+struct Undo {
+    label: &'static str,
+    values: ShaderValues,
+    effects: EffectsConfig,
 }
 
 fn checked_name(name: &str) -> Result<&str, &'static str> {
@@ -421,17 +494,31 @@ mod tests {
     fn grouping_has_no_duplicates_and_search_composes_with_favorites() {
         let mut model = model();
         assert_eq!(model.visuals.len(), 54);
-        assert_eq!(model.matches()[0].1.len(), 6);
-        assert_eq!(filter_ids(&model).into_iter().collect::<std::collections::BTreeSet<_>>().len(), 54);
-        for (category, rows) in model.matches().into_iter().skip(1) {
+        // Every visual appears exactly once, in its collection, in collection order.
+        let ids = filter_ids(&model);
+        assert_eq!(ids.len(), 54);
+        assert_eq!(ids.into_iter().collect::<std::collections::BTreeSet<_>>().len(), 54);
+        let groups: Vec<_> = model.matches().into_iter().map(|(collection, _)| collection).collect();
+        assert_eq!(groups, ["Light", "Night & Water", "Materials", "Color Fields", "Linework", "Shapes", "Paper & Cutouts"]);
+        for (collection, rows) in model.matches() {
             assert!(rows.windows(2).all(|pair| model.visuals[pair[0]].title.to_lowercase() <= model.visuals[pair[1]].title.to_lowercase()));
-            assert!(rows.iter().all(|index| model.visuals[*index].category == category));
+            assert!(rows.iter().all(|index| model.visuals[*index].collection == collection));
         }
         let quiet: Vec<_> = model.visuals.iter().filter(|visual| visual.id.starts_with("reactive-")).collect();
         assert_eq!(quiet.len(), 3);
-        assert!(
-            quiet.iter().all(|visual| visual.category == "Ambient" && visual.uniforms.iter().all(|def| !def.name.starts_with("audio")))
-        );
+        assert!(quiet.iter().all(|visual| visual.uniforms.iter().all(|def| !def.name.starts_with("audio"))));
+
+        // A collection narrows the list, and search and favorites combine with it.
+        model.collection = Some("Materials".into());
+        assert_eq!(model.matches().len(), 1);
+        assert_eq!(filter_ids(&model).len(), 7);
+        model.query = "wood".into();
+        assert_eq!(filter_ids(&model), ["burled-wood"]);
+        model.query = "jellyfish".into();
+        assert!(filter_ids(&model).is_empty(), "search stays inside the collection");
+        model.collection = None;
+        assert_eq!(filter_ids(&model), ["medusa-drift"]);
+        model.query.clear();
 
         model.query = "  luminous COLOR ".into();
         assert!(filter_ids(&model).contains(&"flow-field"));
@@ -443,10 +530,11 @@ mod tests {
         let favorite = model.visuals.iter().position(|visual| visual.id == "reactive-bass-bloom").unwrap();
         model.toggle_favorite(favorite);
         assert_eq!(filter_ids(&model), ["reactive-bass-bloom"]);
-        model.query = "geometric".into();
+        // Search also matches collection names.
+        model.query = "shapes".into();
         assert!(filter_ids(&model).is_empty());
         model.favorites_only = false;
-        assert!(!filter_ids(&model).is_empty());
+        assert_eq!(filter_ids(&model).len(), 10);
         assert_eq!(model.selected, selected);
     }
 
@@ -522,20 +610,28 @@ mod tests {
     }
 
     #[test]
-    fn looks_keep_snapshots_and_maintain_shuffle_references() {
+    fn looks_edit_in_place_and_maintain_shuffle_references() {
         let mut model = model();
         model.set_value("speed", SettingValue::Number(0.8));
         model.save_look("  Night  ", false).unwrap();
+        assert_eq!(model.look.as_deref(), Some("Night"), "a new look opens for editing");
         assert!(model.save_look("Night", false).is_err());
         assert!(model.save_look("  ", false).is_err());
+        // Edits go to the open look; current edits keep their own values.
         model.set_value("speed", SettingValue::Number(0.2));
-        assert!(model.apply_look("Night"));
-        assert_eq!(model.undo_label(), Some("Undo apply look"));
+        assert_eq!(model.config.presets["flow-field"]["Night"]["speed"], SettingValue::Number(0.2));
+        assert_eq!(model.config.shaders["flow-field"]["speed"], SettingValue::Number(0.8));
+        assert_eq!(model.scene().unwrap().speed(), 0.2, "the preview shows the open look");
+        // Reset and undo work on the look, which keeps its (now empty) entry.
+        assert!(model.reset_shader());
+        assert!(model.config.presets["flow-field"]["Night"].is_empty());
+        assert!(model.undo());
+        assert_eq!(model.stored().unwrap()["speed"], SettingValue::Number(0.2));
+        assert!(model.open_look(None));
         assert_eq!(model.stored().unwrap()["speed"], SettingValue::Number(0.8));
-        model.set_value("speed", SettingValue::Number(0.3));
-        assert_eq!(model.config.presets["flow-field"]["Night"]["speed"], SettingValue::Number(0.8));
 
         model.save_look("Dawn", false).unwrap();
+        model.open_look(None);
         assert!(model.rename_look("Night", "Dawn").is_err());
         model.config.rotation.enabled = true;
         model.config.rotation.entries.push(RotationEntry { shader: "flow-field".into(), preset: Some("Night".into()) });
@@ -551,7 +647,7 @@ mod tests {
     fn shader_scene_uses_normalized_edits_and_saved_effects() {
         let mut model = model();
         let def = &Catalog::builtin().effects[0];
-        model.config.effects.layers.push(EffectLayer {
+        model.config.effects.entry("flow-field".into()).or_default().layers.push(EffectLayer {
             id: "test".into(),
             effect_id: def.id.clone(),
             enabled: true,

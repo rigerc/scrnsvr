@@ -52,7 +52,7 @@ pub fn checked_source(source: &str) -> Result<&str, &'static str> {
 
 impl Model {
     pub fn is_custom(&self) -> bool {
-        self.visual().category == "Custom"
+        self.visual().collection == catalog::CUSTOM
     }
 
     pub fn custom(&self, id: &str) -> Option<&CustomShader> {
@@ -69,7 +69,6 @@ impl Model {
             .or_else(|| self.visuals.iter().position(|visual| visual.id == FALLBACK_SHADER))
             .unwrap_or(0);
         self.config.shader = self.visual().id.clone();
-        self.featured = catalog::featured(&self.visuals, &self.initial_shader);
     }
 
     fn unique_id(&self, title: &str, random: u32) -> String {
@@ -131,6 +130,8 @@ impl Model {
         self.undo.remove(id);
         self.config.shaders.remove(id);
         self.config.presets.remove(id);
+        self.config.effects.remove(id);
+        self.config.look_effects.remove(id);
         self.config.colors.overrides.remove(id);
         self.config.rotation.entries.retain(|entry| entry.shader != id);
         if self.config.rotation.entries.is_empty() {
@@ -172,8 +173,8 @@ mod tests {
         let id = model.add_custom("  Neon Rain!  ", template(), 0xab).unwrap();
         assert_eq!(id, "custom-neon-rain-000000ab");
         assert!(model.is_custom() && model.visual().id == id && model.config.shader == id);
-        assert_eq!(model.visual().category, "Custom");
-        assert!(model.matches().iter().any(|(group, rows)| *group == "Custom" && rows.len() == 1));
+        assert_eq!(model.visual().collection, catalog::CUSTOM);
+        assert!(model.matches().iter().any(|(group, rows)| group == catalog::CUSTOM && rows.len() == 1));
         // The same title again gets another ID instead of replacing the first.
         let second = model.add_custom("Neon Rain!", template(), 0xab).unwrap();
         assert_ne!(second, id);

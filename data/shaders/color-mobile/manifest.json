@@ -2,6 +2,7 @@
   "id": "color-mobile",
   "title": "Color Mobile",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Semicircles, rounded bars, and discs rock gently in an open field of color.",
   "fragment": "shader.glsl",
   "uniforms": [

@@ -2,6 +2,7 @@
   "id": "eclipse-study",
   "title": "Eclipse Study",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Two enormous gradient discs pass across dusk, revealing a changing peach crescent.",
   "fragment": "shader.glsl",
   "uniforms": [

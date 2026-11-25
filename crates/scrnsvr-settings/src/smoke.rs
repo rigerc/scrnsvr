@@ -21,7 +21,7 @@ pub fn report(view: &Entity<Settings>, step: &str, cx: &mut AsyncApp) {
         let at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
         let values = settings.model.stored().cloned().unwrap_or_default();
         let config = &settings.model.config;
-        let effects: Vec<_> = config.effects.layers.iter().map(|layer| format!("{}:{}{}", layer.id, layer.effect_id, if layer.enabled { "" } else { "!off" })).collect();
+        let effects: Vec<_> = settings.model.effects().layers.iter().map(|layer| format!("{}:{}{}", layer.id, layer.effect_id, if layer.enabled { "" } else { "!off" })).collect();
         let entries: Vec<_> = config.rotation.entries.iter().map(|entry| format!("{}/{}", entry.shader, entry.preset.as_deref().unwrap_or("-"))).collect();
         let idle = match &settings.system_ui.idle.state {
             Idle::Unchecked => "unchecked".to_owned(),
@@ -32,7 +32,7 @@ pub fn report(view: &Entity<Settings>, step: &str, cx: &mut AsyncApp) {
         println!(
             "step {step}: tab={:?} effects_on={} effects={effects:?} shuffle={}/{}/{entries:?} clock={:?}/{:?}/{:?}/{:?} pattern_state={:?} scheme={} overrides={:?} global={}/{}/{:?} idle={idle} idle_busy={:?} proposal={} skipped={:?} warnings={:?}",
             settings.tab,
-            config.effects.enabled,
+            settings.model.effects().enabled,
             config.rotation.enabled,
             config.rotation.interval_minutes,
             config.clock.position,
@@ -192,7 +192,8 @@ pub async fn steps(view: Entity<Settings>, window: AnyWindowHandle, cx: &mut Asy
     wait(cx, 300).await; // Leave time for an external screenshot of this step.
 
     drive(&view, window, cx, |this, window, cx| {
-        this.tab = crate::app::Tab::Looks;
+        this.tab = crate::app::Tab::Visuals;
+        this.start_look_action(LookAction::New, window, cx);
         this.look_name.update(cx, |input, cx| {
             input.set_value("Smoke look", window, cx);
             input.focus(window, cx);
@@ -213,12 +214,11 @@ pub async fn steps(view: Entity<Settings>, window: AnyWindowHandle, cx: &mut Asy
     report(&view, "look-renamed", cx);
     wait(cx, 300).await; // Leave time for an external screenshot of this step.
     drive(&view, window, cx, |this, window, cx| {
+        this.open_look(None, window, cx);
         if this.model.reset_shader() {
             this.finish_bulk_edit(window, cx);
         }
-        if this.model.apply_look("Smoke saved look") {
-            this.finish_bulk_edit(window, cx);
-        }
+        this.open_look(Some("Smoke saved look"), window, cx);
         this.toggle_pause(cx);
     });
     wait(cx, 700).await;
@@ -312,7 +312,7 @@ async fn custom_editor(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mu
 async fn custom_with_effects(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncApp, wait: impl AsyncFn(&AsyncApp, u64)) {
     drive(view, window, cx, |this, window, cx| {
         this.step_tab(Tab::Visuals, window, cx);
-        if let Some(index) = this.model.visuals.iter().position(|visual| visual.category == "Custom") {
+        if let Some(index) = this.model.visuals.iter().position(|visual| visual.collection == crate::catalog::CUSTOM) {
             this.select(index, window, cx);
             let id = this.model.visual().id.clone();
             this.toggle_shuffle_entry(&id, None, window, cx);
@@ -345,15 +345,15 @@ async fn tabs(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncAp
         wait(cx, 300).await; // Leave time for an external screenshot of this step.
     };
 
-    // Roving focus: focus the selected tab, then Right moves to Effects and selects it.
+    // The Effects pane of the visual editor, on the visual's current edits.
     drive(view, window, cx, |this, window, cx| {
         if this.paused {
             this.toggle_pause(cx);
         }
         this.step_tab(Tab::Visuals, window, cx);
+        this.open_look(None, window, cx);
+        this.pane = crate::app::Pane::Effects;
     });
-    wait(cx, 150).await;
-    keys(window, cx, &["right"]);
     stage("tab-effects-empty", cx).await;
 
     drive(view, window, cx, |this, window, cx| {
@@ -379,8 +379,8 @@ async fn tabs(view: &Entity<Settings>, window: AnyWindowHandle, cx: &mut AsyncAp
     stage("effects-bypassed", cx).await;
     drive(view, window, cx, |this, window, cx| this.set_effects_enabled(true, window, cx));
 
-    // Looks & Shuffle: two entries, shuffle on, a one-minute cycle.
-    drive(view, window, cx, |this, window, cx| this.step_tab(Tab::Looks, window, cx));
+    // Shuffle: two entries, shuffle on, a one-minute cycle.
+    drive(view, window, cx, |this, window, cx| this.step_tab(Tab::Shuffle, window, cx));
     drive(view, window, cx, |this, window, cx| {
         this.toggle_shuffle_entry("flow-field", None, window, cx);
         this.toggle_shuffle_entry("plasma", None, window, cx);

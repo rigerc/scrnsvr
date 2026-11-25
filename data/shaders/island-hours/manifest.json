@@ -2,6 +2,7 @@
   "id": "island-hours",
   "title": "Island Hours",
   "category": "Ambient",
+  "collection": "Color Fields",
   "description": "Organic islands swell gently as nested bands of sage, chalk, and turquoise drift within them.",
   "fragment": "shader.glsl",
   "uniforms": [

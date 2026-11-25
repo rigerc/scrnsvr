@@ -2,6 +2,7 @@
   "id": "interference",
   "title": "Orbital Interference",
   "category": "Geometric",
+  "collection": "Linework",
   "fragment": "shader.glsl",
   "uniforms": [
     {

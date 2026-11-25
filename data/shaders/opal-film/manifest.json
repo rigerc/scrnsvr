@@ -2,6 +2,7 @@
   "id": "opal-film",
   "title": "Opal Film",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Pearlescent bands glide over a gently flexing, luminous surface.",
   "fragment": "shader.glsl",
   "uniforms": [

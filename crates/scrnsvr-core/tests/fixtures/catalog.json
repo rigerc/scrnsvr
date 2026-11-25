@@ -4,6 +4,7 @@
       "id": "aurora-veil",
       "title": "Aurora Veil",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Translucent ribbons of light ripple across a midnight gradient.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -193,6 +194,7 @@
       "id": "brushed-steel",
       "title": "Brushed Steel",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "A brushed steel dial turns its fine grain through a slow sweep of studio light.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -362,6 +364,7 @@
       "id": "burled-wood",
       "title": "Burled Wood",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Polished burl wood shimmers as light slides through its swirling grain.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -530,6 +533,7 @@
       "id": "chromatic-overlap",
       "title": "Chromatic Overlap",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Translucent circles and capsules drift together, mixing apricot, lavender, and teal.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -686,6 +690,7 @@
       "id": "color-estuary",
       "title": "Color Estuary",
       "category": "Ambient",
+      "collection": "Color Fields",
       "description": "A broad branching channel wanders between calm fields of mint, sand, and muted blue.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -836,6 +841,7 @@
       "id": "color-mobile",
       "title": "Color Mobile",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Semicircles, rounded bars, and discs rock gently in an open field of color.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -991,6 +997,7 @@
       "id": "contour-dunes",
       "title": "Contour Dunes",
       "category": "Ambient",
+      "collection": "Linework",
       "description": "Copper and indigo contour lines flow like wind-shaped dunes.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -1191,6 +1198,7 @@
       "id": "crushed-velvet",
       "title": "Crushed Velvet",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Light slides across crushed velvet, catching the pile wherever it turns away.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -1360,6 +1368,7 @@
       "id": "dune-silk",
       "title": "Dune Silk",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Warm amber ribbons of light flow across a deep midnight blue.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -1505,6 +1514,7 @@
       "id": "eclipse-study",
       "title": "Eclipse Study",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Two enormous gradient discs pass across dusk, revealing a changing peach crescent.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -1661,6 +1671,7 @@
       "id": "ember-drift",
       "title": "Ember Drift",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Warm motes rise and softly fade against a smoky night.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -1899,6 +1910,7 @@
       "id": "engraved-sea",
       "title": "Engraved Sea",
       "category": "Ambient",
+      "collection": "Linework",
       "description": "Fine engraved lines swell and thicken as slow waves roll beneath a hatched sun.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2057,6 +2069,7 @@
       "id": "floating-windows",
       "title": "Floating Windows",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Drifting circles and rounded windows reveal a shared wash of slowly moving color.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2207,6 +2220,7 @@
       "id": "flow-field",
       "title": "Flow Field",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Slow currents of luminous color.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2417,6 +2431,7 @@
       "id": "glow-wire",
       "title": "Glow Wire",
       "category": "Ambient",
+      "collection": "Light",
       "description": "A single filament of light traces a slowly tumbling knot in the dark.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2559,6 +2574,7 @@
       "id": "gold-lacquer",
       "title": "Gold Lacquer",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Flecks of gold glint and fade within deep, glossy lacquer as the light drifts.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2727,6 +2743,7 @@
       "id": "gradient-blobs",
       "title": "Gradient Blobs",
       "category": "Ambient",
+      "collection": "Color Fields",
       "description": "Glowing gradient blobs float, merge, and gently pull apart.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -2959,6 +2976,7 @@
       "id": "gradient-drift",
       "title": "Gradient Drift",
       "category": "Ambient",
+      "collection": "Color Fields",
       "description": "Wide, silky bands of color that slowly turn and drift.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -3152,6 +3170,7 @@
       "id": "gradient-loom",
       "title": "Gradient Loom",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Wide translucent strips slide across one another, weaving softly blended patches of color.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -3308,6 +3327,7 @@
       "id": "guilloche",
       "title": "Guilloché",
       "category": "Geometric",
+      "collection": "Linework",
       "description": "Fine interwoven curves slowly evolve like intricate ornamental engravings.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -3466,6 +3486,7 @@
       "id": "incense-smoke",
       "title": "Incense Smoke",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Thin ribbons of smoke curl upward from unseen embers and dissolve into the dark.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -3608,6 +3629,7 @@
       "id": "ink-bloom",
       "title": "Ink Bloom",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Feathery clouds of pigment unfurl through softly lit paper.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -3806,6 +3828,7 @@
       "id": "interference",
       "title": "Orbital Interference",
       "category": "Geometric",
+      "collection": "Linework",
       "fragment": "shader.glsl",
       "uniforms": [
         {
@@ -3999,6 +4022,7 @@
       "id": "island-hours",
       "title": "Island Hours",
       "category": "Ambient",
+      "collection": "Color Fields",
       "description": "Organic islands swell gently as nested bands of sage, chalk, and turquoise drift within them.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4149,6 +4173,7 @@
       "id": "kinetic-tiles",
       "title": "Kinetic Tiles",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Rounded tiles turn and slide in coordinated waves across a quiet grid.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4307,6 +4332,7 @@
       "id": "liquid-chrome",
       "title": "Liquid Chrome",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Broad studio lights ripple across a slowly undulating metallic surface.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4489,6 +4515,7 @@
       "id": "lissajous-table",
       "title": "Lissajous Table",
       "category": "Geometric",
+      "collection": "Linework",
       "description": "A table of Lissajous figures traces every frequency ratio in unhurried harmony.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4647,6 +4674,7 @@
       "id": "magnetic-filaments",
       "title": "Magnetic Filaments",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Fine luminous field lines bend around slowly orbiting magnetic poles.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4789,6 +4817,7 @@
       "id": "medusa-drift",
       "title": "Medusa Drift",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Translucent jellyfish pulse slowly upward, their rims and trailing tendrils glowing in the deep.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -4931,6 +4960,7 @@
       "id": "mesh-gradient",
       "title": "Mesh Gradient",
       "category": "Ambient",
+      "collection": "Color Fields",
       "description": "Four floating pools of color blend into a soft, shifting mesh.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5179,6 +5209,7 @@
       "id": "opal-film",
       "title": "Opal Film",
       "category": "Ambient",
+      "collection": "Materials",
       "description": "Pearlescent bands glide over a gently flexing, luminous surface.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5347,6 +5378,7 @@
       "id": "paper-fans",
       "title": "Paper Fans",
       "category": "Geometric",
+      "collection": "Paper & Cutouts",
       "description": "Broad fans of terracotta, peach, and aubergine slowly open and overlap.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5497,6 +5529,7 @@
       "id": "paper-lanterns",
       "title": "Paper Lanterns",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Warm translucent lanterns float upward through a deep, quiet night.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5667,6 +5700,7 @@
       "id": "pebble-atlas",
       "title": "Pebble Atlas",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Large mineral-colored cells redistribute space between narrow, softly edged channels.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5817,6 +5851,7 @@
       "id": "petal-hours",
       "title": "Petal Hours",
       "category": "Geometric",
+      "collection": "Paper & Cutouts",
       "description": "Broad gradient petals slowly lean and lengthen around a quiet off-center opening.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -5967,6 +6002,7 @@
       "id": "phosphor-garden",
       "title": "Phosphor Garden",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Luminous stems unfurl as gentle pulses travel toward their growing tips.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -6109,6 +6145,7 @@
       "id": "plasma",
       "title": "Chromatic Plasma",
       "category": "Ambient",
+      "collection": "Light",
       "fragment": "shader.glsl",
       "uniforms": [
         {
@@ -6314,6 +6351,7 @@
       "id": "prism-mosaic",
       "title": "Prism Mosaic",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Drifting glass facets catch colored light along their beveled edges.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -6456,6 +6494,7 @@
       "id": "quiet-arches",
       "title": "Quiet Arches",
       "category": "Geometric",
+      "collection": "Paper & Cutouts",
       "description": "Nested arches in clay, rose, and plum slowly widen and slide across one another.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -6611,6 +6650,7 @@
       "id": "quiet-pleats",
       "title": "Quiet Pleats",
       "category": "Geometric",
+      "collection": "Paper & Cutouts",
       "description": "Wide bands of lavender, slate, and cream compress and expand like gently folded paper.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -6761,6 +6801,7 @@
       "id": "rain-glass",
       "title": "Rain Glass",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Slow droplets trail down glass over blurred pools of nighttime color.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -6905,6 +6946,7 @@
       "title": "Quiet Horizon",
       "description": "Lavender haze and a pale peach horizon breathe slowly through a deep navy landscape.",
       "category": "Reactive",
+      "collection": "Color Fields",
       "fragment": "shader.glsl",
       "uniforms": [
         {
@@ -7058,6 +7100,7 @@
       "title": "Velvet Cloud",
       "description": "A softly lit volume of smoky plum and copper folds through darkness, stirred by sustained sound.",
       "category": "Reactive",
+      "collection": "Night & Water",
       "fragment": "shader.glsl",
       "uniforms": [
         {
@@ -7211,6 +7254,7 @@
       "title": "Lightwell",
       "description": "Defocused ivory and amber light drifts over charcoal, gently warmed by sustained sound.",
       "category": "Reactive",
+      "collection": "Light",
       "fragment": "shader.glsl",
       "uniforms": [
         {
@@ -7363,6 +7407,7 @@
       "id": "ridgelines",
       "title": "Ridgelines",
       "category": "Ambient",
+      "collection": "Linework",
       "description": "Layered mountain ridgelines drift past in quiet, hand-plotted strokes.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -7521,6 +7566,7 @@
       "id": "silk-ribbons",
       "title": "Silk Ribbons",
       "category": "Ambient",
+      "collection": "Light",
       "description": "Pearlescent bands of rose and blue silk unfurl in the dark.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -7715,6 +7761,7 @@
       "id": "soft-aperture",
       "title": "Soft Aperture",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Offset rounded openings breathe slowly through washes of lilac, periwinkle, and cream.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -7870,6 +7917,7 @@
       "id": "star-drift",
       "title": "Star Drift",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Layers of softly glowing stars glide through a deep night sky.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8079,6 +8127,7 @@
       "id": "star-trails",
       "title": "Star Trails",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Long-exposure star trails wheel in quiet arcs around a hidden pole.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8221,6 +8270,7 @@
       "id": "string-art",
       "title": "String Art",
       "category": "Geometric",
+      "collection": "Linework",
       "description": "Taut threads stretched between pins weave slowly shifting curves of light.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8379,6 +8429,7 @@
       "id": "sunken-light",
       "title": "Sunken Light",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Shafts of sunlight sway down through deep water, catching slow drifting motes.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8521,6 +8572,7 @@
       "id": "tangram-tide",
       "title": "Tangram Tide",
       "category": "Geometric",
+      "collection": "Shapes",
       "description": "Triangles, trapezoids, and parallelograms glide and gently turn through open space.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8671,6 +8723,7 @@
       "id": "tidal-caustics",
       "title": "Tidal Caustics",
       "category": "Ambient",
+      "collection": "Night & Water",
       "description": "Soft pools of refracted light wander across a tranquil seabed.",
       "fragment": "shader.glsl",
       "uniforms": [
@@ -8855,6 +8908,7 @@
       "id": "tidal-cutouts",
       "title": "Tidal Cutouts",
       "category": "Ambient",
+      "collection": "Paper & Cutouts",
       "description": "Broad layers of sage, sand, and muted blue rise and fall like a paper landscape.",
       "fragment": "shader.glsl",
       "uniforms": [

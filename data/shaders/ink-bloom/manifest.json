@@ -2,6 +2,7 @@
   "id": "ink-bloom",
   "title": "Ink Bloom",
   "category": "Ambient",
+  "collection": "Materials",
   "description": "Feathery clouds of pigment unfurl through softly lit paper.",
   "fragment": "shader.glsl",
   "uniforms": [

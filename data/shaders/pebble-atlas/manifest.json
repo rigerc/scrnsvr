@@ -2,6 +2,7 @@
   "id": "pebble-atlas",
   "title": "Pebble Atlas",
   "category": "Geometric",
+  "collection": "Shapes",
   "description": "Large mineral-colored cells redistribute space between narrow, softly edged channels.",
   "fragment": "shader.glsl",
   "uniforms": [

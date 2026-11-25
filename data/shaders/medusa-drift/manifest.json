@@ -2,6 +2,7 @@
   "id": "medusa-drift",
   "title": "Medusa Drift",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Translucent jellyfish pulse slowly upward, their rims and trailing tendrils glowing in the deep.",
   "fragment": "shader.glsl",
   "uniforms": [

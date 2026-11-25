@@ -2,6 +2,7 @@
   "id": "tidal-cutouts",
   "title": "Tidal Cutouts",
   "category": "Ambient",
+  "collection": "Paper & Cutouts",
   "description": "Broad layers of sage, sand, and muted blue rise and fall like a paper landscape.",
   "fragment": "shader.glsl",
   "uniforms": [

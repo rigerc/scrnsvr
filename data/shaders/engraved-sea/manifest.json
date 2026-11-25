@@ -2,6 +2,7 @@
   "id": "engraved-sea",
   "title": "Engraved Sea",
   "category": "Ambient",
+  "collection": "Linework",
   "description": "Fine engraved lines swell and thicken as slow waves roll beneath a hatched sun.",
   "fragment": "shader.glsl",
   "uniforms": [

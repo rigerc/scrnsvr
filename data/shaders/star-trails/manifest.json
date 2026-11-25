@@ -2,6 +2,7 @@
   "id": "star-trails",
   "title": "Star Trails",
   "category": "Ambient",
+  "collection": "Night & Water",
   "description": "Long-exposure star trails wheel in quiet arcs around a hidden pole.",
   "fragment": "shader.glsl",
   "uniforms": [

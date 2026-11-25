@@ -2,6 +2,7 @@
   "id": "magnetic-filaments",
   "title": "Magnetic Filaments",
   "category": "Ambient",
+  "collection": "Light",
   "description": "Fine luminous field lines bend around slowly orbiting magnetic poles.",
   "fragment": "shader.glsl",
   "uniforms": [

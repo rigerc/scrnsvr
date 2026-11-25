@@ -2,6 +2,7 @@
   "id": "color-estuary",
   "title": "Color Estuary",
   "category": "Ambient",
+  "collection": "Color Fields",
   "description": "A broad branching channel wanders between calm fields of mint, sand, and muted blue.",
   "fragment": "shader.glsl",
   "uniforms": [

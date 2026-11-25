@@ -17,6 +17,10 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct UiState {
     pub favorites: BTreeSet<String>,
+    /// The live preview panel is folded down to its rail.
+    pub preview_collapsed: bool,
+    /// Library collections folded down to their headings.
+    pub collapsed: BTreeSet<String>,
 }
 
 impl UiState {

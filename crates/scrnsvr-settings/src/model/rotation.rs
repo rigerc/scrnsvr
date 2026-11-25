@@ -49,6 +49,43 @@ impl Model {
         }
     }
 
+    /// Whether any entry, current edits or a look, names this visual.
+    pub fn rotation_includes_visual(&self, shader: &str) -> bool {
+        self.config.rotation.entries.iter().any(|entry| entry.shader == shader)
+    }
+
+    /// The visuals named by the shuffle set, each once, in the order they were added.
+    pub fn rotation_visuals(&self) -> Vec<String> {
+        let mut visuals: Vec<String> = Vec::new();
+        for entry in &self.config.rotation.entries {
+            if !visuals.contains(&entry.shader) {
+                visuals.push(entry.shader.clone());
+            }
+        }
+        visuals
+    }
+
+    /// Remove every entry for one visual. An empty set also turns shuffle off, as in
+    /// [`Self::rotation_remove`]. Returns how many entries were removed.
+    pub fn rotation_remove_visual(&mut self, shader: &str) -> usize {
+        let entries = &mut self.config.rotation.entries;
+        let before = entries.len();
+        entries.retain(|entry| entry.shader != shader);
+        let removed = before - entries.len();
+        if removed > 0 && entries.is_empty() {
+            self.config.rotation.enabled = false;
+        }
+        removed
+    }
+
+    /// Empty the set and turn shuffle off.
+    pub fn rotation_clear(&mut self) -> bool {
+        let changed = !self.config.rotation.entries.is_empty() || self.config.rotation.enabled;
+        self.config.rotation.entries.clear();
+        self.config.rotation.enabled = false;
+        changed
+    }
+
     pub fn rotation_remove(&mut self, index: usize) -> Option<RotationEntry> {
         let entries = &mut self.config.rotation.entries;
         let removed = (index < entries.len()).then(|| entries.remove(index))?;
@@ -143,16 +180,6 @@ impl Model {
             format!("Shuffling {count} {looks} when the screensaver starts.")
         }
     }
-
-    /// The visual and look an entry loads into the Visuals tab, or why it cannot be loaded.
-    pub fn entry_target(&self, index: usize) -> Result<(usize, Option<String>), &'static str> {
-        let entry = self.config.rotation.entries.get(index).ok_or("This entry is gone.")?;
-        match self.entry_status(entry) {
-            EntryStatus::UnknownVisual => Err("This visual is no longer available."),
-            EntryStatus::MissingLook => Err("This look no longer exists. Remove the entry or save a look with that name."),
-            EntryStatus::Playable => Ok((self.visual_index(&entry.shader).expect("playable"), entry.preset.clone())),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -179,6 +206,29 @@ mod tests {
         assert!(!model.rotation_toggle("flow-field", Some("Night")));
         assert!(model.rotation_has("flow-field", None), "removing a look from shuffle keeps the other entry");
         assert!(model.looks().any(|name| name == "Night"), "and does not delete the look");
+    }
+
+    #[test]
+    fn the_set_groups_entries_by_visual_and_removing_a_visual_takes_all_its_entries() {
+        let mut model = model();
+        model.set_value("speed", SettingValue::Number(0.8));
+        model.save_look("Night", false).unwrap();
+        model.rotation_toggle("flow-field", Some("Night"));
+        model.rotation_toggle("plasma", None);
+        model.rotation_toggle("flow-field", None);
+        model.set_rotation_enabled(true);
+        assert_eq!(model.rotation_visuals(), ["flow-field", "plasma"]);
+        assert!(model.rotation_includes_visual("flow-field") && !model.rotation_includes_visual("aurora-veil"));
+        assert_eq!(model.rotation_remove_visual("flow-field"), 2);
+        assert_eq!(model.rotation_visuals(), ["plasma"]);
+        assert!(model.config.rotation.enabled);
+        assert_eq!(model.rotation_remove_visual("plasma"), 1);
+        assert!(!model.config.rotation.enabled, "an empty set cannot shuffle");
+        model.rotation_toggle("plasma", None);
+        model.set_rotation_enabled(true);
+        assert!(model.rotation_clear());
+        assert!(model.config.rotation.entries.is_empty() && !model.config.rotation.enabled);
+        assert!(!model.rotation_clear());
     }
 
     #[test]
@@ -238,21 +288,5 @@ mod tests {
         assert_eq!(statuses, [EntryStatus::Playable, EntryStatus::Playable, EntryStatus::MissingLook, EntryStatus::UnknownVisual]);
         assert_eq!(model.entry_detail(&model.config.rotation.entries[2]), "Gone · missing look");
         assert_eq!(model.entry_title(&model.config.rotation.entries[3]), "retired");
-        assert!(model.entry_target(0).is_ok());
-        assert!(model.entry_target(2).unwrap_err().contains("no longer exists"));
-        assert!(model.entry_target(3).unwrap_err().contains("no longer available"));
-        assert!(model.entry_target(9).is_err());
-    }
-
-    #[test]
-    fn loading_a_look_entry_targets_its_visual() {
-        let mut model = model();
-        let plasma = model.visual_index("plasma").unwrap();
-        model.select(plasma);
-        model.set_value("speed", SettingValue::Number(0.5));
-        model.save_look("Calm", false).unwrap();
-        model.rotation_toggle("plasma", Some("Calm"));
-        model.select(0);
-        assert_eq!(model.entry_target(0).unwrap(), (plasma, Some("Calm".into())));
     }
 }

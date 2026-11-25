@@ -201,7 +201,13 @@ impl Control {
                 h_flex()
                     .gap_2()
                     .child(if disabled {
-                        div().size(px(24.)).rounded(px(4.)).border_1().border_color(rgb(0x343738)).bg(swatch).into_any_element()
+                        div()
+                            .size(px(24.))
+                            .rounded(px(4.))
+                            .border_1()
+                            .border_color(rgb(crate::view::STRONG_LINE))
+                            .bg(swatch)
+                            .into_any_element()
                     } else {
                         ColorPicker::new(picker).small().label("Choose").accessibility_label(format!("Choose {label}")).into_any_element()
                     })
@@ -348,15 +354,15 @@ impl Settings {
             h_flex().gap_2().justify_between().child(heading).child(control.element(&value, disabled, cx)).into_any_element()
         } else {
             v_flex()
-                .gap_1()
+                .gap(px(6.))
                 .child(heading)
-                .children(def.description.clone().map(|text| div().text_size(px(13.)).text_color(rgb(0xb6b5ae)).child(text)))
+                .children(def.description.clone().map(|text| div().text_size(px(12.)).text_color(rgb(crate::view::QUIET)).child(text)))
                 .child(control.element(&value, disabled, cx))
                 .children(
                     self.control_error
                         .as_ref()
                         .filter(|(error_key, field, _)| *error_key == key && *field == def.name)
-                        .map(|(_, _, error)| div().text_xs().text_color(rgb(0xff976d)).child(error.clone())),
+                        .map(|(_, _, error)| div().text_xs().text_color(rgb(crate::view::ALERT)).child(error.clone())),
                 )
                 .into_any_element()
         };

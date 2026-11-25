@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::searchable_list::{SearchableListItem, SearchableVec};
-use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::searchable_list::SearchableVec;
+use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use scrnsvr_core::catalog::SettingValue;
@@ -27,25 +27,9 @@ use crate::validation::{RendererChecker, ShaderChecker};
 pub type TextSelect = SelectState<SearchableVec<SharedString>>;
 
 #[derive(Clone)]
-pub struct VisualItem {
-    index: usize,
-    title: SharedString,
-}
-
-impl SearchableListItem for VisualItem {
-    type Value = usize;
-
-    fn title(&self) -> SharedString {
-        self.title.clone()
-    }
-
-    fn value(&self) -> &usize {
-        &self.index
-    }
-}
-
-#[derive(Clone)]
 pub enum LookAction {
+    /// Naming a new look made from the target being edited.
+    New,
     Rename(String),
     Delete(String),
     Overwrite(String),
@@ -54,20 +38,18 @@ pub enum LookAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tab {
     Visuals,
-    Effects,
-    Looks,
+    Shuffle,
     Clock,
     Settings,
 }
 
 impl Tab {
-    pub const ALL: [Self; 5] = [Self::Visuals, Self::Effects, Self::Looks, Self::Clock, Self::Settings];
+    pub const ALL: [Self; 4] = [Self::Visuals, Self::Shuffle, Self::Clock, Self::Settings];
 
     pub fn title(self) -> &'static str {
         match self {
             Self::Visuals => "Visuals",
-            Self::Effects => "Effects",
-            Self::Looks => "Looks & Shuffle",
+            Self::Shuffle => "Shuffle",
             Self::Clock => "Clock",
             Self::Settings => "Settings",
         }
@@ -77,6 +59,13 @@ impl Tab {
     pub fn offset(self, steps: isize) -> Self {
         Self::ALL[(self as isize + steps).rem_euclid(Self::ALL.len() as isize) as usize]
     }
+}
+
+/// The two halves of the visual editor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pane {
+    Parameters,
+    Effects,
 }
 
 pub struct Settings {
@@ -93,11 +82,12 @@ pub struct Settings {
     /// The preview was paused for the fullscreen preview and should resume after it.
     pub fullscreen_paused: bool,
     pub search: Entity<InputState>,
-    pub quick_picker: Entity<SelectState<SearchableVec<VisualItem>>>,
     pub random_scope: Entity<TextSelect>,
     pub look_name: Entity<InputState>,
     pub look_confirm_focus: FocusHandle,
     pub look_action: Option<LookAction>,
+    /// Which half of the visual editor is showing: parameters or the look's effects.
+    pub pane: Pane,
     pub look_message: Option<String>,
     pub controls: Vec<Control>,
     pub advanced: bool,
@@ -117,6 +107,8 @@ pub struct Settings {
     pub filters_focus: FocusHandle,
     pub row_focus: Vec<FocusHandle>,
     pub bank_scroll: ScrollHandle,
+    /// Scroll the library to the chosen visual on the next draw (set when the window opens).
+    pub reveal_selected: std::cell::Cell<bool>,
     pub inspector_scroll: ScrollHandle,
     pub undo_focus: FocusHandle,
     pub pause_focus: FocusHandle,
@@ -147,15 +139,6 @@ impl Settings {
                 }
             }
             _ => {}
-        });
-        let items: Vec<_> =
-            model.visuals.iter().enumerate().map(|(index, visual)| VisualItem { index, title: visual.title.clone().into() }).collect();
-        let quick_picker =
-            cx.new(|cx| SelectState::new(SearchableVec::new(items), Some(IndexPath::new(model.selected)), window, cx).searchable(true));
-        let picked = cx.subscribe_in(&quick_picker, window, |this, _, event: &SelectEvent<SearchableVec<VisualItem>>, window, cx| {
-            if let SelectEvent::Confirm(Some(index)) = event {
-                this.select(*index, window, cx);
-            }
         });
         let random_scope = cx.new(|cx| {
             let scopes = RandomScope::OPTIONS.map(|(label, _)| SharedString::from(label)).to_vec();
@@ -244,11 +227,11 @@ impl Settings {
             fullscreen: Fullscreen::default(),
             fullscreen_paused: false,
             search,
-            quick_picker,
             random_scope,
             look_name,
             look_confirm_focus: cx.focus_handle(),
             look_action: None,
+            pane: Pane::Parameters,
             look_message: None,
             controls: Vec::new(),
             advanced: false,
@@ -267,6 +250,7 @@ impl Settings {
             filters_focus: cx.focus_handle(),
             row_focus,
             bank_scroll: ScrollHandle::new(),
+            reveal_selected: std::cell::Cell::new(true),
             inspector_scroll: ScrollHandle::new(),
             undo_focus: cx.focus_handle(),
             pause_focus: cx.focus_handle(),
@@ -274,10 +258,13 @@ impl Settings {
             paths,
             save_running: false,
             save_task: None,
-            _subscriptions: vec![search_changed, picked, look_enter, title_events, source_events],
+            _subscriptions: vec![search_changed, look_enter, title_events, source_events],
             _preview_task: preview_task,
             _clock_task: clock_task,
         };
+        if settings.model.ui.preview_collapsed {
+            settings.hide_preview();
+        }
         if let Some(preview) = settings.preview.as_mut() {
             preview.set_paused(paused);
             preview.set_clock(settings.model.config.clock.clone());
@@ -298,15 +285,11 @@ impl Settings {
             return;
         }
         self.rebuild_controls(window, cx);
+        self.rebuild_effects(window, cx);
         self.inspector_scroll.set_offset(point(px(0.), px(0.)));
         self.advanced = false;
         self.cancel_look(window, cx);
         self.look_message = None;
-        self.quick_picker.update(cx, |state, cx| {
-            if state.selected_value() != Some(&index) {
-                state.set_selected_value(&index, window, cx);
-            }
-        });
         self.sync_shader_scheme(window, cx);
         self.update_scene();
         self.sync_editor(window, cx);
@@ -317,14 +300,8 @@ impl Settings {
     /// is indexed by it and follow the model's selection.
     pub fn visuals_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.row_focus = self.model.visuals.iter().map(|_| cx.focus_handle()).collect();
-        let items: Vec<_> =
-            self.model.visuals.iter().enumerate().map(|(index, visual)| VisualItem { index, title: visual.title.clone().into() }).collect();
-        let selected = self.model.selected;
-        self.quick_picker.update(cx, |state, cx| {
-            state.set_items(SearchableVec::new(items), window, cx);
-            state.set_selected_value(&selected, window, cx);
-        });
         self.rebuild_controls(window, cx);
+        self.rebuild_effects(window, cx);
         self.advanced = false;
         self.cancel_look(window, cx);
         self.sync_shader_scheme(window, cx);
@@ -333,9 +310,31 @@ impl Settings {
         self.config_changed(window, cx);
     }
 
+    /// Show everything, or only favorites. Either clears the collection filter.
     pub fn filter(&mut self, favorites: bool, cx: &mut Context<Self>) {
         self.model.favorites_only = favorites;
+        self.model.collection = None;
         self.bank_scroll.set_offset(point(px(0.), px(0.)));
+        cx.notify();
+    }
+
+    /// Show one collection. Picking the one already shown goes back to everything.
+    pub fn filter_collection(&mut self, collection: &str, cx: &mut Context<Self>) {
+        let again = self.model.collection.as_deref() == Some(collection);
+        self.model.favorites_only = false;
+        self.model.collection = (!again).then(|| collection.to_owned());
+        self.bank_scroll.set_offset(point(px(0.), px(0.)));
+        cx.notify();
+    }
+
+    /// Fold a collection to its heading or open it again. The choice is kept with favorites.
+    pub fn toggle_collection(&mut self, collection: &str, window: &Window, cx: &mut Context<Self>) {
+        let collapsed = &mut self.model.ui.collapsed;
+        if !collapsed.remove(collection) {
+            collapsed.insert(collection.to_owned());
+        }
+        self.ui_save.edit(cx.background_executor().now());
+        self.start_saving(window, cx);
         cx.notify();
     }
 
@@ -356,6 +355,24 @@ impl Settings {
         self.ui_save.edit(cx.background_executor().now());
         self.start_saving(window, cx);
         cx.notify();
+    }
+
+    /// Fold the preview panel to its rail or open it again. The choice is kept with favorites.
+    pub fn toggle_preview(&mut self, window: &Window, cx: &mut Context<Self>) {
+        self.model.ui.preview_collapsed = !self.model.ui.preview_collapsed;
+        if self.model.ui.preview_collapsed {
+            self.hide_preview();
+        }
+        self.ui_save.edit(cx.background_executor().now());
+        self.start_saving(window, cx);
+        cx.notify();
+    }
+
+    /// Stop drawing into the preview while its panel is folded. Painting places it again.
+    pub(crate) fn hide_preview(&mut self) {
+        if let Some(preview) = self.preview.as_mut() {
+            preview.place(crate::preview::Placement { width: 0, height: 0, ..preview.placement() });
+        }
     }
 
     pub fn toggle_pause(&mut self, cx: &mut Context<Self>) {
@@ -414,8 +431,26 @@ impl Settings {
         self.config_changed(window, cx);
     }
 
+    /// The visual or look being edited changed under the controls: show its values and stack.
+    pub fn target_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.sync_controls(window, cx);
+        self.rebuild_effects(window, cx);
+        self.update_scene();
+        cx.notify();
+    }
+
+    /// Edit a saved look of the selected visual in place, or its current edits with `None`.
+    pub fn open_look(&mut self, name: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.model.open_look(name) {
+            // The look bar already says which look is being edited.
+            self.cancel_look(window, cx);
+            self.target_changed(window, cx);
+        }
+    }
+
     pub fn undo(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.model.undo() {
+            self.rebuild_effects(window, cx);
             self.finish_bulk_edit(window, cx);
             self.pause_focus.focus(window, cx);
         }
@@ -445,6 +480,11 @@ impl Settings {
                 state.focus(window, cx);
                 state.select_all(window, cx);
             });
+        } else if matches!(action, LookAction::New) {
+            self.look_name.update(cx, |state, cx| {
+                state.set_value("", window, cx);
+                state.focus(window, cx);
+            });
         } else {
             self.look_confirm_focus.focus(window, cx);
         }
@@ -462,29 +502,38 @@ impl Settings {
 
     pub fn submit_look(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let draft = self.look_name.read(cx).value();
-        let draft = draft.trim();
-        if self.look_action.is_none() && self.model.looks().any(|name| name == draft) {
-            self.start_look_action(LookAction::Overwrite(draft.into()), window, cx);
+        let draft = draft.trim().to_owned();
+        let naming = matches!(self.look_action, None | Some(LookAction::New));
+        if naming && self.model.looks().any(|name| *name == draft) {
+            self.start_look_action(LookAction::Overwrite(draft), window, cx);
             return;
         }
-        let result = match &self.look_action {
+        let source = self.model.look.clone().map_or_else(|| "current edits".to_owned(), |name| format!("“{name}”"));
+        let result = match self.look_action.clone() {
             Some(LookAction::Delete(name)) => {
-                self.model.delete_look(name);
+                self.model.delete_look(&name);
                 Ok(format!("Deleted “{name}”."))
             }
-            Some(LookAction::Rename(old)) => self.model.rename_look(old, draft).map(|()| format!("Renamed to “{draft}”.")),
-            Some(LookAction::Overwrite(name)) => self.model.save_look(name, true).map(|()| format!("Updated “{name}”.")),
-            None => self.model.save_look(draft, false).map(|()| format!("Saved “{draft}”.")),
+            Some(LookAction::Rename(old)) => self.model.rename_look(&old, &draft).map(|()| format!("Renamed to “{draft}”.")),
+            Some(LookAction::Overwrite(name)) => {
+                self.model.save_look(&name, true).map(|()| format!("Replaced “{name}” with {source}. Now editing it."))
+            }
+            None | Some(LookAction::New) => {
+                self.model.save_look(&draft, false).map(|()| format!("Saved {source} as “{draft}”. Now editing it."))
+            }
         };
         match result {
             Ok(message) => {
                 self.cancel_look(window, cx);
                 self.look_message = Some(message);
+                self.target_changed(window, cx);
                 self.config_changed(window, cx);
             }
-            Err(error) => self.look_message = Some(error.into()),
+            Err(error) => {
+                self.look_message = Some(error.into());
+                self.look_name.update(cx, |state, cx| state.focus(window, cx));
+            }
         }
-        self.look_name.update(cx, |state, cx| state.focus(window, cx));
         cx.notify();
     }
 

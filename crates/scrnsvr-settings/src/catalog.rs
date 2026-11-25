@@ -1,16 +1,18 @@
-//! Browser metadata and grouping for the native shader bank.
+//! Browser metadata for the library: each visual with its collection.
 
 use scrnsvr_core::catalog::{Catalog, UniformDef};
 use scrnsvr_core::config::Config;
 
-const FEATURED: [&str; 6] = ["aurora-veil", "plasma", "tidal-caustics", "silk-ribbons", "mesh-gradient", "flow-field"];
+/// The collection custom shaders are listed under, after the built-in collections.
+pub const CUSTOM: &str = "Your shaders";
 
 #[derive(Clone)]
 pub struct Visual {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub category: &'static str,
+    /// The library collection, from the shader manifest (or [`CUSTOM`]).
+    pub collection: String,
     pub uniforms: Vec<UniformDef>,
 }
 
@@ -45,7 +47,7 @@ pub fn visuals(config: &Config) -> Vec<Visual> {
                 id: shader.id.clone(),
                 title: shader.title.clone(),
                 description: description.into(),
-                category: if shader.category.as_deref() == Some("Geometric") { "Geometric" } else { "Ambient" },
+                collection: shader.collection.clone().unwrap_or_else(|| "Light".into()),
                 uniforms,
             }
         })
@@ -54,26 +56,9 @@ pub fn visuals(config: &Config) -> Vec<Visual> {
         id: shader.id.clone(),
         title: shader.title.clone(),
         description: "Your saved shader.".into(),
-        category: "Custom",
+        collection: CUSTOM.into(),
         uniforms: Vec::new(),
     }));
     visuals.sort_by_key(|visual| visual.title.to_lowercase());
     visuals
-}
-
-pub fn featured(visuals: &[Visual], initial_shader: &str) -> Vec<usize> {
-    let mut results = Vec::new();
-    for index in std::iter::once(initial_shader)
-        .chain(FEATURED)
-        .filter_map(|id| visuals.iter().position(|visual| visual.id == id))
-        .chain(0..visuals.len())
-    {
-        if !results.contains(&index) {
-            results.push(index);
-        }
-        if results.len() == FEATURED.len() {
-            break;
-        }
-    }
-    results
 }

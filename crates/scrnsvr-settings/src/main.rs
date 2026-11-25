@@ -1,6 +1,7 @@
 //! Native settings and inline preview for scrnsvr.
 
 mod app;
+mod assets;
 mod catalog;
 mod clock_tab;
 mod controls;
@@ -75,7 +76,7 @@ fn main() {
     if let Some(program) = std::env::var_os("SCRNSVR_SETTINGS_SMOKE_NOCTALIA") {
         paths.idle.noctalia = scrnsvr_core::noctalia::Noctalia::with_program(program);
     }
-    gpui_kit::application().with_assets(gpui_kit::assets::Assets).run(move |cx| {
+    gpui_kit::application().with_assets(assets::Assets).run(move |cx| {
         gpui_kit::init(cx);
         let motion = reduce_motion();
         cx.set_reduce_motion(motion.unwrap_or_default());
@@ -85,8 +86,8 @@ fn main() {
             window_background: WindowBackgroundAppearance::Transparent,
             app_id: Some("scrnsvr-settings".into()),
             titlebar: Some(TitlebarOptions { title: Some("scrnsvr".into()), ..TitlebarOptions::default() }),
-            window_min_size: Some(size(px(420.), px(420.))),
-            window_bounds: Some(WindowBounds::centered(size(px(1180.), px(720.)), cx)),
+            window_min_size: Some(size(px(420.), px(480.))),
+            window_bounds: Some(WindowBounds::centered(size(px(1320.), px(820.)), cx)),
             ..WindowOptions::default()
         };
         let (window, view) = gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| Settings::open(paths, window, cx)))
@@ -116,6 +117,24 @@ fn main() {
         match smoke.as_deref() {
             Some("steps") => cx.spawn(async move |cx| smoke::steps(view, window, cx).await).detach(),
             Some(seconds) => {
+                // A timed smoke run can open on one section, look and pane, which is how screenshots are taken.
+                let tab =
+                    std::env::var("SCRNSVR_SETTINGS_TAB").ok().and_then(|name| app::Tab::ALL.into_iter().find(|tab| tab.title() == name));
+                let look = std::env::var("SCRNSVR_SETTINGS_LOOK").ok();
+                let effects = std::env::var("SCRNSVR_SETTINGS_PANE").is_ok_and(|pane| pane == "Effects");
+                let _ = window.update(cx, |_, window, cx| {
+                    view.update(cx, |this, cx| {
+                        if let Some(tab) = tab {
+                            this.show_tab(tab, window, cx);
+                        }
+                        if let Some(look) = look.as_deref() {
+                            this.open_look(Some(look), window, cx);
+                        }
+                        if effects {
+                            this.pane = app::Pane::Effects;
+                        }
+                    })
+                });
                 let duration = seconds
                     .parse::<f64>()
                     .ok()

@@ -2,6 +2,7 @@
   "id": "petal-hours",
   "title": "Petal Hours",
   "category": "Geometric",
+  "collection": "Paper & Cutouts",
   "description": "Broad gradient petals slowly lean and lengthen around a quiet off-center opening.",
   "fragment": "shader.glsl",
   "uniforms": [
